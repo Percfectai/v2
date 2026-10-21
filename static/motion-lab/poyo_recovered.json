@@ -1,0 +1,25 @@
+{
+  "note": "Paid PoYo multi-image gens recovered from CDN (download to local before 24h expiry).",
+  "models": [
+    {
+      "task_id": "HVJJMMENE81S5A8A",
+      "cdn": "https://cdn.doculator.org/3d/HVJJMMENE81S5A8A/HVJJMMENE81S5A8A_1.glb",
+      "stage_url": "/motion-lab/poyo-cdn/HVJJMMENE81S5A8A.glb",
+      "local_name": "poyo_HVJJMMENE81S5A8A.glb",
+      "colosseum_label": "PoYo A"
+    },
+    {
+      "task_id": "XK66107KNAZF7C4L",
+      "cdn": "https://cdn.doculator.org/3d/XK66107KNAZF7C4L/XK66107KNAZF7C4L_1.glb",
+      "stage_url": "/motion-lab/poyo-cdn/XK66107KNAZF7C4L.glb",
+      "local_name": "poyo_XK66107KNAZF7C4L.glb",
+      "colosseum_label": "PoYo B"
+    }
+  ],
+  "open_now": {
+    "colosseum_both": "/motion-lab/colosseum-stage.html",
+    "pilot_A": "/motion-lab/colosseum-stage.html?glb=/motion-lab/poyo-cdn/HVJJMMENE81S5A8A.glb",
+    "pilot_B": "/motion-lab/colosseum-stage.html?glb=/motion-lab/poyo-cdn/XK66107KNAZF7C4L.glb",
+    "page_3d": "/3d"
+  }
+}

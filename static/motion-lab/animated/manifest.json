@@ -1,0 +1,61 @@
+{
+  "characters": {
+    "poyo_H": {
+      "strafe_left": "poyo_H_strafe_left.glb",
+      "walk_back": "poyo_H_walk_back.glb",
+      "walk_fwd": "poyo_H_walk_fwd.glb",
+      "strafe_right": "poyo_H_strafe_right.glb",
+      "run": "poyo_H_run.glb",
+      "idle": "poyo_H_idle.glb",
+      "punch": "poyo_H_punch.glb",
+      "jump": "poyo_H_jump.glb",
+      "kick": "poyo_H_kick.glb",
+      "dodge": "poyo_H_dodge.glb",
+      "roundhouse": "poyo_H_roundhouse.glb",
+      "heavy_punch": "poyo_H_heavy_punch.glb",
+      "cast": "poyo_H_cast.glb",
+      "block": "poyo_H_block.glb",
+      "hurt": "poyo_H_hurt.glb",
+      "ko": "poyo_H_ko.glb",
+      "taunt": "poyo_H_taunt.glb"
+    },
+    "poyo_I": {
+      "walk_fwd": "poyo_I_walk_fwd.glb",
+      "idle": "poyo_I_idle.glb",
+      "walk_back": "poyo_I_walk_back.glb",
+      "strafe_right": "poyo_I_strafe_right.glb",
+      "strafe_left": "poyo_I_strafe_left.glb",
+      "kick": "poyo_I_kick.glb",
+      "run": "poyo_I_run.glb",
+      "punch": "poyo_I_punch.glb",
+      "jump": "poyo_I_jump.glb",
+      "heavy_punch": "poyo_I_heavy_punch.glb",
+      "dodge": "poyo_I_dodge.glb",
+      "block": "poyo_I_block.glb",
+      "hurt": "poyo_I_hurt.glb",
+      "ko": "poyo_I_ko.glb",
+      "cast": "poyo_I_cast.glb",
+      "taunt": "poyo_I_taunt.glb",
+      "roundhouse": "poyo_I_roundhouse.glb"
+    },
+    "poyo_X": {
+      "walk_fwd": "poyo_X_walk_fwd.glb",
+      "walk_back": "poyo_X_walk_back.glb",
+      "idle": "poyo_X_idle.glb",
+      "strafe_left": "poyo_X_strafe_left.glb",
+      "strafe_right": "poyo_X_strafe_right.glb",
+      "kick": "poyo_X_kick.glb",
+      "run": "poyo_X_run.glb",
+      "punch": "poyo_X_punch.glb",
+      "jump": "poyo_X_jump.glb",
+      "heavy_punch": "poyo_X_heavy_punch.glb",
+      "block": "poyo_X_block.glb",
+      "dodge": "poyo_X_dodge.glb",
+      "hurt": "poyo_X_hurt.glb",
+      "ko": "poyo_X_ko.glb",
+      "taunt": "poyo_X_taunt.glb",
+      "roundhouse": "poyo_X_roundhouse.glb",
+      "cast": "poyo_X_cast.glb"
+    }
+  }
+}

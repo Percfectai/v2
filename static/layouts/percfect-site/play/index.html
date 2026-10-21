@@ -1,0 +1,168 @@
+<title>Percfect Play</title>
+<style>
+  :root{
+    --void:#04090d; --panel:#0a121b; --inset:#0f1a26; --overlay:#111e2b;
+    --line:#17293a; --line2:#263d52;
+    --ink:#eef4f9; --muted:#8aa0b2; --faint:#5b6d7c;
+    --gold:#e0a94e; --gold-hi:#ffeaa5; --electric:#2b7fd4; --electric-hi:#5aa4ee;
+    --cyan:#39c0e6; --violet:#7c5cc4; --red:#e0524d; --ticket:#f0b54a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; min-height:100%}
+  body{ color:var(--ink); font-family:"Inter",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 600px at 82% -8%, rgba(124,92,196,.16), transparent 60%),
+      radial-gradient(900px 500px at 0% 20%, rgba(43,127,212,.12), transparent 55%),
+      var(--void); }
+
+  .topline{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 26px 14px 20px; position:relative; z-index:40; }
+  .logo-nav{ position:relative; }
+  .logo-btn{ display:flex; align-items:center; gap:8px; background:transparent; border:0; cursor:pointer; padding:6px; border-radius:12px; }
+  .logo-btn:hover{ background:rgba(255,255,255,.04); }
+  .logo-btn .logo{ height:88px; width:auto; filter:drop-shadow(0 0 16px rgba(43,127,212,.5)); }
+  .logo-btn .caret{ width:16px; height:16px; stroke:var(--muted); fill:none; stroke-width:2; transition:transform .18s; }
+  .logo-nav.open .caret{ transform:rotate(180deg); }
+  .dropdown{ position:absolute; top:calc(100% + 6px); left:6px; min-width:210px; padding:8px; background:rgba(13,23,34,.97);
+    border:1px solid var(--line2); border-radius:14px; backdrop-filter:blur(12px); box-shadow:0 20px 46px rgba(0,0,0,.6); display:none; }
+  .logo-nav.open .dropdown{ display:block; }
+  .dropdown a{ display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:10px; text-decoration:none; color:var(--ink);
+    font-family:"Rajdhani",sans-serif; font-weight:700; letter-spacing:.04em; font-size:15px; }
+  .dropdown a:hover{ background:rgba(43,127,212,.16); color:var(--electric-hi); }
+  .dropdown a.on{ color:var(--gold-hi); }
+  .dropdown a .k{ margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--faint); }
+  .dropdown .sep{ height:1px; background:var(--line); margin:6px 4px; }
+
+  .wallet{ display:flex; align-items:center; gap:10px; }
+  .chip{ display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; font-family:"JetBrains Mono",monospace; font-size:14px; border:1px solid var(--line2); background:var(--inset); }
+  .chip.cr{ border-color:var(--cyan); color:var(--cyan); } .chip.tk{ border-color:var(--ticket); color:var(--ticket); }
+  .dot{ width:9px; height:9px; border-radius:50%; } .dot.cr{ background:var(--cyan);} .dot.tk{ background:var(--ticket);}
+  .reup{ font-family:"Rajdhani",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:13px; padding:9px 16px; border-radius:10px;
+    text-decoration:none; color:#1a1204; background:linear-gradient(180deg,var(--gold-hi),var(--gold)); border:1px solid #9a6f2c; }
+
+  .main{ max-width:1200px; margin:0 auto; padding:12px 22px 100px; }
+  .greeting{ text-align:center; padding:12px 0 30px; }
+  .greeting .gtag{ font-family:"Rajdhani",sans-serif; text-transform:uppercase; letter-spacing:.36em; font-size:12px; font-weight:700; color:var(--muted); margin:0 0 10px; }
+  .greeting .gtitle{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:clamp(30px,5.5vw,52px); letter-spacing:.03em; margin:0; line-height:1;
+    background:linear-gradient(180deg,#f4ecff,#b79ce0); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 20px rgba(124,92,196,.3)); }
+
+  
+  /* Play hub: two banners — Arena featured, 3-D UC */
+  .play-banners{ grid-template-columns: 1.4fr 1fr !important; }
+  @media (max-width:860px){ .play-banners{ grid-template-columns:1fr !important; } }
+
+  /* three banners, Productions bigger in the middle */
+  .cbanners{ display:grid; grid-template-columns:1fr 1.5fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:860px){ .cbanners{ grid-template-columns:1fr; } }
+  .ccell{ display:flex; flex-direction:column; gap:12px; }
+  .cbanner-cap{ margin:0; text-align:center; color:var(--muted); font-size:13.5px; line-height:1.55; }
+  .cbanner-cap.ph{ color:var(--faint); font-style:italic; }
+  .cbanner{ position:relative; display:block; aspect-ratio:3/2; border-radius:18px; overflow:hidden;
+    border:1px solid var(--line2); box-shadow:0 16px 40px rgba(0,0,0,.55); transition:transform .18s, box-shadow .18s, border-color .18s; }
+  .cbanner img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cbanner:hover{ transform:translateY(-5px); border-color:var(--electric-hi); box-shadow:0 26px 54px rgba(0,0,0,.66), 0 0 30px rgba(43,127,212,.35); }
+  .cbanner::after{ content:"Open ›"; position:absolute; right:12px; bottom:12px; font-family:"Rajdhani",sans-serif; font-weight:700;
+    text-transform:uppercase; letter-spacing:.08em; font-size:12px; color:#fff; background:rgba(4,9,13,.7); border:1px solid rgba(255,255,255,.2);
+    padding:6px 12px; border-radius:999px; opacity:0; transform:translateY(4px); transition:.18s; }
+  .cbanner:hover::after{ opacity:1; transform:translateY(0); }
+  .cbanner.feature{ box-shadow:0 20px 48px rgba(0,0,0,.6), 0 0 26px rgba(43,127,212,.25); }
+
+  /* library launcher + modal (shared chrome) */
+  .libfab{ position:fixed; right:22px; bottom:calc(22px + env(safe-area-inset-bottom,0px)); z-index:50; width:64px; height:64px; border-radius:50%;
+    display:grid; place-items:center; cursor:pointer; perspective:420px; background:rgba(10,18,27,.86); border:1px solid var(--line2);
+    backdrop-filter:blur(8px); box-shadow:0 12px 30px rgba(0,0,0,.55), 0 0 22px rgba(57,192,230,.3); }
+  .libfab:hover{ border-color:var(--cyan); box-shadow:0 12px 30px rgba(0,0,0,.55), 0 0 36px rgba(57,192,230,.55); }
+  .libfab img{ width:42px; animation:spinY 6s linear infinite; filter:drop-shadow(0 0 8px rgba(57,192,230,.6)); }
+  @keyframes spinY{ from{transform:rotateY(0)} to{transform:rotateY(360deg)} }
+
+  .modal[hidden]{ display:none; }
+  .modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal__backdrop{ position:absolute; inset:0; background:rgba(2,6,10,.72); backdrop-filter:blur(4px); }
+  .modal__panel{ position:relative; width:min(760px,94vw); max-height:86vh; overflow:auto; border-radius:20px;
+    background:linear-gradient(180deg,#0c1723,#070e16); border:1px solid var(--line2); box-shadow:0 30px 70px rgba(0,0,0,.7); padding:20px 22px 26px; }
+  .modal__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .modal__head h3{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:22px; margin:0; letter-spacing:.02em;
+    background:linear-gradient(180deg,var(--gold-hi),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .modal__x{ background:transparent; border:1px solid var(--line2); color:var(--muted); width:34px; height:34px; border-radius:9px; cursor:pointer; font-size:16px; }
+  .modal__tabs{ display:flex; gap:6px; margin:10px 0 16px; flex-wrap:wrap; }
+  .modal__tabs button{ font-family:"Rajdhani",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:13px; padding:8px 16px;
+    border-radius:999px; border:1px solid var(--line2); background:var(--inset); color:var(--muted); cursor:pointer; }
+  .modal__tabs button.on{ background:linear-gradient(180deg,var(--electric-hi),var(--electric)); color:#051019; border-color:var(--electric-hi); }
+  .modal__grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; }
+  .libtile{ aspect-ratio:5/7; border-radius:12px; border:1px dashed var(--line2); background:var(--inset); display:grid; place-items:center;
+    color:var(--faint); font-family:"Rajdhani",sans-serif; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+
+  @media (max-width:520px){ .topline{ padding:12px 14px; } .reup{ display:none; } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<header class="topline">
+  <div class="logo-nav" id="logoNav">
+    <button class="logo-btn" id="logoBtn" aria-haspopup="true" aria-expanded="false">
+      <img class="logo" src="/static/layouts/percfect-site/play/logo-clear.png" alt="PercfectAI — menu">
+      <svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="dropdown" id="pagesMenu" role="menu">
+      <a href="/build" role="menuitem">Build</a>
+      <a href="/create" role="menuitem" >Create</a>
+      <a href="/posts" role="menuitem">Post</a>
+      <a href="/play" role="menuitem" class="on">Play</a>
+      <a href="/cards" role="menuitem">Cards</a>
+      <div class="sep"></div>
+      <a href="/re-up" role="menuitem">Re-Up</a>
+      <a href="/settings" role="menuitem">Settings</a>
+    </div>
+  </div>
+  <div class="wallet">
+    <span class="chip cr"><span class="dot cr"></span>320</span>
+    <span class="chip tk"><span class="dot tk"></span>24</span>
+    <a href="/re-up" class="reup">Re-Up</a>
+  </div>
+</header>
+
+<main class="main">
+  <section class="greeting">
+    <p class="gtag">Compete · Stage · Play</p>
+    <h1 class="gtitle">PLAY</h1>
+  </section>
+
+  <div class="cbanners play-banners">
+    <div class="ccell">
+      <a href="/studios/arena" class="cbanner feature"><img src="/static/layouts/percfect-site/play/arena.jpg" alt="Percfect Arena"></a>
+      <p class="cbanner-cap">Stage face-offs and fights with your characters. Nick will drop the final Arena banner art soon — this is a stand-in.</p>
+    </div>
+    <div class="ccell">
+      <a href="/studios/play/3d" class="cbanner"><img src="/static/layouts/percfect-site/play/three_d.jpg" alt="3-D — Under Construction"></a>
+      <p class="cbanner-cap">3-D — Under Construction.</p>
+    </div>
+  </div>
+</main>
+
+<button class="libfab" id="libBtn" aria-label="Open Library"><img src="/static/layouts/percfect-site/play/crownp.png" alt=""></button>
+
+<div class="modal" id="libModal" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <div class="modal__head"><h3>Library</h3><button class="modal__x" data-close aria-label="Close">✕</button></div>
+    <div class="modal__tabs"><button class="on">Characters</button><button>Cards</button><button>Comics</button><button>Videos</button></div>
+    <div class="modal__grid">
+      <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
+      <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var nav=document.getElementById('logoNav'), btn=document.getElementById('logoBtn');
+  btn.addEventListener('click', function(e){ e.stopPropagation(); var open=nav.classList.toggle('open'); btn.setAttribute('aria-expanded', open); });
+  document.addEventListener('click', function(){ nav.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
+  var modal=document.getElementById('libModal');
+  document.getElementById('libBtn').addEventListener('click', function(){ modal.hidden=false; });
+  modal.addEventListener('click', function(e){ if(e.target.hasAttribute('data-close')) modal.hidden=true; });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') modal.hidden=true; });
+  document.querySelectorAll('.modal__tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ document.querySelectorAll('.modal__tabs button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); });
+  });
+</script>
+<script src="/static/js/percfect_playlist.js?v=playlist-3" defer></script>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+  <title>Phone Keyboard · Percfect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #08080f; --surface: #12121c; --border: #252540;
+      --purple: #7c5cfc; --purple2: #9b7bff; --text: #f0f0ff; --muted: #6e6e9a;
+    }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+      min-height: 100vh; padding: 1.25rem 1rem 2rem;
+    }
+    h1 { font-size: 1.35rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; }
+    textarea, input {
+      width: 100%; padding: 0.85rem 1rem; border-radius: 12px;
+      border: 1px solid var(--border); background: #0a0a14;
+      color: var(--text); font-size: 1rem; font-family: inherit;
+    }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+    textarea:focus, input:focus { outline: none; border-color: var(--purple); }
+    .btn {
+      display: block; width: 100%; padding: 1rem; margin-top: 0.75rem;
+      border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-primary { background: var(--purple); color: #fff; }
+    .btn-primary:active { background: var(--purple2); }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .status { text-align: center; font-size: 0.8rem; color: var(--muted); margin-top: 1rem; }
+    .status.ok { color: #4ade80; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 1rem; }
+    .tab {
+      flex: 1; padding: 0.55rem; border: none; border-radius: 10px;
+      font-weight: 600; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+      background: transparent; color: var(--muted);
+    }
+    .tab.on { background: var(--purple); color: #fff; }
+    .err { color: #f87171; font-size: 0.8rem; margin-top: 0.5rem; display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>📱 Phone Keyboard</h1>
+  <p class="sub">Type here — it appears on your TV.<br>Sign up free for video credits.</p>
+
+  <div class="card">
+    <label>Type your image prompt</label>
+    <textarea id="prompt" placeholder="A neon samurai on a rooftop in the rain, cinematic, 8k…" autofocus></textarea>
+    <button class="btn btn-primary" onclick="sendPrompt()">Send to TV →</button>
+    <p class="status" id="send-status"></p>
+  </div>
+
+  <div class="card">
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">For video generation — connect account:</p>
+    <div class="tabs">
+      <button class="tab on" id="tab-su" onclick="showAuth('signup')">Sign up</button>
+      <button class="tab" id="tab-lo" onclick="showAuth('login')">Log in</button>
+    </div>
+    <div id="auth-signup">
+      <input type="email" id="su-email" placeholder="Email" style="margin-bottom:0.5rem" />
+      <input id="su-user" placeholder="Username" style="margin-bottom:0.5rem" />
+      <input type="password" id="su-pass" placeholder="Password (8+ chars)" style="margin-bottom:0.5rem" />
+      <input type="date" id="su-dob" style="margin-bottom:0.5rem" />
+      <button class="btn btn-ghost" onclick="doSignup()">Create account & connect TV</button>
+      <p class="err" id="su-err"></p>
+    </div>
+    <div id="auth-login" style="display:none">
+      <input id="lo-user" placeholder="Username" style="margin-bottom:0.5rem" />
+      <input type="password" id="lo-pass" placeholder="Password" style="margin-bottom:0.5rem" />
+      <button class="btn btn-ghost" onclick="doLogin()">Log in & connect TV</button>
+      <p class="err" id="lo-err"></p>
+    </div>
+    <p class="status ok" id="auth-ok" style="display:none">✅ TV connected! You can close this page.</p>
+  </div>
+
+<script>
+const API = 'https://percfectai.com';
+const params = new URLSearchParams(location.search);
+const DEVICE = params.get('device') || '';
+
+if (!DEVICE) {
+  document.querySelector('.sub').textContent = 'Missing device code. Scan the QR on your TV again.';
+}
+
+async function sendPrompt() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt || !DEVICE) return;
+  const st = document.getElementById('send-status');
+  st.className = 'status';
+  st.textContent = 'Sending…';
+  try {
+    const r = await fetch(API + '/api/tv/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_code: DEVICE, prompt }),
+    });
+    if (!r.ok) throw new Error('Failed');
+    st.className = 'status ok';
+    st.textContent = '✅ Sent! Check your TV — paste into generator or use the copy bar.';
+  } catch {
+    st.textContent = 'Could not reach server. Try again.';
+  }
+}
+
+function showAuth(mode) {
+  document.getElementById('auth-signup').style.display = mode === 'signup' ? '' : 'none';
+  document.getElementById('auth-login').style.display = mode === 'login' ? '' : 'none';
+  document.getElementById('tab-su').classList.toggle('on', mode === 'signup');
+  document.getElementById('tab-lo').classList.toggle('on', mode === 'login');
+}
+
+async function doSignup() {
+  const err = document.getElementById('su-err');
+  err.style.display = 'none';
+  try {
+    const r = await fetch(API + '/api/kodi/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'signup',
+        email: document.getElementById('su-email').value.trim(),
+        username: document.getElementById('su-user').value.trim(),
+        password: document.getElementById('su-pass').value,
+        birthday: document.getElementById('su-dob').value,
+        device_code: DEVICE,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Signup failed');
+    document.getElementById('auth-ok').style.display = 'block';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+}
+
+async function doLogin() {
+  const err = document.getElementById('lo-err');
+  err.style.display = 'none';
+  try {
+    const r = await fetch(API + '/api/kodi/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('lo-user').value.trim(),
+        password: document.getElementById('lo-pass').value,
+        device_code: DEVICE,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Login failed');
+    document.getElementById('auth-ok').style.display = 'block';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>

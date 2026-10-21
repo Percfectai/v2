@@ -1,0 +1,14 @@
+{
+  "key": "dark",
+  "label": "Dark",
+  "outer": "#9ca3af",
+  "mid": "#4b5563",
+  "inner": "#d1d5db",
+  "bg1": "#111827",
+  "bg2": "#030712",
+  "accent": "#9ca3af",
+  "name_color": "#e5e7eb",
+  "stat_border": "#6b7280",
+  "frame_url": "/static/assets/cards/themes/dark/frame.svg",
+  "bg_url": "/static/assets/cards/themes/dark/bg.svg"
+}

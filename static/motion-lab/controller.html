@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PercfectStudios · Character Controller (17-set)</title>
+<style>
+  html,body{margin:0;height:100%;background:#0a0a12;color:#eee;font-family:system-ui}
+  #ui{position:absolute;top:12px;left:12px;z-index:2;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5}
+  #ui select{background:#111;color:#eee;border:1px solid #333;padding:4px}
+  #hint{position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,.55);padding:8px 12px;border-radius:8px;font-size:12px;max-width:90%}
+  #state{color:#7cf}
+  #err{color:#f88;margin-top:6px;font-size:12px}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div><b>17-SET PROTOTYPE</b> (not Field)</div>
+  <div><b>Character:</b> <select id="charSel"></select></div>
+  <div>State: <span id="state">–</span></div>
+  <div id="err"></div>
+</div>
+<div id="hint">
+  Arrows/WASD = walk · Shift = run · Space = jump<br>
+  B punch · N heavy · K kick · L roundhouse · G block (hold) · Q dodge · C cast · T taunt · H hurt · X KO<br>
+  Local GLBs or Supabase public URLs (manifest_remote on percfectai.com)
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const LOCAL_MANIFEST = '/static/motion-lab/animated/manifest.json';
+const REMOTE_MANIFEST = '/static/motion-lab/animated/manifest_remote.json';
+const GLB_BASE = '/static/motion-lab/animated/';
+const useRemoteFirst = /percfectai\.com$/i.test(location.hostname) || /onrender\.com$/i.test(location.hostname);
+const errEl = document.getElementById('err');
+const stateEl = document.getElementById('state');
+
+function resolveGlbUrl(entry) {
+  if (!entry) return entry;
+  if (/^https?:\/\//i.test(entry)) return entry;
+  return GLB_BASE + entry;
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x223355, 1.2));
+const dir = new THREE.DirectionalLight(0xffffff, 1.8); dir.position.set(4,8,6); scene.add(dir);
+const grid = new THREE.GridHelper(20, 20, 0x334, 0x223); scene.add(grid);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 1.6, 3.5);
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    powerPreference: 'default',
+    failIfMajorPerformanceCaveat: false,
+  });
+} catch (e) {
+  errEl.textContent = 'WebGL failed — close other 3D tabs, restart browser. ' + e.message;
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+addEventListener('resize', ()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,1,0); controls.update();
+
+const loader = new GLTFLoader();
+let manifest = null, mixer = null, clips = {}, current = null, currentName='idle';
+
+async function loadCharacter(charName){
+  const old = scene.getObjectByName('CHAR'); if(old) scene.remove(old);
+  clips = {}; mixer = null; current = null; currentName = 'idle';
+  const anims = manifest.characters[charName];
+  if(!anims){ stateEl.textContent = 'no anims'; return; }
+  stateEl.textContent = 'loading…';
+  try {
+    const baseEntry = anims.idle || Object.values(anims)[0];
+    const baseGLB = await loader.loadAsync(resolveGlbUrl(baseEntry));
+    baseGLB.scene.name = 'CHAR';
+    const box = new THREE.Box3().setFromObject(baseGLB.scene);
+    baseGLB.scene.position.y -= box.min.y;
+    scene.add(baseGLB.scene);
+    mixer = new THREE.AnimationMixer(baseGLB.scene);
+    if(baseGLB.animations[0]) {
+      clips.idle = mixer.clipAction(baseGLB.animations[0]);
+      clips.idle.play();
+      current = clips.idle;
+    }
+    await Promise.all(Object.entries(anims).map(async ([name, file]) => {
+      if(name==='idle' || !file) return;
+      try{
+        const g = await loader.loadAsync(resolveGlbUrl(file));
+        if(g.animations[0]) clips[name] = mixer.clipAction(g.animations[0]);
+      }catch(e){ console.warn('clip fail', name, e); }
+    }));
+    stateEl.textContent = 'idle · ' + Object.keys(clips).length + ' clips';
+    play('idle');
+  } catch (e) {
+    errEl.textContent = 'Load fail: ' + (e.message||e) + ' — local animated/*.glb or Supabase arena-anims';
+    stateEl.textContent = 'ERR';
+    console.error(e);
+  }
+}
+
+function play(name){
+  if(!clips[name] || currentName===name) return;
+  const next = clips[name];
+  if(current){ current.fadeOut(0.15); }
+  next.reset().fadeIn(0.15).play();
+  current = next; currentName = name;
+  stateEl.textContent = name;
+}
+
+const keys = {};
+addEventListener('keydown', e => { keys[e.code]=true; if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault(); });
+addEventListener('keyup', e => { keys[e.code]=false; });
+function pickAction(){
+  if(keys.KeyG && clips.block) return 'block';
+  if(keys.KeyX && clips.ko) return 'ko';
+  if(keys.KeyH && clips.hurt) return 'hurt';
+  if(keys.KeyT && clips.taunt) return 'taunt';
+  if(keys.KeyC && clips.cast) return 'cast';
+  if(keys.KeyQ && clips.dodge) return 'dodge';
+  if(keys.KeyN && clips.heavy_punch) return 'heavy_punch';
+  if(keys.KeyL && clips.roundhouse) return 'roundhouse';
+  if(keys.KeyB && clips.punch) return 'punch';
+  if(keys.KeyK && clips.kick) return 'kick';
+  if(keys.Space && clips.jump) return 'jump';
+  const fwd = keys.ArrowUp||keys.KeyW;
+  const back = keys.ArrowDown||keys.KeyS;
+  const left = keys.ArrowLeft||keys.KeyA;
+  const right = keys.ArrowRight||keys.KeyD;
+  const run = keys.ShiftLeft||keys.ShiftRight;
+  if(fwd) return run && clips.run ? 'run' : (clips.walk_fwd ? 'walk_fwd' : 'idle');
+  if(back) return clips.walk_back ? 'walk_back' : 'idle';
+  if(left) return clips.strafe_left ? 'strafe_left' : 'idle';
+  if(right) return clips.strafe_right ? 'strafe_right' : 'idle';
+  return 'idle';
+}
+
+const clock = new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = clock.getDelta();
+  if(mixer) mixer.update(dt);
+  if(clips.idle) play(pickAction());
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+async function fetchManifest(url){
+  const r = await fetch(url + '?v=' + Date.now(), { cache: 'no-store' });
+  if(!r.ok) throw new Error(url + ' HTTP ' + r.status);
+  return r.json();
+}
+
+async function init(){
+  const order = useRemoteFirst
+    ? [REMOTE_MANIFEST, LOCAL_MANIFEST]
+    : [LOCAL_MANIFEST, REMOTE_MANIFEST];
+  let lastErr = null;
+  for (const url of order) {
+    try {
+      manifest = await fetchManifest(url);
+      console.info('controller manifest:', url);
+      break;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if(!manifest) throw new Error('manifest failed — ' + (lastErr && lastErr.message) + ' (try local python3 app.py or Supabase upload)');
+  const sel = document.getElementById('charSel');
+  Object.keys(manifest.characters||{}).forEach(n => {
+    const o = document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+  });
+  sel.addEventListener('change', e => loadCharacter(e.target.value));
+  const first = Object.keys(manifest.characters||{})[0];
+  if(first){ sel.value = first; await loadCharacter(first); }
+  else errEl.textContent = 'No characters in manifest';
+  loop();
+}
+init().catch(err => {
+  stateEl.textContent = 'ERR';
+  errEl.textContent = String(err.message||err);
+  console.error(err);
+});
+</script>
+</body>
+</html>

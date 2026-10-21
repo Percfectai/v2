@@ -1,0 +1,25 @@
+{
+  "name": "The Percfect Post - Social Publishing & Studio",
+  "short_name": "Percfect Post",
+  "description": "Cross-platform mass posting, custom watermarking, 9:16 video studio, and web clipper.",
+  "start_url": "/percfectposts/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#4f46e5",
+  "categories": ["social", "productivity", "utilities", "business"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "key": "legend",
+  "label": "Legend",
+  "outer": "#c9a227",
+  "mid": "#1a1a1a",
+  "inner": "#e8c547",
+  "bg1": "#6a6a70",
+  "bg2": "#3a3a42",
+  "accent": "#c9a227",
+  "name_color": "#ffffff",
+  "stat_border": "#c9a227",
+  "layout": "legend",
+  "frame_url": "/static/assets/cards/themes/legend/frame.svg",
+  "bg_url": "/static/assets/cards/themes/legend/bg.svg"
+}

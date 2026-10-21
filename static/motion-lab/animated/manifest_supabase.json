@@ -1,0 +1,63 @@
+{
+  "bucket": "arena-anims",
+  "public_base": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims",
+  "characters": {
+    "poyo_H": {
+      "idle": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/idle.glb",
+      "walk_fwd": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/walk_fwd.glb",
+      "walk_back": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/walk_back.glb",
+      "strafe_left": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/strafe_left.glb",
+      "strafe_right": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/strafe_right.glb",
+      "run": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/run.glb",
+      "jump": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/jump.glb",
+      "punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/punch.glb",
+      "heavy_punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/heavy_punch.glb",
+      "kick": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/kick.glb",
+      "roundhouse": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/roundhouse.glb",
+      "block": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/block.glb",
+      "dodge": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/dodge.glb",
+      "cast": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/cast.glb",
+      "taunt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/taunt.glb",
+      "hurt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/hurt.glb",
+      "ko": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/ko.glb"
+    },
+    "poyo_I": {
+      "idle": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/idle.glb",
+      "walk_fwd": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/walk_fwd.glb",
+      "walk_back": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/walk_back.glb",
+      "strafe_left": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/strafe_left.glb",
+      "strafe_right": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/strafe_right.glb",
+      "run": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/run.glb",
+      "jump": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/jump.glb",
+      "punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/punch.glb",
+      "heavy_punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/heavy_punch.glb",
+      "kick": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/kick.glb",
+      "roundhouse": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/roundhouse.glb",
+      "block": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/block.glb",
+      "dodge": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/dodge.glb",
+      "cast": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/cast.glb",
+      "taunt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/taunt.glb",
+      "hurt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/hurt.glb",
+      "ko": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_I/ko.glb"
+    },
+    "poyo_X": {
+      "idle": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/idle.glb",
+      "walk_fwd": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/walk_fwd.glb",
+      "walk_back": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/walk_back.glb",
+      "strafe_left": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/strafe_left.glb",
+      "strafe_right": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/strafe_right.glb",
+      "run": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/run.glb",
+      "jump": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/jump.glb",
+      "punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/punch.glb",
+      "heavy_punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/heavy_punch.glb",
+      "kick": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/kick.glb",
+      "roundhouse": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/roundhouse.glb",
+      "block": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/block.glb",
+      "dodge": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/dodge.glb",
+      "cast": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/cast.glb",
+      "taunt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/taunt.glb",
+      "hurt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/hurt.glb",
+      "ko": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_X/ko.glb"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# Percfect Motion Analyzer v2 — Render.com requirements
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+opencv-python-headless>=4.10.0
+mediapipe>=0.10.14
+numpy>=1.26.0

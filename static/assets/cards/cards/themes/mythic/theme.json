@@ -1,0 +1,14 @@
+{
+  "key": "mythic",
+  "label": "Mythic",
+  "outer": "#ff5ec4",
+  "mid": "#5ec4ff",
+  "inner": "#ffd75e",
+  "bg1": "#1a1030",
+  "bg2": "#0a0618",
+  "accent": "#ff5ec4",
+  "name_color": "#fff",
+  "stat_border": "#b45eff",
+  "frame_url": "/static/assets/cards/themes/mythic/frame.svg",
+  "bg_url": "/static/assets/cards/themes/mythic/bg.svg"
+}

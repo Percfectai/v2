@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>WORLD'S FIRST 3D AGENTS · Meshy-6 · Percfect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "rivals/character_controller.js": "/static/js/rivals/character_controller.js"
+    }
+  }
+  </script>
+  <style>
+    :root {
+      --panel: rgba(6, 12, 10, 0.88);
+      --accent: #00ff88;
+      --text: #f4fff8;
+      --muted: #8fb89a;
+      --hot: #ff5c7a;
+      --mono: "Space Mono", ui-monospace, monospace;
+      --font: Inter, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font); color: var(--text); background: #0a1a12; }
+    .banner {
+      position: relative; z-index: 30;
+      display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: center;
+      padding: 0.4rem 0.75rem;
+      background: linear-gradient(90deg, rgba(0,255,136,0.2), rgba(94,200,255,0.15));
+      border-bottom: 1px solid rgba(0,255,136,0.35);
+      font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--accent);
+    }
+    .banner strong { color: #fff; }
+    .shell {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: calc(100vh - 32px);
+    }
+    @media (max-width: 800px) {
+      .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .roster { max-height: 160px; }
+    }
+    .roster {
+      background: var(--panel);
+      border-right: 1px solid rgba(0,255,136,0.2);
+      padding: 0.75rem;
+      overflow: auto;
+      backdrop-filter: blur(12px);
+    }
+    .roster h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.15rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .roster p { margin: 0 0 0.65rem; font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+    .crew-btn {
+      display: flex; align-items: center; gap: 0.55rem;
+      width: 100%; text-align: left;
+      padding: 0.45rem 0.5rem; margin-bottom: 0.3rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.35);
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--font);
+    }
+    .crew-btn:hover { border-color: rgba(0,255,136,0.4); }
+    .crew-btn.active {
+      border-color: var(--accent);
+      background: rgba(0,255,136,0.12);
+      box-shadow: 0 0 0 1px rgba(0,255,136,0.25);
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .crew-btn .name { font-weight: 800; font-size: 0.85rem; }
+    .crew-btn .role { font-size: 0.65rem; color: var(--muted); font-family: var(--mono); }
+    .stage-wrap { position: relative; min-height: 0; background: #5ec8ff; }
+    #field-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .hud {
+      position: absolute; left: 0.6rem; top: 0.6rem; z-index: 5;
+      display: flex; flex-wrap: wrap; gap: 0.35rem; max-width: 90%;
+      pointer-events: none;
+    }
+    .chip {
+      pointer-events: auto;
+      font-family: var(--mono); font-size: 0.62rem;
+      padding: 0.28rem 0.5rem; border-radius: 99px;
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(0,255,136,0.35); color: var(--accent);
+    }
+    .chip.hot { color: var(--hot); border-color: rgba(255,92,122,0.45); }
+    .controls-hint {
+      position: absolute; right: 0.6rem; bottom: 0.6rem; z-index: 5;
+      font-size: 0.68rem; color: #0a2a14;
+      background: rgba(255,255,255,0.75); padding: 0.4rem 0.65rem; border-radius: 10px;
+      font-weight: 700;
+    }
+    .label3d {
+      font-family: var(--font);
+      font-weight: 900;
+      font-size: 13px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.72);
+      border: 2px solid currentColor;
+      color: #fff;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px #000;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      user-select: none;
+    }
+    .label3d small {
+      display: block;
+      font-size: 9px;
+      font-weight: 700;
+      opacity: 0.85;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
+    #boot-err {
+      display: none; position: absolute; inset: 12% 10%; z-index: 40;
+      background: rgba(20,0,0,0.92); border: 1px solid var(--hot); border-radius: 12px;
+      padding: 1rem; color: #fecaca; font-family: var(--mono); font-size: 0.75rem; white-space: pre-wrap;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0; }
+    button.btn {
+      font-family: var(--font); font-weight: 800; font-size: 0.72rem;
+      padding: 0.4rem 0.65rem; border-radius: 9px; cursor: pointer;
+      border: 1px solid rgba(0,255,136,0.4); background: rgba(0,255,136,0.15); color: var(--accent);
+    }
+    button.btn.primary { background: var(--accent); color: #042f1a; border-color: transparent; }
+    button.btn.hot {
+      border-color: rgba(255,92,122,0.55);
+      background: rgba(255,92,122,0.14);
+      color: var(--hot);
+    }
+    .anim-panel {
+      margin: 0.55rem 0 0.4rem;
+      padding: 0.45rem 0.4rem 0.35rem;
+      border-radius: 10px;
+      border: 1px solid rgba(0,255,136,0.18);
+      background: rgba(0,0,0,0.28);
+    }
+    .anim-panel .anim-head {
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+      gap: 0.35rem; margin-bottom: 0.3rem;
+    }
+    .anim-panel .anim-title {
+      font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--accent); font-family: var(--mono); font-weight: 700;
+    }
+    .anim-panel #anim-target {
+      font-size: 0.6rem; color: var(--muted); font-family: var(--mono);
+    }
+    .anim-panel .anim-all {
+      display: inline-flex; align-items: center; gap: 0.28rem;
+      font-size: 0.62rem; color: var(--muted); font-family: var(--mono); cursor: pointer;
+      user-select: none;
+    }
+    .anim-panel .anim-all input { accent-color: var(--accent); }
+    button.btn.hot { border-color: rgba(255,92,122,0.45); color: var(--hot); background: rgba(255,92,122,0.12); }
+    .anim-panel {
+      margin: 0.35rem 0 0.55rem;
+      padding: 0.5rem 0.45rem 0.45rem;
+      border-radius: 12px;
+      border: 1px solid rgba(0,255,136,0.22);
+      background: rgba(0,0,0,0.35);
+    }
+    .anim-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.35rem;
+      margin-bottom: 0.35rem;
+    }
+    .anim-title {
+      font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.08em;
+      color: var(--accent); font-weight: 700;
+    }
+    .anim-target {
+      font-size: 0.68rem; color: var(--muted); font-weight: 700;
+      max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .anim-row { margin: 0; gap: 0.28rem; }
+    .anim-row .btn { font-size: 0.68rem; padding: 0.32rem 0.5rem; }
+    .anim-hint {
+      margin: 0.4rem 0 0; font-size: 0.62rem; color: var(--muted);
+      font-family: var(--mono); line-height: 1.4;
+    }
+    /* World chat — bottom-right over stage, above canvas */
+    #wgc-root, .wgc-root {
+      position: fixed;
+      z-index: 50;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      pointer-events: auto;
+    }
+    .stage-wrap { position: relative; }
+  </style>
+  <script src="/static/js/world_group_chat.js?v=4"></script>
+  <script src="/static/js/field_body_drive.js?v=1"></script>
+</head>
+<body>
+  <div class="banner" id="banner"><strong>MESHY-6</strong> · world's first 3D agents · bodies that walk</div>
+  <div class="shell">
+    <aside class="roster">
+      <h1 id="title">WORLD'S FIRST 3D AGENTS</h1>
+      <p id="sub">Every agent = own pre-rigged character. Click name to pilot. Crew patrols + jumps. New gens: Meshy rig+anim ON.</p>
+      <div class="row">
+        <button type="button" class="btn primary" id="btn-rally">Rally mid</button>
+        <button type="button" class="btn" id="btn-scatter">Scatter</button>
+        <button type="button" class="btn" id="btn-hop-all">All jump</button>
+      </div>
+      <div class="anim-panel" id="anim-panel" aria-label="Simulate animations">
+        <div class="anim-head">
+          <span class="anim-title">SIM ANIM</span>
+          <span class="anim-target" id="anim-target">Target: —</span>
+        </div>
+        <div class="row anim-row" id="anim-btns">
+          <button type="button" class="btn" data-anim="idle" title="Idle">Idle</button>
+          <button type="button" class="btn" data-anim="jump" title="Jump · J">Jump</button>
+          <button type="button" class="btn" data-anim="attack_light" title="Punch · 1">Punch</button>
+          <button type="button" class="btn" data-anim="attack_heavy" title="Heavy · 2">Heavy</button>
+          <button type="button" class="btn" data-anim="block" title="Block · B">Block</button>
+          <button type="button" class="btn" data-anim="dodge" title="Dodge · F">Dodge</button>
+          <button type="button" class="btn" data-anim="hit_react" title="Hit react">Hit</button>
+          <button type="button" class="btn" data-anim="ko" title="KO">KO</button>
+          <button type="button" class="btn hot" data-anim="all_jump" title="All jump">All↑</button>
+        </div>
+        <p class="anim-hint">Click a crew name (or pilot in POV) → press a button. Clips if Meshy baked them; else procedural.</p>
+      </div>
+      <div id="crew-list"></div>
+      <p style="margin-top:0.75rem;font-size:0.65rem;color:var(--muted);font-family:var(--mono);line-height:1.45">
+        <strong style="color:var(--accent)">ENGINE: meshy-6-multi + rig + anim</strong><br/>
+        Law: each crew[].glb_url = unique pre-rigged body<br/>
+        CharacterController drives them · click name to pilot<br/>
+        New gens → set that agent’s glb_url (never one mesh for all)
+      </p>
+    </aside>
+    <main class="stage-wrap">
+      <canvas id="field-canvas"></canvas>
+      <div class="hud">
+        <span class="chip" id="hud-view">View: OVERVIEW</span>
+        <span class="chip" id="hud-pilot">Pilot: —</span>
+        <span class="chip" id="hud-state">idle</span>
+        <span class="chip hot" id="hud-count">0 agents</span>
+      </div>
+      <div class="controls-hint">Overview shared · Click name = POV · Esc leave · WASD/Space · SIM ANIM: J/1/2/B/F · chat bottom-right</div>
+      <div id="boot-err"></div>
+    </main>
+  </div>
+
+  <!-- Shared world chat — same feed as Colosseum / 3D page (room=3d) -->
+  <div id="wgc-root" class="wgc-root" data-world-chat data-room="3d"
+       data-title="Field chat" data-subtitle="full crew · type here"
+       data-seats="Voltage,Ashley,Vanessa,Sal,Mira,Rook,Vex,Moss,Knox,FrontStreet,Photos,Arena,BuildCrew,Ops,CodeMaster"></div>
+  <script>
+  (function () {
+    var FULL_SEATS = ['Voltage','Ashley','Vanessa','Sal','Mira','Rook','Vex','Moss','Knox','FrontStreet','Photos','Arena','BuildCrew','Ops','CodeMaster'];
+    function mountChat(logged, name) {
+      if (!window.PercfectWorldChat) return;
+      PercfectWorldChat.mount({
+        el: document.getElementById('wgc-root'),
+        room: '3d',
+        seats: FULL_SEATS,
+        loggedIn: !!logged,
+        username: name || '',
+        title: 'Field chat',
+        subtitle: 'real agents · @name to call one',
+      });
+    }
+    fetch('/percfectstudios/session-info', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var logged = !!(d && (d.logged_in || d.username || d.user_id || d.is_admin));
+        var name = (d && (d.username || d.name || d.email)) || '';
+        mountChat(logged, name);
+      })
+      .catch(function () { mountChat(false, ''); });
+  })();
+  </script>
+
+  <script type="module">
+    // Prefer the path that deploys reliably on Render (js/rivals often beats static/data cache)
+    const CONFIG_URLS = [
+      '/static/js/rivals/agent_field_config.json',
+      '/static/data/agent_field_config.json',
+      '/static/data/rivals_config.json',
+    ];
+
+    function showErr(msg) {
+      const el = document.getElementById('boot-err');
+      el.style.display = 'block';
+      el.textContent = String(msg);
+      console.error(msg);
+    }
+    window.addEventListener('error', (e) => showErr(e.message || e.error));
+    window.addEventListener('unhandledrejection', (e) =>
+      showErr(e.reason?.message || e.reason || e)
+    );
+
+    const THREE = await import('three');
+    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const { CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js');
+    const { CharacterController } = await import('rivals/character_controller.js');
+
+    async function loadConfig() {
+      for (const u of CONFIG_URLS) {
+        try {
+          const r = await fetch(u + '?v=' + Date.now(), { cache: 'no-store' });
+          if (!r.ok) continue;
+          const j = await r.json();
+          if (j.crew && Array.isArray(j.crew)) return j;
+        } catch (_) { /* try next */ }
+      }
+      // Hard fallback crew — ALL seats on live meshy6 + strong tint so board never empty
+      const ph = '/motion-lab/meshy6_character.glb';
+      const seat = (id, label, role, tint, x, z) => ({
+        id, label, role, status: 'ON', tint, force_tint: true, glb_url: ph, spawn: { x, z },
+      });
+      return {
+        title: 'FULL CREW · ON THE GRASS',
+        subtitle: 'fallback · every agent on the grass (meshy6 + tint)',
+        banner: 'ALL HANDS · BUILT-IN CREW',
+        movement: { move_speed: 5.2, turn_speed: 14, bounds_radius: 16, target_height_m: 1.75, jump_velocity: 5.2, wander_radius: 12, hop_chance: 0.12, auto_scatter_on_load: true },
+        field: { size: 40, grass: '#3d9e3a', grass_dark: '#2d7a2a', sky_top: '#5ec8ff', sky_bottom: '#c8ecff', sun_intensity: 1.35 },
+        defaults: { placeholder_glb: ph, force_tint: true },
+        crew: [
+          seat('voltage', 'Voltage', 'Commander', '#00ff88', 0, 3),
+          seat('ashley', 'Ashley', 'Support', '#ff7eb6', -3.2, 1.2),
+          seat('vanessa', 'Vanessa', 'PA', '#a78bfa', 3.2, 1.2),
+          seat('sal', 'Sal', 'Debug', '#38bdf8', -5.5, -0.5),
+          seat('mira', 'Mira', 'Admin', '#f472b6', 5.5, -0.5),
+          seat('rook', 'Rook', 'Floor', '#fbbf24', -2.2, -2.8),
+          seat('vex', 'Vex', 'Fight', '#f87171', 2.2, -2.8),
+          seat('moss', 'Moss', 'Motion', '#34d399', -6.5, 2.5),
+          seat('knox', 'Knox', 'Skeleton', '#94a3b8', 6.5, 2.5),
+          seat('frontstreet', 'FrontStreet', 'UI', '#e879f9', 0, -5.5),
+          seat('photos', 'Photos', 'Studio', '#fbbf24', -4, 4.5),
+          seat('arena', 'Arena', 'Studio', '#fb7185', 4, 4.5),
+          seat('buildcrew', 'BuildCrew', 'Ship', '#22d3ee', -7.5, -3.5),
+          seat('ops', 'Ops', 'D-Box', '#facc15', 7.5, -3.5),
+          seat('codemaster', 'CodeMaster', 'GitHub', '#c084fc', 0, 6.5),
+        ],
+      };
+    }
+
+    const cfg = await loadConfig();
+    document.getElementById('title').textContent = cfg.title || 'AGENT FIELD';
+    document.getElementById('sub').textContent = cfg.subtitle || '';
+    document.getElementById('banner').innerHTML =
+      `<strong>${(cfg.banner || 'TONIGHT').split('·')[0].trim()}</strong> · ${(cfg.banner || '').split('·').slice(1).join('·') || 'full team'}`;
+
+    const mov = cfg.movement || {};
+    const field = cfg.field || {};
+    const placeholder = cfg.defaults?.placeholder_glb || '/motion-lab/meshy6_character.glb';
+    const controllerConfig = {
+      movement: {
+        move_speed: Number(mov.move_speed ?? 5.2),
+        turn_speed: Number(mov.turn_speed ?? 14),
+        bounds_radius: Number(mov.bounds_radius ?? 16),
+        target_height_m: Number(mov.target_height_m ?? 1.75),
+      },
+      combat: { max_health: 100 },
+    };
+    const jumpVel = Number(mov.jump_velocity ?? 5.2);
+    const wanderR = Number(mov.wander_radius ?? 12);
+    const idleMin = Number(mov.wander_idle_ms_min ?? 800);
+    const idleMax = Number(mov.wander_idle_ms_max ?? 2800);
+    const hopChance = Number(mov.hop_chance ?? 0.08);
+
+    // —— Scene (Mario grass field) ——
+    const canvas = document.getElementById('field-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.inset = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    canvas.parentElement.appendChild(labelRenderer.domElement);
+
+    const scene = new THREE.Scene();
+    const skyTop = field.sky_top || '#5ec8ff';
+    const skyBot = field.sky_bottom || '#c8ecff';
+    scene.background = new THREE.Color(skyTop);
+    scene.fog = new THREE.Fog(new THREE.Color(skyBot), 28, 70);
+
+    // —— DUAL CAMERA LAW ——
+    // overview = shared world eye (fixed; players do NOT move it)
+    // pov      = belongs to character/player you pilot (only you look around)
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    const OVERVIEW_POS = new THREE.Vector3(0, 14, 22);
+    const OVERVIEW_TARGET = new THREE.Vector3(0, 1.2, 0);
+    camera.position.copy(OVERVIEW_POS);
+    camera.lookAt(OVERVIEW_TARGET);
+
+    // OrbitControls only used as legacy fallback helper; overview is locked.
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.copy(OVERVIEW_TARGET);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.minDistance = 4;
+    controls.maxDistance = 40;
+    controls.enabled = false; // overview is not player-movable
+
+    /** @type {'overview'|'pov'} */
+    let viewMode = 'overview';
+    let povYaw = 0;
+    let povPitch = 0.28;
+    let povDist = 5.2;
+    let dragLook = false;
+    let lastPtr = { x: 0, y: 0 };
+
+    const hemi = new THREE.HemisphereLight(0xb1e1ff, 0x3d6b2e, 0.85);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff2cc, Number(field.sun_intensity ?? 1.35));
+    sun.position.set(12, 22, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 60;
+    sun.shadow.camera.left = -22;
+    sun.shadow.camera.right = 22;
+    sun.shadow.camera.top = 22;
+    sun.shadow.camera.bottom = -22;
+    scene.add(sun);
+
+    const size = Number(field.size ?? 40);
+    const grassGeo = new THREE.PlaneGeometry(size, size, 1, 1);
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: field.grass || '#3d9e3a',
+      roughness: 0.92,
+      metalness: 0.02,
+    });
+    const ground = new THREE.Mesh(grassGeo, grassMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Checker darker patches (Mario field vibe)
+    const grid = new THREE.GridHelper(size, 20, field.grass_dark || '#2d7a2a', field.grass_dark || '#2d7a2a');
+    grid.position.y = 0.02;
+    grid.material.opacity = 0.35;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    // Soft ring boundary
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(Number(mov.bounds_radius ?? 16) - 0.15, Number(mov.bounds_radius ?? 16) + 0.05, 64),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.03;
+    scene.add(ring);
+
+    function resize() {
+      const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+      const h = canvas.clientHeight || canvas.parentElement.clientHeight;
+      if (!w || !h) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+      labelRenderer.setSize(w, h);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // —— Agents ——
+    const agents = []; // { meta, controller, labelObj, brain }
+    let pilotId = null;
+    let animTargetId = null; // SIM ANIM panel target (click roster or pilot)
+    const keys = new Set();
+
+    function makeLabel(meta) {
+      const el = document.createElement('div');
+      el.className = 'label3d';
+      el.style.color = meta.tint || '#00ff88';
+      el.innerHTML = `${meta.label || meta.id}<small>${meta.role || 'agent'}</small>`;
+      const obj = new CSS2DObject(el);
+      obj.position.set(0, 2.05, 0);
+      return obj;
+    }
+
+    function renderRoster() {
+      const list = document.getElementById('crew-list');
+      list.innerHTML = '';
+      for (const a of agents) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'crew-btn' + (a.meta.id === pilotId ? ' active' : '');
+        const st = (a.meta.status || 'ON').toUpperCase();
+        const body = (a.meta.glb_url || a.meta.glb || placeholder || '').split('/').pop() || 'body';
+        btn.innerHTML = `
+          <span class="dot" style="background:${a.meta.tint};color:${a.meta.tint}"></span>
+          <span><div class="name">${a.meta.label} <span style="color:var(--accent);font-size:0.65rem">${st}</span></div><div class="role">${a.meta.role} · ${body.replace(/\.glb$/i,'')}</div></span>
+        `;
+        btn.addEventListener('click', () => setPilot(a.meta.id));
+        list.appendChild(btn);
+      }
+      document.getElementById('hud-count').textContent = `${agents.length} agents`;
+    }
+
+    function updateViewHud() {
+      const v = document.getElementById('hud-view');
+      if (!v) return;
+      if (viewMode === 'overview') {
+        v.textContent = 'View: OVERVIEW (shared)';
+        v.classList.add('hot');
+      } else {
+        const a = agents.find((x) => x.meta.id === pilotId);
+        v.textContent = 'View: POV · ' + (a?.meta.label || pilotId || '?');
+        v.classList.remove('hot');
+      }
+    }
+
+    /** Shared overview — fixed; no player orbit. Board still runs. */
+    function enterOverview() {
+      viewMode = 'overview';
+      controls.enabled = false;
+      // Leave character control; they resume AI wander
+      const was = pilotId;
+      pilotId = null;
+      try { updateAnimTargetUi(); } catch (_) {}
+      for (const o of agents) {
+        if (was && o.meta.id === was) {
+          o.brain.nextAt = performance.now() + 400;
+        }
+      }
+      document.getElementById('hud-pilot').textContent = 'Pilot: — (overview)';
+      document.getElementById('hud-state').textContent = 'spectating';
+      updateViewHud();
+      renderRoster();
+    }
+
+    /**
+     * Enter that character's POV (player-owned camera).
+     * Moving the camera only changes YOUR perception — not the board.
+     */
+    function enterPov(id) {
+      const a = agents.find((x) => x.meta.id === id);
+      if (!a) return;
+      viewMode = 'pov';
+      pilotId = id;
+      animTargetId = id;
+      try { updateAnimTargetUi(); } catch (_) {}
+      controls.enabled = false;
+      // Seed look from character facing
+      povYaw = Number(a.controller.facing) || 0;
+      povPitch = 0.28;
+      povDist = 5.2;
+      // Stop wander — player owns this character
+      a.brain.nextAt = performance.now() + 999999;
+      a.controller.command('idle');
+      for (const o of agents) {
+        if (o.meta.id !== pilotId && o.brain.nextAt > performance.now() + 100000) {
+          o.brain.nextAt = performance.now() + 400;
+        }
+      }
+      document.getElementById('hud-pilot').textContent = 'Pilot: ' + (a.meta.label || id);
+      updateViewHud();
+      renderRoster();
+    }
+
+    function setPilot(id) {
+      // Clicking a roster name = play AS that character (their POV)
+      enterPov(id);
+    }
+
+    function applyOverviewCamera() {
+      camera.position.lerp(OVERVIEW_POS, 0.12);
+      const t = OVERVIEW_TARGET;
+      const cur = new THREE.Vector3();
+      camera.getWorldDirection(cur);
+      // smooth lookAt via controls target helper
+      const look = new THREE.Vector3().copy(camera.position).add(cur);
+      look.lerp(t, 0.15);
+      camera.lookAt(t);
+    }
+
+    function applyPovCamera(pilot) {
+      if (!pilot?.controller?.root) return;
+      const pos = pilot.controller.getPosition();
+      const face = Number(pilot.controller.facing) || 0;
+      // Orbit behind character: yaw around Y, pitch, distance
+      const yaw = face + povYaw;
+      const cp = Math.cos(povPitch);
+      const sp = Math.sin(povPitch);
+      const ox = Math.sin(yaw) * cp * povDist;
+      const oy = Math.max(1.2, 1.4 + sp * povDist * 0.85);
+      const oz = Math.cos(yaw) * cp * povDist;
+      const desired = new THREE.Vector3(pos.x + ox, pos.y + oy, pos.z + oz);
+      camera.position.lerp(desired, 0.18);
+      const lookAt = new THREE.Vector3(pos.x, pos.y + 1.45, pos.z);
+      camera.lookAt(lookAt);
+    }
+
+    function pickWanderTarget(brain) {
+      const ang = Math.random() * Math.PI * 2;
+      const r = Math.random() * wanderR;
+      brain.target = { x: Math.cos(ang) * r, z: Math.sin(ang) * r };
+    }
+
+    async function spawnCrew() {
+      const crew = (cfg.crew || []).filter((m) => String(m.status || 'ON').toUpperCase() !== 'OFF');
+      const bodySummary = [];
+      // Preload each unique GLB once, then SkeletonUtils-clone per seat (15 bodies, 1 download)
+      const gltfCache = new Map();
+      const loader = new GLTFLoader();
+
+      async function getGltf(url) {
+        if (gltfCache.has(url)) return gltfCache.get(url);
+        const gltf = await loader.loadAsync(url);
+        gltfCache.set(url, gltf);
+        return gltf;
+      }
+
+      for (const meta of crew) {
+        // Prefer config glb; on any failure → placeholder so seat NEVER disappears
+        let glb = meta.glb_url || meta.glb || placeholder;
+        if (!meta.glb_url && !meta.glb) {
+          console.warn(`[agent-field] ${meta.id} missing glb_url — using placeholder`);
+        }
+        const c = new CharacterController({
+          id: meta.id,
+          parent: scene,
+          config: controllerConfig,
+          floorY: 0,
+          tint: meta.tint || null,
+        });
+        let usedGlb = glb;
+        try {
+          const gltf = await getGltf(glb);
+          c.attachGltf(gltf, meta.spawn || { x: 0, z: 0 });
+          bodySummary.push(`${meta.label}=ok`);
+        } catch (err) {
+          console.warn('load failed', meta.id, glb, err);
+          gltfCache.delete(glb);
+          if (glb !== placeholder) {
+            try {
+              usedGlb = placeholder;
+              const gltf = await getGltf(placeholder);
+              c.attachGltf(gltf, meta.spawn || { x: 0, z: 0 });
+              bodySummary.push(`${meta.label}=placeholder`);
+            } catch (e2) {
+              showErr(`Failed to load body for ${meta.id}: ${e2.message || e2}`);
+              continue;
+            }
+          } else {
+            showErr(`Failed to load placeholder GLB: ${err.message || err}`);
+            continue;
+          }
+        }
+        const label = makeLabel(meta);
+        c.root.add(label);
+        const brain = {
+          target: null,
+          nextAt: performance.now() + 200 + Math.random() * 800,
+          hopAt: performance.now() + 1500 + Math.random() * 3000,
+        };
+        agents.push({ meta, controller: c, labelObj: label, brain, glb: usedGlb });
+      }
+      if (!agents.length) {
+        showErr('No agents loaded. Check /static/data/agent_field_config.json + /motion-lab/meshy6_character.glb');
+        return;
+      }
+      console.info('[agent-field] crew bodies:', bodySummary.join(', '));
+      // EVERYBODY ON — auto scatter so the field is alive immediately
+      if (mov.auto_scatter_on_load !== false) {
+        for (const a of agents) {
+          pickWanderTarget(a.brain);
+          a.controller.command('move', { x: a.brain.target.x, z: a.brain.target.z });
+          a.brain.nextAt = performance.now() + 1500 + Math.random() * 1500;
+        }
+      }
+      // Start in SHARED OVERVIEW — not piloting. Click agent → their POV.
+      enterOverview();
+      renderRoster();
+      document.getElementById('hud-count').textContent = `${agents.length} ON`;
+      if (agents.length && !animTargetId) {
+        animTargetId = agents[0].meta.id;
+        try { updateAnimTargetUi(); } catch (_) {}
+      }
+    }
+
+    await spawnCrew();
+
+    // —— Input ——
+    function typingInUi(el) {
+      if (!el) return false;
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (el.isContentEditable) return true;
+      // World chat panel
+      if (el.closest && el.closest('#wgc-root, .wgc-root')) return true;
+      return false;
+    }
+    window.addEventListener('keydown', (e) => {
+      // Never steal keys while typing in Field chat
+      if (typingInUi(e.target || document.activeElement)) return;
+      const k = e.key.toLowerCase();
+      // Esc = leave POV → shared overview (board keeps running)
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        enterOverview();
+        return;
+      }
+      if (viewMode !== 'pov') return; // WASD only while in character POV
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
+        e.preventDefault();
+      }
+      keys.add(k);
+      if (k === ' ' || k === 'spacebar') {
+        const p = agents.find((x) => x.meta.id === pilotId);
+        p?.controller.command('jump', { height: jumpVel });
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (typingInUi(e.target || document.activeElement)) return;
+      keys.delete(e.key.toLowerCase());
+    });
+
+    // POV look: drag on canvas (only moves YOUR camera — not the board)
+    canvas.addEventListener('pointerdown', (e) => {
+      if (viewMode !== 'pov') return;
+      dragLook = true;
+      lastPtr.x = e.clientX;
+      lastPtr.y = e.clientY;
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!dragLook || viewMode !== 'pov') return;
+      const dx = e.clientX - lastPtr.x;
+      const dy = e.clientY - lastPtr.y;
+      lastPtr.x = e.clientX;
+      lastPtr.y = e.clientY;
+      povYaw -= dx * 0.005;
+      povPitch += dy * 0.004;
+      povPitch = Math.max(-0.15, Math.min(0.85, povPitch));
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      dragLook = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+    canvas.addEventListener('pointercancel', () => { dragLook = false; });
+    canvas.addEventListener('wheel', (e) => {
+      if (viewMode !== 'pov') return;
+      e.preventDefault();
+      povDist = Math.max(2.5, Math.min(12, povDist + e.deltaY * 0.008));
+    }, { passive: false });
+
+    document.getElementById('btn-rally').onclick = () => {
+      for (const a of agents) {
+        a.controller.command('move', { x: (Math.random() - 0.5) * 1.5, z: (Math.random() - 0.5) * 1.5 });
+        a.brain.nextAt = performance.now() + 2500;
+      }
+    };
+    document.getElementById('btn-scatter').onclick = () => {
+      for (const a of agents) {
+        pickWanderTarget(a.brain);
+        a.controller.command('move', { x: a.brain.target.x, z: a.brain.target.z });
+        a.brain.nextAt = performance.now() + 3000;
+      }
+    };
+    document.getElementById('btn-hop-all').onclick = () => {
+      for (const a of agents) a.controller.command('jump', { height: jumpVel });
+    };
+
+    // —— SIM ANIM: player buttons drive CharacterController on rigged body ——
+    function getAnimTargetAgent() {
+      if (viewMode === 'pov' && pilotId) {
+        const p = agents.find((x) => x.meta.id === pilotId);
+        if (p) return p;
+      }
+      if (animTargetId) {
+        const t = agents.find((x) => x.meta.id === animTargetId);
+        if (t) return t;
+      }
+      return agents[0] || null;
+    }
+
+    function updateAnimTargetUi() {
+      const el = document.getElementById('anim-target');
+      if (!el) return;
+      const a = getAnimTargetAgent();
+      el.textContent = a ? `Target: ${a.meta.label}` : 'Target: —';
+    }
+
+    function playAnimOnAgent(agent, action, params = {}) {
+      if (!agent?.controller) return { ok: false, error: 'no agent' };
+      const act = String(action || '').toLowerCase();
+      // Pause wander so sim isn't immediately overwritten
+      if (agent.brain) {
+        agent.brain.nextAt = performance.now() + 3500;
+        agent.brain.hopAt = performance.now() + 4000;
+        if (act !== 'move') agent.brain.target = null;
+      }
+      const p = { ...params };
+      if (act === 'jump' && p.height == null) p.height = jumpVel;
+      const res = agent.controller.command(act, p);
+      const hud = document.getElementById('hud-state');
+      if (hud) hud.textContent = `${agent.meta.label}: ${act}`;
+      return res;
+    }
+
+    function playAnim(seatOrLabel, action, params) {
+      let agent = null;
+      if (seatOrLabel) {
+        const key = String(seatOrLabel).toLowerCase();
+        agent = agents.find((a) =>
+          String(a.meta.id).toLowerCase() === key ||
+          String(a.meta.label).toLowerCase() === key
+        );
+      }
+      if (!agent) agent = getAnimTargetAgent();
+      if (!agent) return { ok: false, error: 'no target' };
+      animTargetId = agent.meta.id;
+      updateAnimTargetUi();
+      return playAnimOnAgent(agent, action, params || {});
+    }
+
+    document.getElementById('anim-btns')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-anim]');
+      if (!btn) return;
+      const anim = btn.getAttribute('data-anim');
+      if (anim === 'all_jump') {
+        for (const a of agents) {
+          playAnimOnAgent(a, 'jump', { height: jumpVel });
+        }
+        return;
+      }
+      playAnim(null, anim);
+    });
+
+    // Keyboard sim while NOT typing in chat (POV or overview with target)
+    window.addEventListener('keydown', (e) => {
+      if (typingInUi(e.target || document.activeElement)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const map = {
+        j: 'jump',
+        '1': 'attack_light',
+        '2': 'attack_heavy',
+        b: 'block',
+        f: 'dodge',
+        i: 'idle',
+      };
+      const anim = map[e.key.toLowerCase()];
+      if (!anim) return;
+      // Only when piloting or have a target — don't steal random keys in empty overview
+      if (viewMode !== 'pov' && !animTargetId && !agents.length) return;
+      e.preventDefault();
+      playAnim(null, anim);
+    });
+
+    // After crew loads, set default anim target
+    if (agents.length) {
+      animTargetId = agents[0].meta.id;
+      updateAnimTargetUi();
+    }
+
+    // —— Loop ——
+    const clock = new THREE.Clock();
+    function tick() {
+      requestAnimationFrame(tick);
+      const dt = Math.min(0.05, clock.getDelta());
+      const now = performance.now();
+
+      // Pilot WASD — only in POV (character belongs to player)
+      const pilot = viewMode === 'pov' ? agents.find((x) => x.meta.id === pilotId) : null;
+      if (pilot) {
+        let ix = 0, iz = 0;
+        if (keys.has('w') || keys.has('arrowup')) iz -= 1;
+        if (keys.has('s') || keys.has('arrowdown')) iz += 1;
+        if (keys.has('a') || keys.has('arrowleft')) ix -= 1;
+        if (keys.has('d') || keys.has('arrowright')) ix += 1;
+        if (ix || iz) {
+          // Camera-relative on XZ (your POV only)
+          const fwd = new THREE.Vector3();
+          camera.getWorldDirection(fwd);
+          fwd.y = 0;
+          if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
+          fwd.normalize();
+          const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+          const dir = right.multiplyScalar(ix).add(fwd.multiplyScalar(-iz));
+          if (dir.lengthSq() > 1e-6) {
+            dir.normalize();
+            const pos = pilot.controller.getPosition();
+            pilot.controller.command('move', {
+              x: pos.x + dir.x * 2.5,
+              z: pos.z + dir.z * 2.5,
+            });
+          }
+        } else if (pilot.controller.state === 'walk') {
+          const mi = pilot.controller.moveIntent;
+          if (!mi?.active && !pilot.controller.moveTarget) {
+            pilot.controller.command('idle');
+          }
+        }
+        document.getElementById('hud-state').textContent = pilot.controller.state;
+      }
+
+      // World always runs: AI wander for non-pilots (and all agents when in overview)
+      for (const a of agents) {
+        const isPlayerChar = viewMode === 'pov' && a.meta.id === pilotId;
+        if (isPlayerChar) {
+          a.controller.update(dt, camera);
+          continue;
+        }
+        if (now >= a.brain.nextAt) {
+          if (Math.random() < 0.35) {
+            a.controller.command('idle');
+            a.brain.nextAt = now + idleMin + Math.random() * (idleMax - idleMin);
+          } else {
+            pickWanderTarget(a.brain);
+            a.controller.command('move', { x: a.brain.target.x, z: a.brain.target.z });
+            a.brain.nextAt = now + 1800 + Math.random() * 2200;
+          }
+        }
+        if (now >= a.brain.hopAt) {
+          if (Math.random() < hopChance + 0.25) {
+            a.controller.command('jump', { height: jumpVel * (0.85 + Math.random() * 0.3) });
+          }
+          a.brain.hopAt = now + 2500 + Math.random() * 5000;
+        }
+        if (a.brain.target && a.controller.root) {
+          const p = a.controller.getPosition();
+          const dx = p.x - a.brain.target.x;
+          const dz = p.z - a.brain.target.z;
+          if (dx * dx + dz * dz < 0.35) {
+            a.controller.command('idle');
+            a.brain.target = null;
+            a.brain.nextAt = now + idleMin + Math.random() * (idleMax - idleMin);
+          }
+        }
+        a.controller.update(dt, camera);
+      }
+
+      // Cameras: overview = shared fixed; POV = that character's eyes only
+      if (viewMode === 'overview') {
+        applyOverviewCamera();
+      } else if (pilot) {
+        applyPovCamera(pilot);
+      }
+      // controls stay disabled — overview not player-moved; POV is custom
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+    tick();
+
+    // —— Real agents drive their bodies (world chat → CharacterController) ——
+    function findAgentBySeatOrLabel(seatOrLabel) {
+      const key = String(seatOrLabel || '').trim().toLowerCase();
+      if (!key) return null;
+      return agents.find((a) => {
+        const id = String(a.meta.id || '').toLowerCase();
+        const label = String(a.meta.label || '').toLowerCase();
+        return id === key || label === key || label.replace(/\s+/g, '') === key;
+      }) || null;
+    }
+
+    function driveAgent(seatOrLabel, actions, detail) {
+      const a = findAgentBySeatOrLabel(seatOrLabel)
+        || (detail && findAgentBySeatOrLabel(detail.label));
+      if (!a || !a.controller) {
+        console.warn('[agent-field] drive: no body for', seatOrLabel, detail);
+        return false;
+      }
+      // Pause wander while brain owns the body
+      a.brain.nextAt = performance.now() + 8000;
+      a.brain.hopAt = performance.now() + 9000;
+      a.brain.target = null;
+
+      const list = Array.isArray(actions) && actions.length
+        ? actions
+        : [{ op: 'approach' }, { op: 'jump' }];
+
+      const pilot = viewMode === 'pov' ? agents.find((x) => x.meta.id === pilotId) : null;
+      const pilotPos = pilot?.controller?.getPosition?.() || { x: 0, z: 0 };
+      const me = a.controller.getPosition();
+
+      let delay = 0;
+      for (const act of list.slice(0, 5)) {
+        const op = String(act.op || act.action || '').toLowerCase();
+        setTimeout(() => {
+          if (!a.controller) return;
+          if (op === 'jump') {
+            a.controller.command('jump', { height: Number(act.height) || jumpVel });
+          } else if (op === 'idle' || op === 'stop') {
+            a.controller.command('idle');
+          } else if (op === 'move') {
+            const x = Number(act.x);
+            const z = Number(act.z);
+            if (Number.isFinite(x) && Number.isFinite(z)) {
+              a.brain.target = { x, z };
+              a.controller.command('move', { x, z });
+            }
+          } else if (op === 'approach') {
+            // Walk toward pilot if someone is piloting, else toward field center
+            const tx = (pilotPos.x || 0) + (Math.random() - 0.5) * 1.2;
+            const tz = (pilotPos.z || 0) + (Math.random() - 0.5) * 1.2;
+            // If no pilot, step toward origin from current pos
+            const aimX = pilot ? tx : me.x * 0.35;
+            const aimZ = pilot ? tz : me.z * 0.35;
+            a.brain.target = { x: aimX, z: aimZ };
+            a.controller.command('move', { x: aimX, z: aimZ });
+          } else if (op === 'scatter') {
+            pickWanderTarget(a.brain);
+            a.controller.command('move', { x: a.brain.target.x, z: a.brain.target.z });
+          } else if (op === 'look_at_pilot' || op === 'look') {
+            const lx = pilot ? pilotPos.x : 0;
+            const lz = pilot ? pilotPos.z : 0;
+            a.controller.command('turn', { look_at: { x: lx, z: lz } });
+          } else if (op === 'wave' || op === 'celebrate') {
+            a.controller.command('jump', { height: jumpVel * 0.9 });
+          }
+        }, delay);
+        delay += op === 'jump' ? 450 : 700;
+      }
+      // Flash label / hud so Nick sees who moved
+      try {
+        if (a.labelObj?.element) {
+          a.labelObj.element.style.transform = 'translate(-50%, -100%) scale(1.15)';
+          setTimeout(() => {
+            if (a.labelObj?.element) a.labelObj.element.style.transform = 'translate(-50%, -100%)';
+          }, 900);
+        }
+        const hud = document.getElementById('hud-state');
+        if (hud) hud.textContent = `${a.meta.label} moves`;
+      } catch (_) { /* ignore */ }
+      return true;
+    }
+
+    window.addEventListener('percfect-agent-body', (ev) => {
+      const d = ev.detail || {};
+      driveAgent(d.seat || d.label, d.actions, d);
+    });
+
+    // Expose for debug / recording / multiplayer later
+    window.__AGENT_FIELD__ = {
+      agents: () => agents.map((a) => ({ id: a.meta.id, label: a.meta.label, state: a.controller.getState(), glb: a.glb })),
+      _agents: agents, // live refs for field_body_drive
+      findAgent: findAgentBySeatOrLabel,
+      setPilot,
+      enterOverview,
+      enterPov,
+      getViewMode: () => viewMode,
+      drive: driveAgent,
+      playAnim,
+      getAnimTarget: () => (getAnimTargetAgent()?.meta?.id) || null,
+      cfg,
+    };
+  </script>
+</body>
+</html>

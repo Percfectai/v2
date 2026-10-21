@@ -1,0 +1,14 @@
+{
+  "key": "classic",
+  "label": "Classic",
+  "outer": "#f5f5f7",
+  "mid": "#c41e3a",
+  "inner": "#1a1a1a",
+  "bg1": "#f8f6f0",
+  "bg2": "#e8e4d8",
+  "accent": "#c41e3a",
+  "name_color": "#1a1a1a",
+  "stat_border": "#c41e3a",
+  "frame_url": "/static/assets/cards/themes/classic/frame.svg",
+  "bg_url": "/static/assets/cards/themes/classic/bg.svg"
+}

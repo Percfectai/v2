@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Percfect Studios{% endblock %}</title>
+    <link rel="icon" href="/static/assets/brand/percfect_crown_lockup.png" type="image/png">
+    <style>
+        /* ── STUB: base.html CSS was inline here ── */
+        /* TODO: restore full inline CSS from the live site or frozen backup */
+        :root {
+            --bg: #0a0a0a;
+            --text: #fff;
+            --accent: #e91e8c;
+            --accent2: #7c3aed;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        .nav-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 24px; background: rgba(0,0,0,0.8);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: sticky; top: 0; z-index: 1000;
+        }
+        .nav-bar .logo { font-size: 1.4rem; font-weight: 700; }
+        .nav-bar .logo span { color: var(--accent); }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { color: #ccc; font-size: 0.9rem; }
+        .nav-links a:hover { color: #fff; }
+        .credits-pill {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            padding: 4px 14px; border-radius: 20px; font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .main-content { padding: 20px; }
+        /* Auth modal placeholder */
+        .auth-modal { display: none; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="logo"><span>P</span>erfect Studios</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <div class="dropdown">
+                <a href="#">Create ▾</a>
+            </div>
+            <div class="dropdown">
+                <a href="#">Build ▾</a>
+            </div>
+            <a href="/cards">Cards</a>
+            <a href="/percfectposts">Post</a>
+            <a href="/play">Play</a>
+            <a href="/reup">Re-Up</a>
+            {% if session.get('user_id') %}
+            <span class="credits-pill">{{ session.get('credits', 0) }} cr</span>
+            {% else %}
+            <a href="/login">Log In</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Library sidebar placeholder -->
+    {% block library_sidebar %}{% endblock %}
+
+    <!-- Vanessa FAB placeholder -->
+    {% block vanessa %}{% endblock %}
+
+    {% block scripts %}{% endblock %}
+
+    <!-- STUB NOTICE: This is a minimal base.html stub.
+         The real base.html had ALL CSS inline, the full auth modal,
+         Library FAB with crown-P logo, Vanessa support chat,
+         site-wide playlist, and the Studios dropdown menu.
+         Restore from the live site CSS or rebuild per the handoffs. -->
+</body>
+</html>

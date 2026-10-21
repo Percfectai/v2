@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: percfect-motion-analyzer
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: standard
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    autoDeploy: true
+    healthCheckPath: /health

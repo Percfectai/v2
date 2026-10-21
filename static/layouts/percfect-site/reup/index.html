@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Percfect Re-Up</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --void:#07080c; --ink:#f2f4f8; --muted:rgba(200,210,230,.6);
+  --line:rgba(224,169,78,.28); --gold:#e0a94e;
+  --font-display:"Bebas Neue",Impact,sans-serif;
+  --font-body:"Rajdhani",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(224,169,78,.08),transparent 55%),var(--void);color:var(--ink);font-family:var(--font-body)}
+a{color:inherit;text-decoration:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px clamp(14px,3vw,28px);border-bottom:1px solid var(--line);background:rgba(0,0,0,.35);position:relative;z-index:20}
+.logo-btn{background:none;border:0;padding:0;cursor:pointer}
+.logo-btn img{height:48px;width:auto;max-width:min(240px,52vw);display:block;object-fit:contain}
+.wallet{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.chip{font-size:.72rem;font-weight:700;padding:.3rem .65rem;border-radius:999px;border:1px solid var(--line);color:var(--gold)}
+.dd{display:none;position:absolute;top:100%;left:14px;margin-top:6px;min-width:200px;padding:8px;border-radius:12px;background:#0c1018;border:1px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.dd.open{display:block}
+.dd a{display:block;padding:.45rem .65rem;border-radius:8px;font-size:.85rem;font-weight:600;color:rgba(230,235,245,.85)}
+.dd a:hover,.dd a.on{background:rgba(224,169,78,.12);color:var(--gold)}
+.dd .sep{height:1px;margin:6px 0;background:rgba(224,169,78,.15)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px clamp(14px,3vw,24px) 100px}
+h1{font-family:var(--font-display);font-size:clamp(2.4rem,6vw,3.4rem);letter-spacing:.1em;color:var(--gold);text-align:center;margin-bottom:6px}
+.sub{text-align:center;color:var(--muted);font-size:.95rem;margin-bottom:22px}
+.header-strip{width:100%;border-radius:14px;overflow:hidden;margin-bottom:22px;border:1px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.header-strip img{width:100%;height:auto;display:block;max-height:200px;object-fit:cover}
+.film{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:860px){.film{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.film{grid-template-columns:1fr}}
+.cell{display:flex;flex-direction:column;gap:8px}
+.banner{display:block;border-radius:12px;overflow:hidden;border:1px solid rgba(224,169,78,.35);box-shadow:0 12px 32px rgba(0,0,0,.5);transition:transform .15s,border-color .15s;position:relative}
+.banner:hover{transform:translateY(-3px);border-color:var(--gold)}
+.banner.uc{opacity:.72;cursor:default}
+.banner.uc:hover{transform:none}
+.banner img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block}
+.banner .uc-tag{position:absolute;left:10px;top:10px;font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .5rem;border-radius:6px;background:rgba(0,0,0,.75);color:#ffb86b;border:1px solid rgba(255,184,107,.4)}
+.banner.lib-card{display:grid;place-items:center;aspect-ratio:2/3;background:radial-gradient(ellipse at 50% 30%,rgba(57,192,230,.22),transparent 55%),linear-gradient(165deg,#0c1524,#07080c 70%);text-decoration:none}
+.banner.lib-card img{width:42%;height:auto;aspect-ratio:auto;object-fit:contain;filter:drop-shadow(0 0 14px rgba(57,192,230,.55))}
+.banner.lib-card .lib-label{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-family:var(--font-display);letter-spacing:.14em;font-size:1.35rem;color:var(--gold)}
+.cap{font-size:.8rem;color:var(--muted);line-height:1.35;text-align:center}
+.libfab{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:30;width:60px;height:60px;border-radius:50%;border:1px solid rgba(57,192,230,.35);background:rgba(8,12,22,.92);display:grid;place-items:center;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.libfab img{width:40px;height:40px;animation:spinY 6s linear infinite;filter:drop-shadow(0 0 8px rgba(57,192,230,.6))}
+@keyframes spinY{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <button type="button" class="logo-btn" id="logoBtn" aria-haspopup="true"><img src="/static/layouts/percfect-site/reup/logo-clear.png" alt="PERCFECT STUDIOS" onerror="this.src='/static/layouts/percfect-site/home/logo-clear.png'"/></button>
+  <div class="dd" id="pagesMenu">
+    <a href="/">Home</a>
+    <a href="/create">Create</a>
+    <a href="/build">Build</a>
+    <a href="/play">Play</a>
+    <a href="/percfectposts">Post</a>
+    <a href="/cards">Cards</a>
+    <div class="sep"></div>
+    <a class="on" href="/re-up">Re-Up</a>
+    <a href="/studios/library">Library</a>
+    <a href="/settings">Settings</a>
+  </div>
+  <div class="wallet">
+    <span class="chip"><span class="dot"></span><span id="crBal">0</span> credits</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>RE-UP</h1>
+  <p class="sub">Credits · tickets · account · support</p>
+  <div class="header-strip"><img src="/static/layouts/percfect-site/reup/header.jpg" alt="Percfect Re-Up"/></div>
+  <div class="film">
+    <div class="cell">
+      <a class="banner" href="/credits"><img src="/static/layouts/percfect-site/reup/credits.jpg" alt="Credits"/></a>
+      <p class="cap">Credits — buy packs &amp; subscriptions</p>
+    </div>
+    <div class="cell">
+      <a class="banner uc" href="/re-up/tickets" title="Under construction"><span class="uc-tag">Under construction</span><img src="/static/layouts/percfect-site/reup/tickets.jpg" alt="Hero Tickets"/></a>
+      <p class="cap">Hero Tickets — coming soon</p>
+    </div>
+    <div class="cell">
+      <a class="banner" href="/re-up/api-keys" title="API Keys"><img src="/static/layouts/percfect-site/reup/apikeys.jpg" alt="API Keys"/></a>
+      <p class="cap">API Keys</p>
+    </div>
+    <div class="cell">
+      <a class="banner lib-card" href="/studios/library" title="Your Library">
+        <img src="/static/layouts/percfect-site/reup/crownp.png" alt="" onerror="this.src='/static/assets/brand/library_fab_crownp.png'"/>
+        <span class="lib-label">LIBRARY</span>
+      </a>
+      <p class="cap">Library — photos · videos · characters</p>
+    </div>
+    <div class="cell">
+      <a class="banner" href="/support"><img src="/static/layouts/percfect-site/reup/support.jpg" alt="Support"/></a>
+      <p class="cap">Support — get help</p>
+    </div>
+    <div class="cell">
+      <a class="banner uc" href="/re-up/settings-hub" title="Under construction"><span class="uc-tag">Under construction</span><img src="/static/layouts/percfect-site/reup/settings.jpg" alt="Settings"/></a>
+      <p class="cap">Settings — coming soon</p>
+    </div>
+    <div class="cell">
+      <a class="banner" href="/settings"><img src="/static/layouts/percfect-site/reup/account.jpg" alt="Account"/></a>
+      <p class="cap">Account — your profile</p>
+    </div>
+  </div>
+</main>
+
+<a class="libfab" href="/studios/library" id="libFab" title="Open Library"><img src="/static/layouts/percfect-site/reup/crownp.png" alt="" onerror="this.src='/static/layouts/percfect-site/home/crownp.png'"/></a>
+<script src="/static/js/user_library_sidebar.js" defer></script>
+<script src="/static/js/percfect_playlist.js?v=playlist-bl-1" defer></script>
+<script>
+(function(){
+  var b=document.getElementById('logoBtn'), m=document.getElementById('pagesMenu');
+  if(b&&m){ b.onclick=function(e){e.stopPropagation();m.classList.toggle('open')}; document.onclick=function(){m.classList.remove('open')}; }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "key": "collector",
+  "label": "Collector",
+  "outer": "#ffcb05",
+  "mid": "#3b4cca",
+  "inner": "#ffcb05",
+  "bg1": "#1a2040",
+  "bg2": "#0c1020",
+  "accent": "#ffcb05",
+  "name_color": "#ffcb05",
+  "stat_border": "#3b4cca",
+  "frame_url": "/static/assets/cards/themes/collector/frame.svg",
+  "bg_url": "/static/assets/cards/themes/collector/bg.svg"
+}

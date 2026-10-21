@@ -1,0 +1,7 @@
+.venv/
+.conda-env/
+color_mask_test_output/
+_test_frame.jpg
+_test_clip.mp4
+__pycache__/
+*.pyc

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420" fill="none">
+  <!-- Outer gold double border -->
+  <rect x="18" y="48" width="264" height="340" rx="4" fill="none" stroke="#c9a227" stroke-width="6"/>
+  <rect x="24" y="54" width="252" height="328" rx="2" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+  <rect x="28" y="58" width="244" height="320" rx="2" fill="none" stroke="#e8c547" stroke-width="1.5"/>
+  <!-- Top name plate bar -->
+  <rect x="48" y="22" width="220" height="36" rx="4" fill="#0a0a0a" stroke="#c9a227" stroke-width="3"/>
+  <!-- Badge circle left of name -->
+  <circle cx="42" cy="40" r="22" fill="#c9a227" stroke="#1a1a1a" stroke-width="3"/>
+  <circle cx="42" cy="40" r="16" fill="#0a0a0a" stroke="#f0c14a" stroke-width="1.5"/>
+</svg>

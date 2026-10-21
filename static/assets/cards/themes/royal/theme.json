@@ -1,0 +1,14 @@
+{
+  "key": "royal",
+  "label": "Royal",
+  "outer": "#c9a227",
+  "mid": "#6b21a8",
+  "inner": "#e9d5ff",
+  "bg1": "#2e1065",
+  "bg2": "#0f0720",
+  "accent": "#c9a227",
+  "name_color": "#fde68a",
+  "stat_border": "#a855f7",
+  "frame_url": "/static/assets/cards/themes/royal/frame.svg",
+  "bg_url": "/static/assets/cards/themes/royal/bg.svg"
+}

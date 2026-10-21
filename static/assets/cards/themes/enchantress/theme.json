@@ -1,0 +1,14 @@
+{
+  "key": "enchantress",
+  "label": "Enchantress",
+  "outer": "#f0c14a",
+  "mid": "#166534",
+  "inner": "#86efac",
+  "bg1": "#052e16",
+  "bg2": "#0a1f12",
+  "accent": "#f0c14a",
+  "name_color": "#f0c14a",
+  "stat_border": "#22c55e",
+  "frame_url": "/static/assets/cards/themes/enchantress/frame.svg",
+  "bg_url": "/static/assets/cards/themes/enchantress/bg.svg"
+}

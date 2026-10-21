@@ -1,0 +1,14 @@
+{
+  "key": "hero",
+  "label": "Hero",
+  "outer": "#ffc107",
+  "mid": "#f0c14a",
+  "inner": "#8b6914",
+  "bg1": "#1a1208",
+  "bg2": "#0a0a0c",
+  "accent": "#ffc107",
+  "name_color": "#ffc107",
+  "stat_border": "#ffc107",
+  "frame_url": "/static/assets/cards/themes/hero/frame.svg",
+  "bg_url": "/static/assets/cards/themes/hero/bg.svg"
+}

@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en" class="antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Percfect Productions</title>
+    <meta name="description" content="Drop a folder of clips. Matching openings auto-trim onto the tree and timeline." />
+    <meta name="theme-color" content="#09090b" />
+    <meta property="og:title" content="Percfect Productions" />
+    <meta property="og:image" content="/percfectproductions/og.jpg" />
+    <link rel="icon" type="image/svg+xml" href="/percfectproductions/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="/percfectproductions/assets/productions-Dl0TdY3F.js?v=fix-4"></script>
+    <link rel="stylesheet" crossorigin href="/percfectproductions/assets/productions-C9YhnH0p.css">
+    <script src="/static/js/user_library_sidebar.js?v=lib-chain-1" defer></script>
+    <script src="/static/js/user_library_glb_drop.js?v=glb-drop-1" defer></script>
+    <script src="/static/js/percfect_playlist.js?v=playlist-bl-1" defer></script>
+    <script src="/percfectproductions/percfect-chrome.js?v=fix-6" defer></script>
+  </head>
+  <body class="bg-bg text-fg">
+    <div id="app"></div>
+
+
+<style>
+  /* Match Home/Build/Create .libfab — spinning crown-P, bottom-right */
+  .user-lib-fab {
+    position: fixed;
+    right: 22px;
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    z-index: 1200;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 1px solid rgba(57, 192, 230, 0.35);
+    background: rgba(8, 12, 22, 0.92);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 0 24px rgba(57, 192, 230, 0.25);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    filter: none;
+  }
+  .user-lib-fab:hover {
+    border-color: #39c0e6;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), 0 0 36px rgba(57, 192, 230, 0.6);
+    transform: none;
+  }
+  .user-lib-fab.open { opacity: 0.9; }
+  .user-lib-fab.user-lib-fab--inline {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    z-index: 1;
+    flex: 0 0 auto;
+  }
+  .user-lib-fab.user-lib-fab--inline img {
+    animation: none;
+    width: 100%;
+    height: 100%;
+    filter: none;
+  }
+  .user-lib-fab img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    display: block;
+    border-radius: 0;
+    animation: percfectLibSpinY 6s linear infinite;
+    filter: drop-shadow(0 0 8px rgba(57, 192, 230, 0.6));
+  }
+  @keyframes percfectLibSpinY {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(360deg); }
+  }
+  .user-lib-scrim {
+    position: fixed; inset: 0; z-index: 1205;
+    background: rgba(0,0,0,.45); opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  .user-lib-scrim.open { opacity: 1; pointer-events: auto; }
+  .user-lib-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 1210;
+    width: min(360px, 92vw);
+    background: var(--bg-2);
+    border-left: 1px solid var(--border);
+    box-shadow: -16px 0 48px rgba(0,0,0,.45);
+    transform: translateX(105%);
+    transition: transform .22s ease;
+    display: flex; flex-direction: column;
+  }
+  .user-lib-panel.open { transform: translateX(0); }
+  .lib-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1rem; border-bottom: 1px solid var(--border);
+    gap: .5rem;
+  }
+  .lib-head h3 {
+    margin: 0; font-size: .95rem; font-weight: 800; letter-spacing: -.02em;
+  }
+  .lib-head-actions { display: flex; gap: .35rem; }
+  .lib-icon-btn {
+    width: 34px; height: 34px; border-radius: 10px;
+    border: 1px solid var(--border-2); background: var(--bg-3);
+    color: var(--text-muted); cursor: pointer; font-size: .95rem;
+  }
+  .lib-icon-btn:hover { border-color: var(--accent); color: var(--accent-3); }
+  .lib-tabs {
+    display: flex; gap: .25rem; padding: .55rem .65rem;
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .lib-tab {
+    flex: 0 0 auto; padding: .4rem .7rem; border-radius: 99px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--text-muted); font-size: .75rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+  }
+  .lib-tab:hover { color: var(--text); }
+  .lib-tab.active {
+    background: rgba(124,92,252,.15); border-color: rgba(124,92,252,.35);
+    color: var(--accent-3);
+  }
+  .lib-body {
+    flex: 1; overflow-y: auto; padding: .75rem;
+    display: flex; flex-direction: column; gap: .55rem;
+  }
+  .lib-empty {
+    color: var(--text-muted); font-size: .85rem; text-align: center;
+    padding: 2rem 1rem; margin: 0; line-height: 1.5;
+  }
+  .lib-item {
+    display: flex; gap: .65rem; align-items: center;
+    padding: .5rem; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--bg-3);
+    cursor: grab; user-select: none; transition: border-color .15s, transform .15s;
+  }
+  .lib-item:hover { border-color: rgba(124,92,252,.45); transform: translateY(-1px); }
+  .lib-item.dragging { opacity: .55; cursor: grabbing; }
+  .lib-item.pickable { cursor: pointer; }
+  .lib-item.pick-selected {
+    border-color: #00ff88 !important;
+    box-shadow: 0 0 0 2px rgba(0,255,136,.35);
+    background: rgba(0,255,136,.08);
+  }
+  .lib-item.pick-selected .lib-kind { color: #86efac; }
+  .lib-pick-banner {
+    display: none;
+    margin: 0;
+    padding: .65rem .85rem;
+    background: linear-gradient(90deg, rgba(0,255,136,.12), rgba(124,92,252,.12));
+    border-bottom: 1px solid rgba(0,255,136,.3);
+    font-size: .8rem;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .lib-pick-banner.show { display: block; }
+  .lib-pick-banner strong { color: #86efac; }
+  .lib-pick-actions {
+    display: none;
+    gap: .5rem;
+    padding: .55rem .75rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-3);
+  }
+  .lib-pick-actions.show { display: flex; }
+  .lib-pick-done {
+    flex: 1;
+    padding: .55rem .75rem;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #00c96b, #00ff88);
+    color: #04140c;
+    font-weight: 800;
+    font-size: .82rem;
+    cursor: pointer;
+  }
+  .lib-pick-done:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    filter: grayscale(.3);
+  }
+  .lib-pick-cancel {
+    padding: .55rem .75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-2);
+    background: var(--bg-2);
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: .78rem;
+    cursor: pointer;
+  }
+  body.lib-pick-mode .lib-tab {
+    /* active tab lock is applied in JS per pickMode.tab */
+  }
+  .lib-thumb {
+    width: 56px; height: 56px; border-radius: 10px; overflow: hidden;
+    background: var(--bg); flex-shrink: 0; position: relative;
+  }
+  .lib-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Full-screen zoom — works in browse AND Arena/Motion pick mode */
+  .lib-zoom-btn {
+    position: absolute; right: 2px; bottom: 2px; z-index: 3;
+    width: 22px; height: 22px; padding: 0; border: none; border-radius: 6px;
+    background: rgba(0,0,0,.72); color: #fff; font-size: .72rem; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .lib-zoom-btn:hover { background: var(--accent); }
+  .lib-vid-ph {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    color: var(--accent-3); font-size: 1.1rem; background: #0a0a12;
+  }
+  .lib-badge {
+    position: absolute; top: 3px; left: 3px;
+    background: rgba(0,0,0,.75); color: var(--accent-3);
+    font-size: .55rem; font-family: var(--font-mono); padding: .1rem .3rem; border-radius: 4px;
+  }
+  .lib-meta { min-width: 0; flex: 1; }
+  .lib-name {
+    font-size: .82rem; font-weight: 700; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .lib-kind {
+    font-size: .68rem; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: .06em; font-family: var(--font-mono); margin-top: .15rem;
+  }
+  .lib-pager {
+    display: none; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: .4rem; padding: .45rem .65rem; border-top: 1px solid var(--border);
+    background: var(--bg-2);
+  }
+  .lib-pager-meta {
+    font-size: .68rem; color: var(--text-muted); font-family: var(--font-mono);
+  }
+  .lib-page-btns { display: flex; flex-wrap: wrap; gap: .25rem; }
+  .lib-page-btn {
+    min-width: 28px; height: 28px; padding: 0 .45rem; border-radius: 8px;
+    border: 1px solid var(--border-2); background: var(--bg-3);
+    color: var(--text-muted); font-size: .72rem; font-weight: 700; cursor: pointer;
+  }
+  .lib-page-btn:hover { border-color: var(--accent); color: var(--accent-3); }
+  .lib-page-btn.active {
+    background: rgba(124,92,252,.2); border-color: rgba(124,92,252,.45); color: var(--accent-3);
+  }
+  .lib-foot {
+    padding: .55rem .85rem; border-top: 1px solid var(--border);
+    font-size: .72rem; color: var(--text-muted); text-align: center;
+  }
+  .lib-toast {
+    position: fixed; bottom: 5.5rem; right: 1rem; z-index: 1100;
+    background: var(--bg-3); border: 1px solid rgba(124,92,252,.4);
+    color: var(--text); padding: .55rem 1rem; border-radius: 10px;
+    font-size: .82rem; opacity: 0; pointer-events: none;
+    transition: opacity .2s; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  .lib-toast.show { opacity: 1; }
+  /* Full-screen media preview — above panel (1050) + toast (1100) */
+  .lib-media-lightbox {
+    position: fixed; inset: 0; z-index: 12000;
+    background: rgba(0,0,0,.92);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 1.25rem; gap: .75rem;
+    cursor: zoom-out;
+  }
+  .lib-media-lightbox img,
+  .lib-media-lightbox video {
+    max-width: min(94vw, 1100px);
+    max-height: 72vh;
+    border-radius: 12px;
+    box-shadow: 0 0 60px rgba(0,0,0,.75);
+    object-fit: contain;
+    background: #0a0a12;
+    cursor: default;
+  }
+  .lib-media-lightbox-actions {
+    display: flex; flex-wrap: wrap; gap: .5rem;
+    justify-content: center; max-width: 94vw;
+  }
+  .lib-lb-btn {
+    border: none; border-radius: 10px;
+    padding: .55rem 1rem; font-size: .82rem; font-weight: 700;
+    cursor: pointer;
+    background: linear-gradient(135deg, #7c5cfc, #2a4fcf);
+    color: #fff;
+  }
+  .lib-lb-btn:hover { filter: brightness(1.08); }
+  .lib-lb-btn-ghost {
+    background: var(--bg-3, #1a1a28);
+    border: 1px solid rgba(255,255,255,.2);
+    color: #fff;
+  }
+  .lib-media-lightbox-hint {
+    margin: 0; font-size: .72rem; color: rgba(255,255,255,.5);
+    text-align: center;
+  }
+  .lib-drop-zone.lib-drop-hover {
+    outline: 2px dashed var(--accent) !important;
+    outline-offset: 4px;
+    background: rgba(124,92,252,.08) !important;
+  }
+  body.lib-dragging .lib-drop-zone {
+    outline: 1px dashed rgba(124,92,252,.35);
+    outline-offset: 3px;
+  }
+  /* OS file drop for .glb onto 3D tab */
+  .lib-3d-tools {
+    flex-wrap: wrap;
+  }
+  .lib-3d-tools .lib-3d-hint {
+    flex: 1 1 100%;
+    font-size: .68rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.35;
+  }
+  .lib-body.lib-3d-file-drop {
+    position: relative;
+  }
+  .lib-body.lib-3d-file-drop.lib-file-drag {
+    outline: 2px dashed #00ff88;
+    outline-offset: -6px;
+    background: rgba(0,255,136,.06);
+  }
+  .lib-body.lib-3d-file-drop.lib-file-drag::after {
+    content: 'Drop .glb files to add to library';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+    font-weight: 800;
+    font-size: .95rem;
+    color: #86efac;
+    text-align: center;
+    padding: 1rem;
+    background: rgba(6, 12, 18, 0.72);
+  }
+  .lib-empty-3d-drop {
+    border: 2px dashed rgba(0,255,136,.35);
+    border-radius: 14px;
+    padding: 1.25rem 1rem;
+    margin: .5rem 0;
+    background: rgba(0,255,136,.04);
+    cursor: pointer;
+  }
+  .lib-empty-3d-drop:hover {
+    border-color: #00ff88;
+    background: rgba(0,255,136,.08);
+  }
+  .lib-empty-3d-drop strong { color: #86efac; display: block; margin-bottom: .35rem; }
+  @media (max-width: 520px) {
+    .user-lib-panel { width: 100vw; }
+  }
+</style>
+
+<button type="button" class="user-lib-fab" id="user-lib-fab" title="Your library" aria-label="Open your library"><img src="/static/layouts/percfect-site/home/crownp.png" alt="" onerror="this.src='/static/assets/brand/library_fab_crownp.png'" /></button>
+<div class="user-lib-scrim" id="user-lib-scrim" aria-hidden="true"></div>
+<aside class="user-lib-panel" id="user-lib-panel" aria-label="Your media library">
+  <div class="lib-head">
+    <h3>Your library</h3>
+    <div class="lib-head-actions">
+      <button type="button" class="lib-icon-btn" id="user-lib-refresh" title="Refresh">↻</button>
+      <button type="button" class="lib-icon-btn" id="user-lib-close" title="Close">✕</button>
+    </div>
+  </div>
+  <div class="lib-pick-banner" id="lib-pick-banner" role="status"></div>
+  <div class="lib-tabs" role="tablist">
+    <button type="button" class="lib-tab active" data-tab="characters">Characters</button>
+    <button type="button" class="lib-tab" data-tab="cards">Cards</button>
+    <button type="button" class="lib-tab" data-tab="photos">Photos</button>
+    <button type="button" class="lib-tab" data-tab="videos">Videos</button>
+    <button type="button" class="lib-tab" data-tab="backgrounds">Backgrounds</button>
+    <button type="button" class="lib-tab" data-tab="3d">3D</button>
+  </div>
+  <div class="lib-3d-tools" id="lib-3d-tools" hidden style="display:none;padding:.4rem .65rem;border-bottom:1px solid var(--border);gap:.4rem;align-items:center;">
+    <button type="button" class="lib-icon-btn" id="lib-3d-upload" title="Upload or drop GLB from your computer" style="width:auto;padding:0 .65rem;font-size:.72rem;font-weight:700;">↑ Upload GLB</button>
+    <a class="lib-icon-btn" href="/3d" title="Open 3D stage" style="width:auto;padding:0 .65rem;font-size:.72rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">↗ 3D stage</a>
+    <input type="file" id="lib-3d-file" accept=".glb,model/gltf-binary,application/octet-stream" multiple hidden />
+    <p class="lib-3d-hint">Drop .glb files from Finder onto this panel · or click Upload</p>
+  </div>
+  <div class="lib-body" id="lib-body" data-glb-drop="1">
+    <p class="lib-empty">Open to load your media…</p>
+  </div>
+  <div class="lib-pager" id="lib-pager" aria-label="Library pages"></div>
+  <div class="lib-pick-actions" id="lib-pick-actions">
+    <button type="button" class="lib-pick-cancel" id="lib-pick-cancel">Cancel</button>
+    <button type="button" class="lib-pick-done" id="lib-pick-done" disabled>Use selected</button>
+  </div>
+  <div class="lib-foot" id="lib-foot">Click to enlarge · drag onto Studio · 3D tab: drop .glb from your computer</div>
+</aside>
+<script src="/static/js/user_library_glb_drop.js?v=glb-drop-1" defer></script>
+
+
+  </body>
+</html>

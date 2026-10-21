@@ -1,0 +1,14 @@
+{
+  "key": "neon",
+  "label": "Neon",
+  "outer": "#22d3ee",
+  "mid": "#e879f9",
+  "inner": "#22d3ee",
+  "bg1": "#083344",
+  "bg2": "#0c0a14",
+  "accent": "#22d3ee",
+  "name_color": "#a5f3fc",
+  "stat_border": "#e879f9",
+  "frame_url": "/static/assets/cards/themes/neon/frame.svg",
+  "bg_url": "/static/assets/cards/themes/neon/bg.svg"
+}

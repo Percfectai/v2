@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Colosseum · 2 AIs · 3 bodies · Controller</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1a24; color: #e3d4b6; font-family: system-ui, sans-serif; }
+    canvas { display: block; touch-action: none; }
+    #banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+      display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: center;
+      padding: 0.4rem 0.75rem; background: linear-gradient(90deg, rgba(227,212,182,0.2), rgba(255,92,122,0.15));
+      border-bottom: 1px solid rgba(227,212,182,0.4); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    #banner strong { color: #fff; }
+    #hud {
+      position: fixed; top: 2.6rem; left: 50%; transform: translateX(-50%); z-index: 25;
+      font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+      background: rgba(0,0,0,0.6); border: 1px solid rgba(227,212,182,0.35); border-radius: 99px;
+      padding: 0.35rem 0.85rem; pointer-events: none; white-space: nowrap;
+    }
+    #pick {
+      position: fixed; top: 5rem; left: 0.75rem; z-index: 30;
+      background: rgba(0,0,0,0.82); border: 1px solid rgba(0,255,136,0.35); border-radius: 12px;
+      padding: 0.65rem 0.75rem; width: min(280px, calc(100vw - 1.5rem)); font-size: 0.78rem;
+    }
+    #pick h2 { margin: 0 0 0.4rem; font-size: 0.72rem; letter-spacing: 0.08em; color: #86efac; text-transform: uppercase; }
+    #pick label { display: block; margin: 0.35rem 0 0.15rem; color: #94a3b8; font-size: 0.65rem; }
+    #pick select, #pick button {
+      width: 100%; box-sizing: border-box; background: #0f172a; color: #e2e8f0;
+      border: 1px solid rgba(148,163,184,0.35); border-radius: 8px; padding: 0.4rem 0.45rem; font-size: 0.8rem;
+    }
+    #pick button {
+      margin-top: 0.55rem; background: rgba(0,120,80,0.55); border-color: rgba(0,255,136,0.45);
+      font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    #pick button:hover { background: rgba(0,160,100,0.65); }
+    #hint {
+      position: fixed; bottom: 0.75rem; left: 0.75rem; z-index: 25;
+      background: rgba(0,0,0,0.65); border: 1px solid rgba(227,212,182,0.3); border-radius: 10px;
+      padding: 0.45rem 0.65rem; font-size: 0.68rem; max-width: min(360px, 55vw); line-height: 1.4;
+    }
+    #err { color: #f87171; margin-top: 0.35rem; font-size: 0.7rem; }
+    .colo-label {
+      font-weight: 900; font-size: 13px; padding: 3px 10px; border-radius: 999px;
+      background: rgba(0,0,0,0.72); border: 2px solid currentColor; color: #fff;
+      white-space: nowrap; text-shadow: 0 1px 2px #000; transform: translate(-50%, -100%);
+      pointer-events: none; user-select: none;
+    }
+    .colo-label small { display: block; font-size: 9px; font-weight: 700; opacity: 0.85; letter-spacing: 0.06em; text-transform: uppercase; }
+    #wgc-root { z-index: 40; }
+  </style>
+  <script src="/static/js/world_group_chat.js?v=5"></script>
+</head>
+<body>
+  <div id="banner"><strong>COLOSSEUM DUEL</strong> · 2 AIs · pick body · chat by name · controller</div>
+  <div id="hud">Loading…</div>
+  <div id="pick">
+    <h2>Bodies (prerigged)</h2>
+    <label>YOU pilot → agent name</label>
+    <select id="pilot-agent">
+      <option value="voltage">Voltage</option>
+      <option value="ashley">Ashley</option>
+    </select>
+    <label>Your character (3 choices)</label>
+    <select id="pilot-char">
+      <option value="poyo_H">1 · poyo_H</option>
+      <option value="poyo_I">2 · poyo_I</option>
+      <option value="poyo_X" selected>3 · poyo_X (default)</option>
+    </select>
+    <label>Other AI agent</label>
+    <select id="other-agent">
+      <option value="ashley" selected>Ashley</option>
+      <option value="voltage">Voltage</option>
+    </select>
+    <label>Other AI character</label>
+    <select id="other-char">
+      <option value="poyo_H" selected>1 · poyo_H</option>
+      <option value="poyo_I">2 · poyo_I</option>
+      <option value="poyo_X">3 · poyo_X</option>
+    </select>
+    <button type="button" id="btn-load">Load arena</button>
+    <div id="err"></div>
+  </div>
+  <div id="hint">
+    WASD walk · Shift run · Space jump<br>
+    B punch · N heavy · K kick · L roundhouse · G block · Q dodge · C cast · T taunt · H hurt · X KO<br>
+    Chat: @Voltage / @Ashley · speak-as seat
+  </div>
+  <div id="wgc-root" class="wgc-root" data-world-chat data-room="colosseum"
+       data-title="Colosseum chat" data-subtitle="2 AIs · name them" data-seats="Voltage,Ashley"></div>
+
+  <script type="importmap">
+  { "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }}
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+  import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+  const SB = 'https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims';
+  const ACTIONS = [
+    'idle','walk_fwd','walk_back','strafe_left','strafe_right','run','jump',
+    'punch','heavy_punch','kick','roundhouse','block','dodge','cast','taunt','hurt','ko',
+  ];
+  const AGENT_META = {
+    voltage: { id: 'voltage', label: 'Voltage', role: 'Commander', tint: '#00ff88' },
+    ashley: { id: 'ashley', label: 'Ashley', role: 'Support', tint: '#ff7eb6' },
+  };
+
+  function setUrls(key) {
+    const o = {};
+    for (const a of ACTIONS) o[a] = `${SB}/${key}/${a}.glb`;
+    return o;
+  }
+
+  const hud = document.getElementById('hud');
+  const errEl = document.getElementById('err');
+  const setHud = (t) => { hud.textContent = t; };
+  const setErr = (t) => { errEl.textContent = t || ''; };
+
+  // —— Scene ——
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a24);
+  scene.fog = new THREE.FogExp2(0x1a1a24, 0.012);
+  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 500);
+  camera.position.set(0, 14, 28);
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default', failIfMajorPerformanceCaveat: false });
+  } catch (e) {
+    setErr('WebGL failed — close other 3D tabs. ' + e.message);
+    throw e;
+  }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(innerWidth, innerHeight);
+  labelRenderer.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:15';
+  document.body.appendChild(labelRenderer.domElement);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 2.5, 0);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const sun = new THREE.DirectionalLight(0xfff5e6, 1.4);
+  sun.position.set(40, 55, 25); sun.castShadow = true; scene.add(sun);
+
+  // Sand floor + simple ring (no metro, light colosseum)
+  const sand = new THREE.Mesh(
+    new THREE.CylinderGeometry(28, 28, 0.8, 48),
+    new THREE.MeshStandardMaterial({ color: 0xdfc08a, roughness: 0.9 })
+  );
+  sand.position.y = -0.4; sand.receiveShadow = true; scene.add(sand);
+  const stone = new THREE.MeshStandardMaterial({ color: 0xe3d4b6, roughness: 0.85 });
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const p = new THREE.Mesh(new THREE.BoxGeometry(3.2, 8, 2.2), stone);
+    p.position.set(Math.cos(a) * 32, 4, Math.sin(a) * 32);
+    p.lookAt(0, 4, 0);
+    p.castShadow = true;
+    scene.add(p);
+  }
+
+  const loader = new GLTFLoader();
+  const cache = new Map();
+  async function getGltf(url) {
+    if (cache.has(url)) return cache.get(url);
+    const g = await loader.loadAsync(url);
+    cache.set(url, g);
+    return g;
+  }
+
+  function plant(root, h = 6.2) {
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const s = h / Math.max(0.001, size.y);
+    root.scale.setScalar(s);
+    const b2 = new THREE.Box3().setFromObject(root);
+    root.position.y -= b2.min.y;
+    return root.position.y;
+  }
+
+  function nameLabel(entry) {
+    const el = document.createElement('div');
+    el.className = 'colo-label';
+    el.style.color = entry.tint || '#e3d4b6';
+    el.innerHTML = `${entry.label}<small>${entry.role} · ${entry.charKey || ''}</small>`;
+    const obj = new CSS2DObject(el);
+    obj.position.set(0, 7.0, 0);
+    return obj;
+  }
+
+  /** Load full 17-set onto one body (same character's baked clips — controller.html pattern). */
+  async function loadAgent(entry, x, z, isPilot) {
+    const urls = setUrls(entry.charKey);
+    setHud(`Loading ${entry.label} · ${entry.charKey}…`);
+    const idleG = await getGltf(urls.idle);
+    // SkeletonUtils.clone keeps skinned mesh + bones intact (scene.clone breaks skins)
+    let root;
+    try {
+      root = skeletonClone(idleG.scene);
+    } catch (_) {
+      root = idleG.scene.clone(true);
+    }
+    root.name = entry.id;
+    const floorY = plant(root, 6.2);
+    root.position.x = x;
+    root.position.z = z;
+    root.position.y = floorY;
+    root.traverse((o) => {
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+    });
+    root.add(nameLabel(entry));
+    scene.add(root);
+
+    const mixer = new THREE.AnimationMixer(root);
+    const clips = {};
+    // Bind clips from each action GLB onto THIS root (same Meshy char skeleton)
+    async function bindClip(name, url) {
+      const g = await getGltf(url);
+      const clip = g.animations && g.animations[0];
+      if (!clip) return;
+      const action = mixer.clipAction(clip, root);
+      action.enabled = true;
+      action.setEffectiveWeight(0);
+      action.play();
+      clips[name] = action;
+    }
+    await bindClip('idle', urls.idle);
+    if (clips.idle) {
+      clips.idle.setEffectiveWeight(1);
+    }
+    await Promise.all(ACTIONS.filter((n) => n !== 'idle').map((name) =>
+      bindClip(name, urls[name]).catch((e) => console.warn('clip', name, e))
+    ));
+    const nClips = Object.keys(clips).length;
+    if (nClips < 2) {
+      throw new Error(`${entry.charKey}: only ${nClips} clips loaded — check Supabase`);
+    }
+
+    let current = clips.idle || null;
+    let currentName = 'idle';
+    function play(name) {
+      if (!clips[name] || currentName === name) return;
+      const next = clips[name];
+      if (current) {
+        current.fadeOut(0.12);
+        current.setEffectiveWeight(0);
+      }
+      next.reset().setEffectiveWeight(1).fadeIn(0.12).play();
+      current = next;
+      currentName = name;
+    }
+    if (clips.idle) play('idle');
+
+    return {
+      entry, root, mixer, clips, play,
+      floorY,
+      isPilot,
+    };
+  }
+
+  let agents = [];
+  let pilot = null;
+  const keys = {};
+  const MOVE = 9;
+  const BOUNDS = 24;
+  const camFwd = new THREE.Vector3();
+  const camRight = new THREE.Vector3();
+  const moveDir = new THREE.Vector3();
+
+  function pickAction() {
+    if (!pilot) return 'idle';
+    const c = pilot.clips;
+    if (keys.KeyG && c.block) return 'block';
+    if (keys.KeyX && c.ko) return 'ko';
+    if (keys.KeyH && c.hurt) return 'hurt';
+    if (keys.KeyT && c.taunt) return 'taunt';
+    if (keys.KeyC && c.cast) return 'cast';
+    if (keys.KeyQ && c.dodge) return 'dodge';
+    if (keys.KeyN && c.heavy_punch) return 'heavy_punch';
+    if (keys.KeyL && c.roundhouse) return 'roundhouse';
+    if (keys.KeyB && c.punch) return 'punch';
+    if (keys.KeyK && c.kick) return 'kick';
+    if (keys.Space && c.jump) return 'jump';
+    const fwd = keys.KeyW || keys.ArrowUp;
+    const back = keys.KeyS || keys.ArrowDown;
+    const left = keys.KeyA || keys.ArrowLeft;
+    const right = keys.KeyD || keys.ArrowRight;
+    const run = keys.ShiftLeft || keys.ShiftRight;
+    if (fwd) return run && c.run ? 'run' : (c.walk_fwd ? 'walk_fwd' : 'idle');
+    if (back) return c.walk_back ? 'walk_back' : 'idle';
+    if (left) return c.strafe_left ? 'strafe_left' : 'idle';
+    if (right) return c.strafe_right ? 'strafe_right' : 'idle';
+    return 'idle';
+  }
+
+  function updatePilotMove(dt) {
+    if (!pilot) return;
+    let ix = 0, iy = 0;
+    if (keys.KeyW || keys.ArrowUp) iy += 1;
+    if (keys.KeyS || keys.ArrowDown) iy -= 1;
+    if (keys.KeyA || keys.ArrowLeft) ix -= 1;
+    if (keys.KeyD || keys.ArrowRight) ix += 1;
+    const len = Math.hypot(ix, iy);
+    if (len < 0.08) return;
+    ix /= len; iy /= len;
+    camera.getWorldDirection(camFwd);
+    camFwd.y = 0;
+    if (camFwd.lengthSq() < 1e-6) camFwd.set(0, 0, -1); else camFwd.normalize();
+    camRight.crossVectors(camFwd, new THREE.Vector3(0, 1, 0)).normalize();
+    moveDir.set(0, 0, 0);
+    moveDir.addScaledVector(camRight, ix);
+    moveDir.addScaledVector(camFwd, iy);
+    if (moveDir.lengthSq() < 1e-8) return;
+    moveDir.normalize();
+    const sp = (keys.ShiftLeft || keys.ShiftRight) ? MOVE * 1.55 : MOVE;
+    pilot.root.position.x += moveDir.x * sp * dt;
+    pilot.root.position.z += moveDir.z * sp * dt;
+    pilot.root.position.y = pilot.floorY;
+    const r = Math.hypot(pilot.root.position.x, pilot.root.position.z);
+    if (r > BOUNDS) {
+      pilot.root.position.x *= BOUNDS / r;
+      pilot.root.position.z *= BOUNDS / r;
+    }
+    pilot.root.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+    controls.target.lerp(new THREE.Vector3(pilot.root.position.x, pilot.floorY + 3, pilot.root.position.z), 1 - Math.exp(-2.2 * dt));
+  }
+
+  // Other AI: idle wander a little
+  function updateNpc(dt, now) {
+    for (const a of agents) {
+      if (a.isPilot) continue;
+      if (!a._next) a._next = now + 800;
+      if (now < a._next) continue;
+      a._next = now + 1800 + Math.random() * 2200;
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 4 + Math.random() * 10;
+      a._tx = Math.cos(ang) * rad;
+      a._tz = Math.sin(ang) * rad;
+      if (a.clips.walk_fwd) a.play('walk_fwd');
+    }
+    for (const a of agents) {
+      if (a.isPilot || a._tx == null) continue;
+      const dx = a._tx - a.root.position.x;
+      const dz = a._tz - a.root.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.35) {
+        a.play('idle');
+        a._tx = null;
+        continue;
+      }
+      a.root.position.x += (dx / d) * 4.2 * dt;
+      a.root.position.z += (dz / d) * 4.2 * dt;
+      a.root.position.y = a.floorY;
+      a.root.rotation.y = Math.atan2(dx, dz);
+    }
+  }
+
+  async function loadArena() {
+    setErr('');
+    setHud('Loading 2 agents…');
+    // clear old
+    for (const a of agents) {
+      scene.remove(a.root);
+      if (a.mixer) a.mixer.stopAllAction();
+    }
+    agents = [];
+    pilot = null;
+
+    let pilotId = document.getElementById('pilot-agent').value;
+    let otherId = document.getElementById('other-agent').value;
+    if (pilotId === otherId) otherId = pilotId === 'voltage' ? 'ashley' : 'voltage';
+    const pilotChar = document.getElementById('pilot-char').value;
+    let otherChar = document.getElementById('other-char').value;
+    if (otherChar === pilotChar) {
+      otherChar = pilotChar === 'poyo_X' ? 'poyo_H' : 'poyo_X';
+    }
+
+    const pMeta = { ...AGENT_META[pilotId], charKey: pilotChar };
+    const oMeta = { ...AGENT_META[otherId], charKey: otherChar };
+
+    try {
+      const p = await loadAgent(pMeta, -5, 2, true);
+      const o = await loadAgent(oMeta, 5, -2, false);
+      agents = [p, o];
+      pilot = p;
+      setHud(`Pilot: ${pMeta.label} (${pilotChar}) · Other: ${oMeta.label} (${otherChar}) · WASD + B punch`);
+      camera.position.set(p.root.position.x, 12, p.root.position.z + 18);
+      controls.target.set(p.root.position.x, 3, p.root.position.z);
+      // Chat seats = both agent display names
+      if (window.PercfectWorldChat) {
+        PercfectWorldChat.mount({
+          el: document.getElementById('wgc-root'),
+          room: 'colosseum',
+          seats: [pMeta.label, oMeta.label],
+          loggedIn: true,
+          title: 'Colosseum chat',
+          subtitle: `${pMeta.label} + ${oMeta.label}`,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setErr('Load failed: ' + (e.message || e));
+      setHud('Load failed');
+    }
+  }
+
+  document.getElementById('btn-load').onclick = () => loadArena();
+
+  // Chat mount (default seats until load)
+  fetch('/percfectstudios/session-info', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    .then((r) => r.json())
+    .then((d) => {
+      const logged = !!(d && (d.logged_in || d.username || d.user_id || d.is_admin));
+      const name = (d && (d.username || d.name)) || '';
+      if (window.PercfectWorldChat) {
+        PercfectWorldChat.mount({
+          el: document.getElementById('wgc-root'),
+          room: 'colosseum',
+          seats: ['Voltage', 'Ashley'],
+          loggedIn: logged,
+          username: name,
+          title: 'Colosseum chat',
+          subtitle: '2 AIs · pick bodies · chat by name',
+        });
+      }
+    })
+    .catch(() => {
+      if (window.PercfectWorldChat) {
+        PercfectWorldChat.mount({
+          el: document.getElementById('wgc-root'),
+          room: 'colosseum',
+          seats: ['Voltage', 'Ashley'],
+          loggedIn: false,
+          title: 'Colosseum chat',
+          subtitle: '2 AIs · log in to chat',
+        });
+      }
+    });
+
+  addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  });
+  addEventListener('keyup', (e) => { keys[e.code] = false; });
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    labelRenderer.setSize(innerWidth, innerHeight);
+  });
+
+  const clock = new THREE.Clock();
+  function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, clock.getDelta());
+    const now = performance.now();
+    updatePilotMove(dt);
+    if (pilot) pilot.play(pickAction());
+    updateNpc(dt, now);
+    for (const a of agents) if (a.mixer) a.mixer.update(dt);
+    controls.update();
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+  }
+  loop();
+
+  // Default: 3rd character poyo_X for pilot — auto load
+  setHud('Ready · default pilot body = poyo_X (3rd)');
+  loadArena();
+  </script>
+</body>
+</html>

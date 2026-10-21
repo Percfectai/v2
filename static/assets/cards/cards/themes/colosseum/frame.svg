@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" fill="none">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0d78c"/>
+      <stop offset="50%" stop-color="#e8a54b"/>
+      <stop offset="100%" stop-color="#6b5420"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="292" height="412" rx="10" stroke="url(#gold)" stroke-width="9" fill="none"/>
+  <rect x="12" y="12" width="276" height="396" rx="6" stroke="#1a1a1a" stroke-width="4" fill="none"/>
+  <rect x="17" y="17" width="266" height="386" rx="4" stroke="url(#gold)" stroke-width="1.5" fill="none" opacity="0.7"/>
+  <!-- crown-like top bar -->
+  <path d="M40 12 L60 28 L150 18 L240 28 L260 12" stroke="url(#gold)" stroke-width="2" fill="none" opacity="0.9"/>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "key": "vintage",
+  "label": "Vintage",
+  "layout": "vintage",
+  "series": "VINTAGE SERIES",
+  "outer": "#0a0a0a",
+  "mid": "#1a1a1a",
+  "inner": "#f5f0e6",
+  "bg1": "#0a0a0c",
+  "bg2": "#050508",
+  "accent": "#f0c14a",
+  "name_color": "#ffffff",
+  "stat_border": "#f0c14a",
+  "scene_url": "/static/assets/cards/themes/vintage/scene.jpg",
+  "bg_url": "/static/assets/cards/themes/vintage/scene.jpg",
+  "frame_url": "/static/assets/cards/themes/vintage/frame.svg"
+}

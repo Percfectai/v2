@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ "Percfect Videos" if studio_mode == "videos" else "Percfect Pictures" }} — Percfect Studios{% endblock %}
+{% block content %}
+<div id="studio-app" data-mode="{{ studio_mode }}">
+    <!-- STUB: The real percfectstudios.html had the full photos/videos studio UI.
+         This includes: prompt input, reference photo upload, aspect ratio picker,
+         batch controls, AI-assist, saved/recent strip, results grid.
+         Restore from the live site or rebuild per HANDOFFS/01_PHOTOS.md -->
+    <h1>{{ "Percfect Videos" if studio_mode == "videos" else "Percfect Pictures" }}</h1>
+    <p style="color:#aaa;">Studio template stub — needs full UI restoration.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/studio_jobs.js"></script>
+{% if studio_mode == "videos" %}
+<script src="/static/js/video_extend.js"></script>
+{% endif %}
+{% endblock %}

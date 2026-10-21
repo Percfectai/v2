@@ -1,0 +1,1730 @@
+{% extends "base.html" %}
+{% block title %}PERCFECT CHARACTERS{% endblock %}
+{% block body_class %}theme-characters{% endblock %}
+
+{% block content %}
+
+<!-- Title only (same DNA as Photos / Videos) -->
+<div class="studio-hero char-hero-top">
+  <div class="container">
+    <h1 class="hero-grad char-page-title">PERCFECT CHARACTERS</h1>
+    {# Wallet hooks for spend UI (credits also in nav) #}
+    <span id="img-credits" class="visually-hidden" aria-hidden="true">{% if user %}{{ user.picture_credits }}{% else %}0{% endif %}</span>
+    <span id="vid-credits" style="display:none" aria-hidden="true">{% if user %}{{ user.picture_credits }}{% else %}0{% endif %}</span>
+  </div>
+</div>
+
+<div class="container char-board-wrap">
+  <div class="chars-board" id="char-panel">
+
+    <!-- LEFT: name · sex · description · Start building -->
+    <div class="chars-col chars-col-prompt">
+      <label class="chars-label" for="char-name">Name</label>
+      <input class="form-control chars-input" id="char-name" placeholder="Character name" maxlength="80" autocomplete="off" />
+
+      <span class="chars-label">Sex</span>
+      <div class="chars-mf" role="group" aria-label="Sex">
+        <button type="button" class="chars-mf-btn" id="gender-male" onclick="setGender('male')">Male</button>
+        <button type="button" class="chars-mf-btn" id="gender-female" onclick="setGender('female')">Female</button>
+        <button type="button" class="chars-mf-btn" id="gender-other" onclick="setGender('other')">Other</button>
+      </div>
+
+      <label class="chars-label" for="desc">Description</label>
+      <textarea class="form-control chars-prompt" id="desc" rows="5" placeholder="Face, outfit, vibe…" autocomplete="off"></textarea>
+
+      <button class="generate-btn chars-start-btn" id="gen-btn" onclick="generateOne()">
+        <span class="btn-text" id="gen-btn-label">Start building</span>
+        <span class="btn-spinner" style="display:none">Building…</span>
+      </button>
+      <div id="gen-err" class="gen-error" style="display:none"></div>
+    </div>
+
+    <!-- MIDDLE: 4 generation boxes (no camera refs) -->
+    <div class="chars-col chars-col-gens">
+      <div class="chars-gen-four" id="gen-four" aria-label="Generated shots">
+        <button type="button" class="chars-gen-slot" id="gen-slot-0" data-slot="0" onclick="charFocusGen(0)"><span class="slot-ph">1</span><img id="gen-slot-img-0" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-1" data-slot="1" onclick="charFocusGen(1)"><span class="slot-ph">2</span><img id="gen-slot-img-1" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-2" data-slot="2" onclick="charFocusGen(2)"><span class="slot-ph">3</span><img id="gen-slot-img-2" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-3" data-slot="3" onclick="charFocusGen(3)"><span class="slot-ph">4</span><img id="gen-slot-img-3" alt="" /></button>
+      </div>
+      {# Legacy one-shot display (JS hooks) — mirrored into gen-slot-0 #}
+      <div class="output-area" id="one-out" style="display:none" aria-hidden="true">
+        <div class="loading-overlay" id="one-loading"><div class="spinner"></div><p>Building…</p></div>
+        <img id="one-img" src="" alt="" />
+      </div>
+    </div>
+
+    <!-- RIGHT: reference photo · Percfect Precision -->
+    <div class="chars-col chars-col-adv">
+      <div class="mode-pane" id="upload-pane" style="margin:0;flex:1;display:flex;flex-direction:column;min-height:0">
+        <div class="chars-main-ref" id="ref-slots" data-lib-drop="character-ref">
+          {# Characters: one reference photo only #}
+          <div class="ref-cell chars-main-ref-cell" data-slot="0" id="ref-slot-0" tabindex="0" role="button" aria-label="Reference photo"
+            onclick="pickRefSlot(0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickRefSlot(0);}">
+            <div class="ref-cell-inner" id="ref-slot-body-0"></div>
+          </div>
+        </div>
+        <input type="file" id="file" accept="image/*" style="display:none" onchange="handleFile(this)" />
+        <div id="drop" class="lib-drop-zone" style="display:none" aria-hidden="true"></div>
+      </div>
+
+      <div class="chars-precision-wrap">
+        <button type="button" class="chars-precision-btn" id="super-accuracy-main-btn" onclick="superAccuracyRegen()">Percfect Precision</button>
+        <button type="button" class="chars-precision-q" id="precision-q" title="About Percfect Precision" aria-label="About Percfect Precision" onclick="toggleCharTip(event,'precision')">?</button>
+        <div class="char-tip chars-precision-tip" id="tip-precision">
+          Having trouble finding your character? AI doesn’t like re-creating specific characters.
+          We try to help recreate you a more accurate match with a <strong>95% proven accuracy</strong>.
+          Type <strong>only the character’s name</strong> in the prompt box. We do the rest 😉 ·
+          <strong>5 credits</strong>
+        </div>
+      </div>
+      {# Second hook for review path #}
+      <button type="button" id="super-accuracy-btn" style="display:none" aria-hidden="true" onclick="superAccuracyRegen()">Percfect Precision</button>
+    </div>
+
+    <!-- Progress full width -->
+    <div class="chars-progress-row">
+      <div class="progress-wrap" id="fin-wrap" style="display:none">
+        <div class="progress-top"><span id="fin-label">Building…</span><span class="progress-time"><span id="fin-elapsed">0</span>s</span></div>
+        <div class="progress-track"><div class="progress-bar" id="fin-bar"></div></div>
+        <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
+      </div>
+    </div>
+
+    <!-- Wide stage: selected still / 360° spin -->
+    <div class="chars-wide-row">
+      <div class="chars-wide" id="chars-wide">
+        <span class="chars-wide-badge" id="chars-wide-badge" style="display:none">360° spin</span>
+        <span class="chars-wide-ph" id="chars-wide-ph">Like the first shot? Make it a character → 4 stills + 360° here</span>
+        <img id="chars-wide-img" alt="" onclick="if(this.src)openLightbox(this.src)" style="display:none;cursor:zoom-in" />
+        <div class="output-area spin-out" id="final-spin-out" style="min-height:auto;background:transparent;border:none">
+          <div class="output-placeholder" id="final-spin-ph" style="display:none"><p class="ph-text"></p></div>
+          <video id="final-spin" controls loop muted playsinline style="display:none;width:100%;max-height:58vh;border-radius:12px;background:#000"></video>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions: Make it a character -->
+    <div class="chars-actions-row">
+      <div id="review-section" style="display:none" class="chars-review-actions">
+        <div id="review-prompt-wrap" style="display:none">
+          <textarea class="form-control" id="review-prompt" rows="2" style="display:none" aria-hidden="true"></textarea>
+        </div>
+        <div class="review-row chars-make-row">
+          <button type="button" class="btn-accent chars-make-btn" id="make-char-btn" onclick="approveOne()">Make it a character? ({{ pack_cost|default(40) }})</button>
+          <button type="button" class="btn-outline-accent" onclick="regenFront()">↻ Start building again</button>
+        </div>
+        <div id="review-err" class="gen-error" style="display:none"></div>
+      </div>
+
+      <div id="final-section" style="display:none" class="chars-final-actions">
+        <div class="approved-pill">✓ Character built</div>
+        <div class="shots-grid" id="final-grid" style="display:none" aria-hidden="true"></div>
+        <div id="char-pack-actions" style="display:none;text-align:center">
+          <div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap">
+            <a id="char-pack-dl" href="#" class="btn-accent" style="display:none">↓ Download pack</a>
+            <button type="button" class="btn-outline-accent" onclick="showRefine()">✕ Fix one angle</button>
+            <button type="button" class="btn-outline-accent" onclick="showEditPrompt()">✏️ Edit description</button>
+          </div>
+        </div>
+        <div id="approval-row" style="display:none;text-align:center">
+          <button type="button" class="btn-accent" onclick="runCharacterSpin(false)">↻ Retry 360° spin (1 credit)</button>
+        </div>
+        <div id="editprompt-section" style="display:none" class="mt-3">
+          <textarea class="form-control" id="editprompt-text" rows="3" placeholder="Description"></textarea>
+          <div class="review-row" style="margin-top:.5rem">
+            <button type="button" class="btn-accent" style="flex:1" onclick="redoFromPrompt()">↻ Regenerate · 1 credit</button>
+            <button type="button" class="btn-outline-accent" onclick="hide('editprompt-section')">Cancel</button>
+          </div>
+          <div id="editprompt-err" class="gen-error" style="display:none"></div>
+        </div>
+        <div id="refine-section" style="display:none" class="mt-3">
+          <label class="form-label">Which photo</label>
+          <div class="shots-grid" id="refine-picker"></div>
+          <input class="form-control mt-2" id="refine-text" placeholder="Optional fix only if something is wrong (e.g. wrong hair color)…" autocomplete="off" />
+          <div class="review-row" style="margin-top:.5rem">
+            <button type="button" class="btn-accent" style="flex:1" onclick="applyRefine()">Apply + re-spin · 2 credits</button>
+            <button type="button" class="btn-outline-accent" onclick="hide('refine-section')">Cancel</button>
+          </div>
+          <div id="refine-err" class="gen-error" style="display:none"></div>
+        </div>
+        <button type="button" class="btn-outline-accent w-100 mt-3" onclick="resetBuilder()">＋ Create another character</button>
+        <a href="/studios/percfectcharacter/arena" class="btn-accent w-100 mt-2 d-block" style="text-align:center">⚔ Enter PERCFECT ARENA →</a>
+      </div>
+      <div id="fin-err" class="gen-error" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Roster: scroll down · all characters · profiles via CharProfile ── -->
+<div class="container mt-5 mb-6 char-roster-section" id="gallery-section">
+  <div class="roster-head">
+    <div>
+      <p class="section-label" style="margin:0">Your PERCFECT CHARACTERS</p>
+      <p class="library-hint" style="margin:.35rem 0 0;font-size:.8rem;color:var(--text-muted)">Scroll to see your full roster · tap a card for profile · select &amp; manage</p>
+    </div>
+    <a href="/studios/percfectcharacter/arena" class="btn-accent arena-btn">⚔ Enter PERCFECT ARENA →</a>
+  </div>
+  <div id="roster-empty" class="roster-empty" style="display:none">No characters yet — start building above.</div>
+  <div id="roster-err" class="gen-error" style="display:none"></div>
+  <div class="roster-grid" id="roster-grid"></div>
+</div>
+
+{% include 'partials/credit_pay_modal.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── PERCFECT CHARACTERS board (Photos/Videos DNA) ── */
+.visually-hidden {
+  position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+.char-hero-top {
+  text-align:center;
+  padding:2.5rem 1rem 1rem;
+  position:relative;
+}
+.char-hero-top::before {
+  content:''; position:absolute; top:-10%; left:50%; transform:translateX(-50%);
+  width:700px; height:700px; border-radius:50%;
+  background:radial-gradient(circle,rgba(217,70,239,.16) 0%,transparent 65%);
+  pointer-events:none;
+}
+.char-page-title {
+  position:relative;
+  font-size:clamp(2.2rem,6vw,4rem); font-weight:900;
+  letter-spacing:-.05em; line-height:1.05; margin:0;
+}
+.hero-grad {
+  background:linear-gradient(135deg,#fff 0%,var(--accent-3) 40%,var(--accent) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.char-board-wrap { max-width:1100px; margin:0 auto 2rem; }
+.chars-board {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-areas:
+    "prompt gens adv"
+    "progress progress progress"
+    "wide wide wide"
+    "actions actions actions";
+  gap:1rem;
+  align-items:stretch;
+}
+.chars-col-prompt { grid-area:prompt; display:flex; flex-direction:column; min-width:0; gap:.45rem; }
+.chars-col-gens { grid-area:gens; min-width:0; display:flex; flex-direction:column; min-height:16rem; }
+.chars-col-adv {
+  grid-area:adv; min-width:0; display:flex; flex-direction:column; gap:.65rem;
+  padding:.85rem; border:1px solid var(--border-2); border-radius:14px; background:var(--bg-3);
+}
+.chars-progress-row { grid-area:progress; }
+.chars-wide-row { grid-area:wide; }
+.chars-actions-row { grid-area:actions; }
+
+.chars-label {
+  font-family:var(--font-mono); font-size:.68rem; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin:0;
+}
+.chars-input, .chars-prompt {
+  width:100%; border-radius:12px !important; border:1px solid var(--border-2) !important;
+  background:var(--bg-3) !important; color:var(--text) !important;
+  font-size:.95rem !important; padding:.7rem .9rem !important;
+}
+.chars-prompt { flex:1 1 auto; min-height:8rem !important; resize:vertical; }
+.chars-mf { display:flex; gap:.4rem; width:100%; }
+.chars-mf-btn {
+  flex:1 1 0; border:1px solid var(--border-2); background:var(--bg-2); color:var(--text-muted);
+  border-radius:12px; padding:.55rem .3rem; font-size:.82rem; font-weight:800; cursor:pointer;
+}
+.chars-mf-btn.active, .chars-mf-btn:hover { border-color:var(--accent); color:#fff; background:var(--accent); }
+.chars-start-btn {
+  width:100%; margin-top:.35rem; border:none; border-radius:14px; padding:.8rem;
+  font-weight:800; font-size:.95rem; cursor:pointer; color:#fff;
+  background:linear-gradient(135deg,#d946ef,#a855f7) !important;
+  box-shadow:0 4px 24px rgba(217,70,239,.35);
+}
+.chars-start-btn:disabled { opacity:.55; cursor:wait; }
+
+.chars-gen-four {
+  display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+  gap:.45rem; flex:1 1 auto; min-height:16rem; height:100%;
+}
+.chars-gen-slot {
+  position:relative; min-height:0; border:2px dashed var(--border-2); border-radius:12px;
+  background:var(--bg-3); overflow:hidden; cursor:pointer; padding:0;
+}
+.chars-gen-slot.filled { border-style:solid; border-color:var(--accent); }
+.chars-gen-slot.active { box-shadow:0 0 0 2px var(--accent); }
+.chars-gen-slot img { display:none; width:100%; height:100%; object-fit:contain; object-position:center; background:#0a0a12; }
+.chars-gen-slot.filled img { display:block; }
+.chars-gen-slot .slot-ph {
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-family:var(--font-mono); font-size:.72rem; color:var(--text-muted); font-weight:700;
+}
+.chars-gen-slot.filled .slot-ph { display:none; }
+
+.chars-main-ref {
+  flex:1 1 auto; min-height:12rem; width:100%;
+  border:2px dashed var(--border-2); border-radius:14px; background:var(--bg-2);
+  overflow:hidden; position:relative;
+}
+.chars-main-ref-cell {
+  position:absolute; inset:0; min-height:100% !important; aspect-ratio:auto !important;
+  border:none !important; border-radius:0 !important; cursor:pointer;
+}
+.chars-main-ref .ref-cell-inner { height:100%; }
+.chars-main-ref:not(.has-ref) .ref-cell-inner::after {
+  content:'Reference photo\A drop · paste · or 📚 library';
+  white-space:pre-line; text-align:center; color:var(--text-muted); font-size:.85rem;
+  position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
+  padding:1rem; line-height:1.4;
+}
+.chars-main-ref.has-ref { border-style:solid; border-color:var(--accent); }
+
+.chars-precision-wrap { position:relative; flex-shrink:0; margin-top:auto; }
+.chars-precision-btn {
+  width:100%; border:1px solid rgba(232,121,249,.45);
+  background:linear-gradient(135deg,rgba(217,70,239,.22),rgba(168,85,247,.18));
+  color:var(--accent-3); border-radius:12px; padding:.7rem 1.6rem .7rem .55rem;
+  font-size:.82rem; font-weight:800; cursor:pointer;
+}
+.chars-precision-btn:hover { filter:brightness(1.08); }
+.chars-precision-q {
+  position:absolute; top:6px; right:6px; z-index:3; width:18px; height:18px;
+  border-radius:50%; border:1px solid var(--border-2); background:rgba(0,0,0,.45);
+  color:var(--text-muted); font-size:.65rem; font-weight:700; cursor:pointer;
+  display:grid; place-items:center; padding:0;
+}
+.chars-precision-tip {
+  top:auto !important; bottom:calc(100% + 6px) !important; right:0; left:auto;
+  max-width:min(260px,70vw);
+}
+
+.chars-wide {
+  position:relative; width:100%; max-width:960px; margin:0 auto;
+  min-height:min(36vh,300px); border:2px dashed var(--border-2); border-radius:14px;
+  background:var(--bg-3); overflow:hidden; display:grid; place-items:center;
+}
+.chars-wide.has-media { border-style:solid; border-color:rgba(232,121,249,.4); }
+.chars-wide-ph { font-family:var(--font-mono); font-size:.78rem; color:var(--text-muted); text-align:center; padding:1rem; }
+.chars-wide.has-media .chars-wide-ph { display:none; }
+.chars-wide-badge {
+  position:absolute; top:.5rem; left:.5rem; z-index:2; font-family:var(--font-mono);
+  font-size:.65rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  background:rgba(0,0,0,.65); color:#fff; padding:.25rem .5rem; border-radius:8px;
+}
+.chars-wide img { max-width:100%; max-height:58vh; object-fit:contain; }
+
+.chars-make-row { display:flex; flex-wrap:wrap; gap:.55rem; justify-content:center; margin-top:.5rem; }
+.chars-make-btn {
+  border:none !important; font-weight:800 !important; font-size:.95rem !important;
+  padding:.75rem 1.35rem !important;
+  background:linear-gradient(135deg,#d946ef,#a855f7) !important;
+  box-shadow:0 4px 20px rgba(217,70,239,.3);
+}
+.char-roster-section { scroll-margin-top:1rem; padding-bottom:4rem; }
+.section-label { font-family:var(--font-mono); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--text-muted); }
+.library-hint { font-size:.8rem; color:var(--text-muted); }
+.roster-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:.75rem; margin-bottom:1rem; }
+.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.85rem; }
+.mb-6 { margin-bottom:4rem; }
+
+@media (max-width:800px) {
+  .chars-board {
+    grid-template-columns:1fr;
+    grid-template-areas:"prompt" "gens" "adv" "progress" "wide" "actions";
+  }
+  .chars-gen-four { min-height:14rem; }
+  .char-hero-top { padding:2rem 1rem .75rem; }
+}
+
+/* legacy bits still used by refine / etc */
+.builder-wrap { max-width:1100px; margin:0 auto; }
+.mode-toggle { display:flex; background:var(--bg-3); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:1rem; }
+.mode-btn { flex:1; padding:.55rem; border:none; border-radius:9px; background:transparent; color:var(--text-muted); font-family:var(--font-main); font-weight:600; font-size:.9rem; cursor:pointer; transition:all .2s; }
+.mode-btn.active { background:var(--accent); color:#fff; }
+.mode-pane { margin-bottom:1rem; }
+.drop-zone { border:2px dashed var(--border-2); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all .2s; color:var(--text-muted); font-size:.85rem; background:var(--bg-3); }
+.drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent); background:rgba(124,92,252,.06); color:var(--accent-2); }
+.drop-zone.has-image { border-style:solid; border-color:var(--accent); }
+/* Quiet secondary — not a giant yellow CTA */
+.think-smarter-row {
+  text-align:center;
+  margin:.55rem 0 0;
+  font-size:.8rem;
+  color:var(--text-muted);
+  line-height:1.4;
+}
+.think-smarter-link {
+  background:none;
+  border:none;
+  padding:0;
+  margin:0 .15rem;
+  color:var(--accent-2);
+  font:inherit;
+  font-weight:600;
+  font-size:.8rem;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  cursor:pointer;
+}
+.think-smarter-link:hover { color:var(--accent-3); }
+.think-smarter-link:disabled { opacity:.5; cursor:wait; text-decoration:none; }
+.think-smarter-hint { font-size:.72rem; opacity:.75; }
+.super-acc-btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+
+.generate-btn { width:100%; padding:.75rem; border-radius:14px; border:none; cursor:pointer; background:linear-gradient(135deg,var(--accent),#5a3fcf); color:#fff; font-size:1rem; font-weight:700; font-family:var(--font-main); transition:all .2s; margin-bottom:.5rem; box-shadow:0 4px 24px rgba(124,92,252,.3); }
+.generate-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,92,252,.45); }
+.generate-btn:disabled { opacity:.55; transform:none; cursor:not-allowed; box-shadow:none; }
+.credit-note { font-size:.75rem; color:var(--text-muted); text-align:center; margin-bottom:1rem; }
+.form-hint { font-size:.72rem; color:var(--text-muted); font-weight:400; }
+
+/* Description + M/F side column */
+.char-prompt-section { margin-bottom:1rem; }
+.char-prompt-row {
+  display:flex;
+  align-items:stretch;
+  gap:.55rem;
+}
+.char-prompt-main { flex:1; min-width:0; }
+.char-prompt-frame {
+  position:relative;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--bg-3);
+  padding:.55rem .75rem .55rem;
+  min-height:100%;
+}
+.char-prompt-label {
+  display:block;
+  font-size:.78rem;
+  font-weight:600;
+  color:var(--text-muted);
+  margin:0 1.4rem .35rem 0;
+  letter-spacing:0;
+  text-transform:none;
+}
+.char-prompt,
+.char-prompt-input {
+  width:100%;
+  border-radius:10px !important;
+  border:none !important;
+  background:transparent !important;
+  color:var(--text) !important;
+  font-size:1rem !important;
+  line-height:1.45 !important;
+  padding:.35rem .15rem .5rem !important;
+  resize:vertical;
+  min-height:5.5rem;
+  box-shadow:none !important;
+}
+.char-prompt-input { resize:none; min-height:2.75rem; }
+.char-prompt:focus,
+.char-prompt-input:focus {
+  outline:none !important;
+  box-shadow:none !important;
+}
+.char-prompt-frame:focus-within {
+  border-color:rgba(124,92,252,.55);
+  box-shadow:0 0 0 3px rgba(124,92,252,.15);
+}
+/* Corner ? tips on prompt frame */
+.char-q {
+  position:absolute;
+  top:.4rem; right:.4rem;
+  z-index:3;
+  width:18px; height:18px;
+  border-radius:50%;
+  border:1px solid var(--border-2);
+  background:var(--bg-2);
+  color:var(--text-muted);
+  font-size:.65rem;
+  font-weight:700;
+  line-height:1;
+  padding:0;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.char-q-br { top:auto; bottom:.4rem; right:.4rem; }
+.char-q:hover, .char-q.open { color:var(--accent-3); border-color:var(--accent); }
+.char-tip {
+  display:none;
+  position:absolute;
+  top:1.7rem; right:.35rem;
+  z-index:5;
+  max-width:min(240px, 70vw);
+  padding:.45rem .55rem;
+  border-radius:8px;
+  background:rgba(12,12,20,.96);
+  border:1px solid var(--border-2);
+  color:var(--text);
+  font-size:.7rem;
+  line-height:1.35;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  text-align:left;
+}
+.char-tip-br { top:auto; bottom:1.7rem; }
+.char-tip.show { display:block; }
+/* Compact M / F next to description */
+.char-mf {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  width:2.4rem;
+  flex-shrink:0;
+}
+.char-mf-btn {
+  flex:1;
+  min-height:0;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--bg-3);
+  color:var(--text-muted);
+  font-weight:800;
+  font-size:.85rem;
+  font-family:var(--font-main);
+  cursor:pointer;
+  padding:0;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.char-mf-btn.active {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+}
+.char-mf-btn:hover:not(.active) {
+  border-color:var(--accent);
+  color:var(--accent-3);
+}
+
+.output-area { background:var(--bg-3); border:1px solid var(--border); border-radius:var(--radius-lg); min-height:300px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+.output-area img { max-width:100%; max-height:460px; width:100%; border-radius:var(--radius); object-fit:contain; }
+.spin-out video { width:100%; max-height:420px; border-radius:var(--radius); object-fit:contain; }
+.shimmer-overlay { display:none; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(124,92,252,.08) 50%,transparent 100%); background-size:200% 100%; animation:shimmer 1.5s infinite; }
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.loading-overlay{ display:none; position:absolute; inset:0; background:rgba(13,13,24,.92); flex-direction:column; align-items:center; justify-content:center; color:var(--accent-3); text-align:center; gap:.85rem; z-index:5; backdrop-filter:blur(4px); }
+.loading-overlay.show{ display:flex; }
+.loading-overlay p{ margin:0; font-weight:700; font-size:1.05rem; }
+.loading-overlay small{ color:var(--text-muted); font-weight:500; font-size:.78rem; }
+.spinner{ width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin{ to{transform:rotate(360deg);} }
+
+.shots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; }
+.shot { aspect-ratio:1; border-radius:12px; overflow:hidden; border:1px solid var(--border); background:var(--bg-3); }
+.shot img { width:100%; height:100%; object-fit:contain; object-position:center; background:#0a0a12; }
+@media(max-width:560px){ .shots-grid{ grid-template-columns:repeat(2,1fr);} }
+
+.review-row { display:flex; gap:.6rem; margin-top:.9rem; }
+.approved-pill { display:inline-flex; align-items:center; gap:.4rem; color:var(--success); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:99px; padding:.3rem .9rem; font-size:.78rem; font-weight:600; margin-bottom:.9rem; }
+.gen-error { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:var(--danger); border-radius:10px; padding:.75rem 1rem; font-size:.85rem; margin-top:.5rem; }
+
+.progress-wrap { margin:1rem 0; padding:1rem 1.25rem; background:var(--bg-3); border:1px solid var(--border); border-radius:14px; }
+.progress-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem; font-size:.85rem; font-weight:600; }
+.progress-time { font-family:var(--font-mono); font-size:.8rem; color:var(--accent-2); }
+.progress-track { background:var(--bg-2); border-radius:99px; height:8px; overflow:hidden; }
+.progress-bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:99px; transition:width 1s linear; }
+.progress-hint { font-size:.75rem; color:var(--text-muted); margin-top:.5rem; text-align:center; }
+
+.roster-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
+.arena-btn { font-size:.95rem; padding:.6rem 1.4rem; }
+.roster-empty { color:var(--text-muted); font-size:.9rem; padding:2rem; text-align:center; border:1px dashed var(--border-2); border-radius:var(--radius-lg); }
+.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:1rem; }
+.rchar { background:var(--bg-2); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:border-color .2s,box-shadow .2s,transform .2s; }
+.rbtn { flex:1; padding:.35rem .5rem; border-radius:9px; border:1px solid var(--border-2); background:var(--bg-3); color:var(--text); font-size:.72rem; cursor:pointer; transition:all .15s; text-decoration:none; text-align:center; white-space:nowrap; }
+.rbtn:hover { border-color:var(--accent); color:var(--accent-3); }
+.rbtn.locked { opacity:.55; }
+.rbtn.danger:hover { border-color:var(--danger); color:var(--danger); }
+.d-block{display:block;}
+/* One drop box → three equal squares */
+.ref-box {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:0;
+  border:2px dashed var(--border-2);
+  border-radius:12px;
+  background:var(--bg-3);
+  overflow:hidden;
+}
+.ref-cell {
+  position:relative;
+  aspect-ratio:1;
+  min-height:0;
+  cursor:pointer;
+  border-right:1px solid var(--border);
+  outline:none;
+  transition:background .15s;
+}
+.ref-cell:last-child { border-right:none; }
+.ref-cell:hover, .ref-cell:focus-visible {
+  background:rgba(124,92,252,.08);
+}
+.ref-cell.drag-over, .ref-cell.paste-flash {
+  background:rgba(0,255,136,.1);
+  box-shadow:inset 0 0 0 2px rgba(0,255,136,.55);
+}
+.ref-cell.filled { background:transparent; }
+.ref-cell-inner {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  text-align:center; padding:.5rem;
+  gap:.15rem;
+}
+.ref-cell-inner img {
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:contain; object-position:center;
+  display:block; background:#0a0a12;
+}
+.ref-cell-mark {
+  font-size:clamp(1.35rem, 4.5vw, 1.75rem);
+  line-height:1.15;
+  user-select:none;
+}
+.ref-cell-cr {
+  font-size:.58rem;
+  font-weight:700;
+  font-family:var(--font-mono);
+  letter-spacing:.02em;
+  color:var(--text-muted);
+  margin-top:.2rem;
+  user-select:none;
+}
+.ref-cell-q {
+  position:absolute;
+  top:.28rem; right:.28rem;
+  z-index:4;
+  width:16px; height:16px;
+  border-radius:50%;
+  border:1px solid var(--border-2);
+  background:rgba(20,20,30,.85);
+  color:var(--text-muted);
+  font-size:.58rem;
+  font-weight:700;
+  line-height:1;
+  padding:0;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.ref-cell-q:hover, .ref-cell-q.open { color:var(--accent-3); border-color:var(--accent); }
+.ref-cell-tip {
+  display:none;
+  position:absolute;
+  top:1.35rem; right:.2rem;
+  z-index:6;
+  width:min(150px, 42vw);
+  padding:.4rem .45rem;
+  border-radius:8px;
+  background:rgba(12,12,20,.96);
+  border:1px solid var(--border-2);
+  color:var(--text);
+  font-size:.65rem;
+  line-height:1.3;
+  text-align:left;
+  box-shadow:0 8px 20px rgba(0,0,0,.4);
+}
+.ref-cell-tip.show { display:block; }
+.ref-cell.filled .ref-cell-mark {
+  position:absolute; top:.3rem; left:.3rem; z-index:2;
+  font-size:.85rem;
+  background:rgba(0,0,0,.72);
+  border-radius:8px;
+  padding:.1rem .28rem;
+  line-height:1.1;
+}
+.ref-cell.filled .ref-cell-cr { display:none; }
+.ref-cell-x {
+  position:absolute; top:.3rem; right:.3rem; z-index:3;
+  width:22px; height:22px; border:none; border-radius:50%;
+  background:rgba(0,0,0,.7); color:#fff; font-size:.85rem; cursor:pointer;
+  line-height:1; display:flex; align-items:center; justify-content:center;
+}
+.ref-cell-x:hover { background:rgba(248,113,113,.95); }
+.ref-cell-cta {
+  position:absolute; left:0; right:0; bottom:0; z-index:2;
+  padding:.35rem .25rem;
+  background:linear-gradient(transparent, rgba(0,0,0,.85));
+  font-size:.62rem; font-weight:600; color:#f4f4ff; text-align:center;
+}
+#desc.desc-flash {
+  box-shadow: 0 0 0 2px rgba(134,239,172,.5);
+  transition: box-shadow .15s;
+}
+/* Keep three equal photo squares on all widths */
+</style>
+
+<script src="/static/js/studio_jobs.js?v=gen-opt-3"></script>
+<script>
+const LOGGED_IN = {{ 'true' if user else 'false' }};
+const INITIAL_CHARACTERS = {{ initial_characters|tojson }};
+let canDownload = {{ 'true' if user and user.has_purchased else 'false' }};
+const PACK_COST = {{ pack_cost|default(40) }};
+const REGEN_COST = 1;
+const SUPER_ACCURACY_COST = 5; /* Percfect Precision — flat 5, no per-ref surcharge */
+const MAX_REFS = 1; /* Characters: one reference photo only */
+const CREDIT_PACKAGES = {{ packages|tojson if packages else '{}' }};
+const STRIPE_PK = {{ (stripe_pk or '')|tojson }};
+/** refs: [{kind:'file'|'url', file?:File, url?:string, preview:string}] — length 1 */
+const state = {
+  gender:null, mode:'describe',
+  refs:[null],
+  file:null, imageUrl:null, candidate:null, prompt:null, busy:false,
+  pendingSlot: null,
+};
+function refSlots(){ return state.refs || [null]; }
+function compactRefList(){ return refSlots().filter(Boolean); }
+function hasPhoto(){ return compactRefList().length > 0 || !!(state.file || state.imageUrl); }
+function refCount(){ return compactRefList().length; }
+function firstEmptySlot(){
+  const r = refSlots();
+  for(let i=0;i<MAX_REFS;i++) if(!r[i]) return i;
+  return -1;
+}
+function genCost(){
+  // Regular Generate: 1 credit flat (ref free). Percfect Precision: 5 (separate path).
+  return 1;
+}
+function sourceMode(){ return hasPhoto() ? 'upload' : 'describe'; }
+function descText(){ return (document.getElementById('desc')?.value || '').trim(); }
+/** Single ref marker (legacy emoji strip still cleaned from user text). */
+const REF_PIC_MARKERS = ['1️⃣📸'];
+function refPicMarker(slot){
+  return REF_PIC_MARKERS[0] || '1️⃣📸';
+}
+function descriptionForApi(raw){
+  // Plain user text only — never send @Image / IMAGE_ tags to the model path as user copy
+  let out = (raw || '').trim();
+  out = out.replace(/<\/?IMAGE_\d+>/gi, '');
+  out = out.replace(/@\s*[Ii]mage[\s_]*\d+/gi, '');
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+function updateGenCostUI(){
+  const lab = document.getElementById('gen-btn-label');
+  if(lab) lab.textContent = 'Start building';
+  const make = document.getElementById('make-char-btn');
+  if(make) make.textContent = 'Make it a character? (' + PACK_COST + ')';
+}
+function toggleCharTip(e, id){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  const tip = document.getElementById('tip-' + id);
+  const btn = e && e.currentTarget;
+  const open = tip && tip.classList.contains('show');
+  document.querySelectorAll('.char-tip, .ref-cell-tip').forEach(t => t.classList.remove('show'));
+  document.querySelectorAll('.char-q, .ref-cell-q').forEach(b => b.classList.remove('open'));
+  if(!open && tip){
+    tip.classList.add('show');
+    if(btn) btn.classList.add('open');
+  }
+}
+function toggleRefTip(e, slot){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  const tip = document.getElementById('ref-tip-' + slot);
+  const btn = e && e.currentTarget;
+  const open = tip && tip.classList.contains('show');
+  document.querySelectorAll('.char-tip, .ref-cell-tip').forEach(t => t.classList.remove('show'));
+  document.querySelectorAll('.char-q, .ref-cell-q').forEach(b => b.classList.remove('open'));
+  if(!open && tip){
+    tip.classList.add('show');
+    if(btn) btn.classList.add('open');
+  }
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.char-tip, .ref-cell-tip').forEach(t => t.classList.remove('show'));
+  document.querySelectorAll('.char-q, .ref-cell-q').forEach(b => b.classList.remove('open'));
+});
+let finTimer = null;
+let _creditPayCallback = null;
+let _embeddedCheckout = null;
+
+/* ── Auth ── */
+function onAuthSuccess(data){
+  window.LOGGED_IN = true;
+  const c = document.querySelector('.hero-credits');
+  if (c) c.innerHTML = `
+    <span class="credit-badge" title="Unified wallet"><span class="dot"></span><span id="img-credits">${data.picture_credits ?? data.credits ?? 0}</span> credits</span>
+    <a href="/buy-credits" class="btn-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">+ Buy credits</a>
+    <a href="/settings?tab=offers" class="btn-outline-accent" style="padding:.45rem 1.2rem;font-size:.85rem;">Redeem coupon</a>`;
+  loadRoster();
+  if (window._pending){ window._pending(); window._pending=null; }
+}
+function requireAuth(fn){ if (LOGGED_IN||window.LOGGED_IN){ fn(); return; } window._pending=fn; openAuthModal('signup'); }
+
+/* ── helpers ── */
+function show(id){ const e=document.getElementById(id); if(e) e.style.display=''; }
+function hide(id){ const e=document.getElementById(id); if(e) e.style.display='none'; }
+function err(id,msg){ const e=document.getElementById(id); if(e){ e.textContent=msg; e.style.display='block'; } }
+function setBtn(id,on){ const b=document.getElementById(id); if(!b) return; b.disabled=on; const t=b.querySelector('.btn-text'),s=b.querySelector('.btn-spinner'); if(t)t.style.display=on?'none':''; if(s)s.style.display=on?'':'none'; }
+function adjCredit(id,d){ const e=document.getElementById(id); if(e){ const n=parseInt(e.textContent); if(!isNaN(n)) e.textContent=Math.max(0,n+d); } }
+function getImgCredits(){ const e=document.getElementById('img-credits'); return e?(parseInt(e.textContent,10)||0):0; }
+function creditFromPayload(d){
+  if(!d) return 0;
+  if(d.credits!=null) return parseInt(d.credits,10)||0;
+  if(d.picture_credits!=null) return parseInt(d.picture_credits,10)||0;
+  return 0;
+}
+function updateCreditBadges(d){
+  const bal = creditFromPayload(d);
+  const e=document.getElementById('img-credits');
+  if(e) e.textContent = bal;
+  const v=document.getElementById('vid-credits');
+  if(v) v.textContent = bal;
+}
+async function refreshCredits(){
+  try{
+    const res=await fetch('/api/user-credits');
+    if(res.ok) updateCreditBadges(await res.json());
+  }catch(e){}
+}
+async function pollCreditsUntil(min,tries=30){
+  for(let i=0;i<tries;i++){
+    try{
+      const res=await fetch('/api/user-credits');
+      if(res.ok){
+        const d=await res.json();
+        updateCreditBadges(d);
+        if(creditFromPayload(d)>=min) return true;
+      }
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,2000));
+  }
+  return false;
+}
+function resetCreditPayModal(){
+  document.getElementById('credit-pack-picker').style.display='';
+  document.getElementById('credit-checkout-mount').style.display='none';
+  document.getElementById('credit-checkout-mount').innerHTML='';
+  if(_embeddedCheckout){ try{_embeddedCheckout.destroy();}catch(e){} _embeddedCheckout=null; }
+}
+function openCreditPayModal(opts){
+  const needed=opts.needed||PACK_COST;
+  _creditPayCallback=opts.onPaid||null;
+  const have=getImgCredits();
+  document.getElementById('credit-pay-msg').textContent=
+    `You need ${needed} credits for this step (you have ${have}). Pick a pack — your character and prompt stay right here.`;
+  const picker=document.getElementById('credit-pack-picker');
+  picker.innerHTML=Object.entries(CREDIT_PACKAGES).map(([key,pkg])=>{
+    const n = pkg.credits != null ? pkg.credits : (pkg.image_credits || 0);
+    const dollars = Math.round((pkg.price||0)/100);
+    return `
+    <div class="col-md-4">
+      <button type="button" class="btn-accent w-100 py-3" style="border-radius:12px" onclick="startEmbeddedCheckout('${key}')">
+        <div style="font-weight:700;font-size:1.1rem">$${dollars}</div>
+        <div style="font-size:.8rem;opacity:.9">${n} credits</div>
+      </button>
+    </div>`;
+  }).join('');
+  resetCreditPayModal();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('creditPayModal')).show();
+}
+async function startEmbeddedCheckout(packageKey){
+  if(!STRIPE_PK){ loudErr('fin-err','Payments are not configured.'); return; }
+  const fd=new FormData();
+  fd.append('package',packageKey);
+  fd.append('return_flow','character_pack');
+  const res=await fetch('/create-embedded-checkout-session',{method:'POST',body:fd});
+  let data; try{ data=await res.json(); }catch(e){ data={}; }
+  if(!res.ok||!data.client_secret){ loudErr('fin-err',data.error||'Could not start checkout.'); return; }
+  document.getElementById('credit-pack-picker').style.display='none';
+  const mount=document.getElementById('credit-checkout-mount');
+  mount.style.display='block';
+  mount.innerHTML='';
+  const stripe=Stripe(STRIPE_PK);
+  _embeddedCheckout=await stripe.initEmbeddedCheckout({
+    clientSecret:data.client_secret,
+    onComplete:async()=>{
+      const ok=await pollCreditsUntil(PACK_COST);
+      bootstrap.Modal.getInstance(document.getElementById('creditPayModal'))?.hide();
+      resetCreditPayModal();
+      if(ok&&_creditPayCallback) _creditPayCallback();
+      else if(!ok) loudErr('fin-err','Payment received — credits may take a moment. Try Approve again.');
+    },
+  });
+  _embeddedCheckout.mount(mount);
+}
+document.getElementById('creditPayModal')?.addEventListener('hidden.bs.modal',resetCreditPayModal);
+
+/* ── Gender ── */
+function setGender(g){
+  state.gender=g;
+  document.getElementById('gender-male')?.classList.toggle('active', g==='male');
+  document.getElementById('gender-female')?.classList.toggle('active', g==='female');
+  document.getElementById('gender-other')?.classList.toggle('active', g==='other');
+}
+
+function paintGenSlot(i, url){
+  const slot = document.getElementById('gen-slot-' + i);
+  const img = document.getElementById('gen-slot-img-' + i);
+  if(!slot || !img) return;
+  if(url){
+    img.src = url;
+    slot.classList.add('filled');
+  } else {
+    img.removeAttribute('src');
+    slot.classList.remove('filled');
+  }
+}
+function paintGenSlotsFromState(){
+  const shots = state.shots || [];
+  if(shots.length){
+    for(let i=0;i<4;i++) paintGenSlot(i, shots[i] || null);
+  } else if(state.candidate){
+    paintGenSlot(0, state.candidate);
+    for(let i=1;i<4;i++) paintGenSlot(i, null);
+  } else {
+    for(let i=0;i<4;i++) paintGenSlot(i, null);
+  }
+}
+function charFocusGen(i){
+  const shots = state.shots || [];
+  const url = shots[i] || (i===0 ? state.candidate : null);
+  if(!url) return;
+  document.querySelectorAll('.chars-gen-slot').forEach((el, idx) => {
+    el.classList.toggle('active', idx === i);
+  });
+  const wideImg = document.getElementById('chars-wide-img');
+  const wide = document.getElementById('chars-wide');
+  const spin = document.getElementById('final-spin');
+  if(spin) { try{ spin.pause(); }catch(_e){} spin.style.display='none'; }
+  document.getElementById('chars-wide-badge').style.display = 'none';
+  if(wideImg){
+    wideImg.src = url;
+    wideImg.style.display = 'block';
+  }
+  if(wide) wide.classList.add('has-media');
+  openLightbox(url);
+}
+function setWideStill(url){
+  const wide = document.getElementById('chars-wide');
+  const wideImg = document.getElementById('chars-wide-img');
+  const spin = document.getElementById('final-spin');
+  if(spin){ try{ spin.pause(); }catch(_e){} spin.style.display='none'; }
+  document.getElementById('chars-wide-badge').style.display = 'none';
+  if(!url){
+    if(wideImg){ wideImg.style.display='none'; wideImg.removeAttribute('src'); }
+    if(wide) wide.classList.remove('has-media');
+    return;
+  }
+  if(wideImg){ wideImg.src=url; wideImg.style.display='block'; }
+  if(wide) wide.classList.add('has-media');
+}
+function setWideSpinVisible(){
+  const wide = document.getElementById('chars-wide');
+  const wideImg = document.getElementById('chars-wide-img');
+  const badge = document.getElementById('chars-wide-badge');
+  if(wideImg) wideImg.style.display='none';
+  if(badge) badge.style.display='';
+  if(wide) wide.classList.add('has-media');
+}
+/** @deprecated mode toggle removed — photo + prompt always available together */
+function setMode(m){ state.mode = m === 'upload' ? 'upload' : 'describe'; }
+
+/* ── One reference photo only ── */
+function ensureRefSlots(){
+  if(!Array.isArray(state.refs) || state.refs.length !== MAX_REFS){
+    const prev = compactRefList();
+    state.refs = [null];
+    prev.slice(0, MAX_REFS).forEach((r, i) => { state.refs[i] = r; });
+  }
+  return state.refs;
+}
+/**
+ * Place the single reference. A second drop/paste replaces the first.
+ */
+function placeRef(ref, preferredSlot){
+  ensureRefSlots();
+  const slot = 0;
+  state.refs[slot] = ref;
+  return slot;
+}
+function renderRefThumbs(){
+  ensureRefSlots();
+  for(let i=0;i<MAX_REFS;i++){
+    const body = document.getElementById('ref-slot-body-' + i);
+    const card = document.getElementById('ref-slot-' + i);
+    if(!body) continue;
+    const r = state.refs[i];
+    if(!r){
+      card?.classList.remove('filled');
+      body.innerHTML = '';
+      continue;
+    }
+    card?.classList.add('filled');
+    body.innerHTML =
+      '<img src="'+escapeHtmlSa(r.preview)+'" alt="Reference">' +
+      '<button type="button" class="ref-cell-x" aria-label="Remove" onclick="event.stopPropagation();removeRef('+i+')">×</button>';
+  }
+  const mainWrap = document.getElementById('ref-slots');
+  if(mainWrap) mainWrap.classList.toggle('has-ref', !!state.refs[0]);
+  const list = compactRefList();
+  if(!list.length){
+    state.file = null; state.imageUrl = null; state.mode = 'describe';
+  } else {
+    const first = list[0];
+    state.file = first.kind === 'file' ? first.file : null;
+    state.imageUrl = first.kind === 'url' ? first.url
+      : (first.preview && first.preview.startsWith('http') ? first.preview : null);
+    state.mode = 'upload';
+  }
+  updateGenCostUI();
+}
+function removeRef(i){
+  ensureRefSlots();
+  if(i < 0 || i >= MAX_REFS) return;
+  state.refs[i] = null;
+  // Keep slot numbers stable so 1️⃣📸… mentions still match the right photo
+  renderRefThumbs();
+}
+function clearPhoto(){
+  state.refs = [null];
+  state.pendingSlot = null;
+  renderRefThumbs();
+  const fileEl=document.getElementById('file'); if(fileEl) fileEl.value='';
+}
+function canAddRef(){
+  // Single-ref product: always allow (placeRef replaces).
+  return true;
+}
+function pickRefSlot(slot){
+  ensureRefSlots();
+  // Click the box to add or replace a photo — nothing goes into the prompt
+  state.pendingSlot = slot;
+  const fileEl = document.getElementById('file');
+  if(fileEl){ fileEl.value = ''; fileEl.click(); }
+}
+function handleFile(input){
+  if(!input.files || !input.files.length) return;
+  const preferred = state.pendingSlot;
+  state.pendingSlot = null;
+  // One file per picker click; if multi somehow, fill sequentially
+  Array.from(input.files).forEach((f, idx) => {
+    loadFile(f, { preferredSlot: idx === 0 ? preferred : null });
+  });
+  input.value = '';
+}
+
+function isImageFile(file){
+  if(!file) return false;
+  const t = (file.type || '').toLowerCase();
+  if(t.startsWith('image/')) return true;
+  if(/\.(png|jpe?g|gif|webp|heic|heif|bmp)$/i.test(file.name || '')) return true;
+  if(!t && file.size > 32) return true;
+  return false;
+}
+function loadFile(file, opts){
+  opts = opts || {};
+  if(!isImageFile(file)) return;
+  if(!canAddRef()) return;
+  let f = file;
+  if(!f.type || f.type === 'application/octet-stream'){
+    try {
+      f = new File([file], file.name || ('paste-' + (refCount()+1) + '.png'), {
+        type: (file.type && file.type.startsWith('image/')) ? file.type : 'image/png',
+      });
+    } catch (_e) { f = file; }
+  }
+  const preferred = (opts.preferredSlot != null) ? opts.preferredSlot : state.pendingSlot;
+  const r = new FileReader();
+  r.onload = e => {
+    const slot = placeRef({ kind:'file', file: f, preview: e.target.result }, preferred);
+    if(slot < 0) return;
+    renderRefThumbs();
+    flashRefSlot(slot);
+    updateGenCostUI();
+  };
+  r.onerror = () => loudErr('gen-err', 'Could not read photo — try again or drop the file.');
+  r.readAsDataURL(f);
+}
+function loadImageUrl(url, opts){
+  opts = opts || {};
+  if(!url) return;
+  if(!canAddRef() && !opts.force) return;
+  ensureRefSlots();
+  if(!opts.force && state.refs.some(x => x && (x.url === url || x.preview === url))) return;
+  if(opts.force){
+    state.refs = [null];
+  }
+  const preferred = (opts.preferredSlot != null) ? opts.preferredSlot : state.pendingSlot;
+  const slot = placeRef({ kind:'url', url, preview: url }, preferred);
+  if(slot < 0) return;
+  renderRefThumbs();
+  flashRefSlot(slot);
+  updateGenCostUI();
+}
+function flashRefSlot(slot){
+  const el = document.getElementById('ref-slot-' + slot);
+  if(!el) return;
+  el.classList.add('paste-flash');
+  setTimeout(() => el.classList.remove('paste-flash'), 600);
+}
+/* URL paste has no field — paste into Description or a photo box → loadImageUrl */
+
+/** Library photo / background / character still → character refs. */
+window.applyLibraryCharacterRef = async function(p){
+  if(!p) return;
+  const url = p.url || p.thumb || p.primary_image_url || '';
+  if(!url) throw new Error('No image on that library item');
+  loadImageUrl(url);
+  document.getElementById('upload-pane')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+};
+window.applyLibraryImage = window.applyLibraryCharacterRef;
+window.applyLibraryBackground = window.applyLibraryCharacterRef;
+
+function openCharacterPhotoPicker(){
+  if(typeof PercfectLibrary === 'undefined' || typeof PercfectLibrary.openPhotoPicker !== 'function'){
+    if(typeof PercfectLibrary !== 'undefined' && PercfectLibrary.open) PercfectLibrary.open();
+    else { loudErr('gen-err','Library unavailable — log in and try again.'); }
+    return;
+  }
+  const room = Math.max(1, MAX_REFS - refCount());
+  PercfectLibrary.openPhotoPicker({
+    title: 'Add reference photos (max ' + room + ' more)',
+    max: room,
+    open: true,
+    onDone: async (_ids, items) => {
+      for(const item of (items || [])){
+        if(!canAddRef()) break;
+        await applyLibraryCharacterRef(item);
+      }
+    },
+  });
+}
+
+(function(){
+  // Per-slot drag & drop
+  for(let i=0;i<MAX_REFS;i++){
+    const z = document.getElementById('ref-slot-' + i);
+    if(!z) continue;
+    z.addEventListener('dragover', e => {
+      e.preventDefault();
+      z.classList.add('drag-over');
+    });
+    z.addEventListener('dragleave', () => z.classList.remove('drag-over'));
+    z.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      z.classList.remove('drag-over');
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if(files && files.length){
+        // First file aims at this slot (auto-packs to Photo 1 if earlier empty)
+        loadFile(files[0], { preferredSlot: i });
+        // Extra files fill subsequent empties
+        Array.from(files).slice(1).forEach(f => {
+          if(isImageFile(f)) loadFile(f, { preferredSlot: null });
+        });
+      }
+    });
+  }
+  function pastePhotoAsRef(f){
+    loadFile(f, { preferredSlot: null });
+  }
+  if(window.PercfectPasteDrop){
+    PercfectPasteDrop.bind({
+      zone: 'ref-slots',
+      accept: 'image',
+      focusIds: ['desc', 'review-prompt', 'gen-btn', 'upload-pane', 'describe-pane', 'ref-slots'],
+      onFile: function(f){ pastePhotoAsRef(f); },
+      onUrl: function(u){ loadImageUrl(u); },
+    });
+  }
+  // Paste photo file OR image URL → photo boxes (no URL field, no tags in text)
+  function looksLikeImageUrl(t){
+    t = (t || '').trim();
+    if(!/^https?:\/\//i.test(t)) return false;
+    if(/\s/.test(t)) return false;
+    if(/\.(png|jpe?g|gif|webp|heic|bmp)(\?|#|$)/i.test(t)) return true;
+    if(/cdn\.|imgur|i\.|media\.|cloudinary|supabase|x\.ai|grok/i.test(t)) return true;
+    return t.length < 500 && /^https?:\/\/\S+$/i.test(t);
+  }
+  ['desc', 'review-prompt', 'editprompt-text', 'ref-slots'].forEach(function(tid){
+    const ta = tid === 'ref-slots' ? document.getElementById(tid) : document.getElementById(tid);
+    if(!ta || ta._imgPaste) return;
+    ta._imgPaste = true;
+    ta.addEventListener('paste', function(e){
+      const cd = e.clipboardData;
+      if(!cd) return;
+      const items = cd.items;
+      if(items){
+        for(let i = 0; i < items.length; i++){
+          if(items[i].kind !== 'file') continue;
+          const f = items[i].getAsFile();
+          if(f && isImageFile(f)){
+            e.preventDefault();
+            e.stopPropagation();
+            pastePhotoAsRef(f);
+            return;
+          }
+        }
+      }
+      if(cd.files && cd.files.length){
+        for(let i = 0; i < cd.files.length; i++){
+          if(isImageFile(cd.files[i])){
+            e.preventDefault();
+            e.stopPropagation();
+            pastePhotoAsRef(cd.files[i]);
+            return;
+          }
+        }
+      }
+      const text = (cd.getData && cd.getData('text')) || '';
+      if(looksLikeImageUrl(text)){
+        e.preventDefault();
+        e.stopPropagation();
+        loadImageUrl(text.trim());
+      }
+    }, true);
+  });
+  if(window.PercfectLibrary && typeof PercfectLibrary.registerDropZone === 'function'){
+    for(let i=0;i<MAX_REFS;i++){
+      const slotEl = document.getElementById('ref-slot-' + i);
+      if(!slotEl) continue;
+      PercfectLibrary.registerDropZone(slotEl, {
+        accept: ['character', 'image', 'photo', 'background'],
+        onDrop: async (p) => {
+          state.pendingSlot = i;
+          await applyLibraryCharacterRef(p);
+          state.pendingSlot = null;
+        },
+      });
+    }
+  }
+  updateGenCostUI();
+})();
+
+/* ── Step 1: generate ONE shot (photo and/or prompt) ── */
+function generateOne(){ requireAuth(_generateOne); }
+// Regenerate front shot; review-prompt edits apply on top of the same photo if present.
+function regenFront(){
+  const rp=document.getElementById('review-prompt');
+  if(rp){
+    const v=rp.value.trim();
+    // Allow empty prompt only when a photo is still attached
+    if(!v && !hasPhoto()){ loudErr('review-err','Enter a prompt, or keep a reference photo.'); return; }
+    document.getElementById('desc').value=v;
+  }
+  generateOne();
+}
+/**
+ * Percfect Precision (5 credits total on generate):
+ *  1) Search Google/Bing: a portrait of {name}
+ *  2) Seed is an *imaginary* ref — kept in memory only, NOT shown in the UI ref box
+ *  3) Auto-generate with that seed + default character prompt (name never to xAI)
+ */
+function superAccuracyRegen(){ requireAuth(_superAccuracyRegen); }
+async function _superAccuracyRegen(){
+  const rp = document.getElementById('review-prompt');
+  let d = (rp && rp.value.trim()) || descText();
+  const errId = (document.getElementById('review-section')?.style.display !== 'none' && state.candidate)
+    ? 'review-err' : 'gen-err';
+  if(!state.gender){ loudErr(errId,'Pick male or female first.'); return; }
+  if(!d){
+    loudErr(errId,'Type a name/prompt first — Percfect Precision searches for a portrait of that.');
+    document.getElementById('desc')?.focus();
+    return;
+  }
+  document.getElementById('desc').value = d;
+  // Pay 5 credits first (covers search + generate)
+  if(getImgCredits() < SUPER_ACCURACY_COST){
+    openCreditPayModal({ needed: SUPER_ACCURACY_COST, onPaid: () => _superAccuracyRegen() });
+    return;
+  }
+  if(typeof PercfectStudioJobs === 'undefined' || !PercfectStudioJobs.postQueued){
+    loudErr(errId, 'Page scripts not loaded — hard-refresh (Cmd+Shift+R) and try again.');
+    return;
+  }
+  hide('gen-err'); hide('review-err');
+  const saBtns = [
+    document.getElementById('super-accuracy-btn'),
+    document.getElementById('super-accuracy-main-btn'),
+  ].filter(Boolean);
+  saBtns.forEach(b => { b.disabled = true; b.textContent = 'Finding portrait…'; });
+  setBtn('gen-btn', true);
+  show('review-section');
+  const loadEl = document.getElementById('one-loading');
+  if(loadEl) loadEl.classList.add('show');
+  startFinProgress('Searching a portrait of "' + d.slice(0, 40) + (d.length > 40 ? '…' : '') + '"…');
+  document.getElementById('gen-four')?.scrollIntoView({behavior:'smooth',block:'center'});
+  try{
+    // Step 1 — fetch web seed (no charge). Invisible / imaginary ref — do not paint UI.
+    const seedFd = new FormData();
+    seedFd.append('description', d);
+    const seedData = await PercfectStudioJobs.postQueued(
+      '/studios/percfectcharacter/precision-seed',
+      seedFd,
+      {
+        deadlineMs: 90000,
+        onProgress: (_x, label) => setFinLabel(label || 'Searching a portrait of…'),
+      }
+    );
+    const seedUrl = seedData.seed_image_url || seedData.reference_image_url || seedData.url;
+    if(!seedUrl){
+      throw new Error(seedData.error || 'Could not find a portrait of that on the web.');
+    }
+    // Step 2 — keep seed in memory only (NOT loadImageUrl / NOT visible ref box)
+    setFinLabel('Reference found — generating…');
+    saBtns.forEach(b => { b.textContent = 'Generating…'; });
+    // Step 3 — auto generate with hidden seed (charges 5)
+    await _generateOne({
+      superAccuracy: true,
+      description: d,
+      seedImageUrl: seedUrl,
+      searchQuery: seedData.search_query || ('a portrait of ' + d),
+      sourcePageImage: seedData.source_page_image || '',
+      skipPrecisionSeed: true,
+    });
+  }catch(e){
+    loudErr(errId, e.message || 'Percfect Precision failed — try again.');
+    if(!state.candidate) hide('review-section');
+    stopFinProgress();
+    setBtn('gen-btn', false);
+    if(loadEl) loadEl.classList.remove('show');
+    saBtns.forEach(b => { b.disabled = false; b.textContent = 'Percfect Precision'; });
+  }
+}
+function loudErr(id,msg){ err(id,msg); const e=document.getElementById(id); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); }
+async function _generateOne(opts){
+  opts = opts || {};
+  const superAccuracy = !!opts.superAccuracy;
+  if(!state.gender){ loudErr(superAccuracy?'review-err':'gen-err','Pick male or female first.'); return; }
+  const d = (opts.description != null ? String(opts.description) : descText()).trim();
+  const photo = hasPhoto();
+  if(superAccuracy){
+    if(!d){
+      loudErr('review-err','Percfect Precision needs your prompt text to search the web.');
+      return;
+    }
+  } else if(!photo && !d){
+    loudErr('gen-err','Add a photo and/or write a prompt — need at least one.');
+    return;
+  }
+  const cost = superAccuracy ? SUPER_ACCURACY_COST : genCost();
+  if(getImgCredits() < cost){
+    openCreditPayModal({ needed: cost, onPaid: () => _generateOne(opts) });
+    return;
+  }
+  const fd=new FormData();
+  fd.append('gender',state.gender);
+  if(superAccuracy){
+    // Precision: prompt box was for Google only (seed step). xAI must NEVER see it.
+    // Gen = default one-ref character prompt + Google seed photo only.
+    fd.append('super_accuracy', '1');
+    // Do NOT send description / prompt-box text on generate.
+    if(opts.seedImageUrl) fd.append('seed_image_url', opts.seedImageUrl);
+    if(opts.searchQuery) fd.append('search_query', opts.searchQuery);
+    if(opts.sourcePageImage) fd.append('source_page_image', opts.sourcePageImage);
+  } else {
+    // One reference photo only (user upload)
+    ensureRefSlots();
+    const r = state.refs[0];
+    if(r){
+      if(r.kind === 'file' && r.file) fd.append('image_file_0', r.file);
+      else if(r.url) fd.append('image_url_0', r.url);
+      else if(r.preview && r.preview.startsWith('http')) fd.append('image_url_0', r.preview);
+    }
+    const apiDesc = descriptionForApi(d);
+    if(apiDesc) fd.append('description', apiDesc);
+  }
+  state.mode = superAccuracy ? 'upload' : sourceMode();
+  hide('gen-err'); hide('review-err'); hide('final-section');
+  setBtn('gen-btn',true);
+  const saBtns = [
+    document.getElementById('super-accuracy-btn'),
+    document.getElementById('super-accuracy-main-btn'),
+  ].filter(Boolean);
+  const saLabelBusy = 'Generating…';
+  const saLabelIdle = 'Percfect Precision';
+  saBtns.forEach(b => { b.disabled = true; if(superAccuracy) b.textContent = saLabelBusy; });
+  show('review-section');
+  const img=document.getElementById('one-img'); if(img){ img.style.display='none'; img.src=''; }
+  const loadEl = document.getElementById('one-loading');
+  if(loadEl) loadEl.classList.add('show');
+  if(!opts.skipPrecisionSeed){
+    startFinProgress(superAccuracy ? 'Percfect Precision…' : 'Building…');
+  } else {
+    setFinLabel('Generating from web reference…');
+  }
+  document.getElementById('gen-four')?.scrollIntoView({behavior:'smooth',block:'center'});
+  try{
+    if(typeof PercfectStudioJobs === 'undefined' || !PercfectStudioJobs.postQueued){
+      throw new Error('Page scripts not loaded — hard-refresh (Cmd+Shift+R) and try again.');
+    }
+    const data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/generate-one', fd, {
+      deadlineMs: superAccuracy ? 180000 : 150000,
+      onProgress: (_d, label) => setFinLabel(label || 'Building…'),
+    });
+    if(!data.url){
+      loudErr(superAccuracy?'review-err':'gen-err', data.error || 'Generation failed. Please try again.');
+      if(!state.candidate) hide('review-section');
+      return;
+    }
+    state.candidate=data.url;
+    state.shots = null;
+    state.prompt = (data.user_description || data.display_prompt || '').trim()
+      || (document.getElementById('desc') && document.getElementById('desc').value.trim())
+      || '';
+    state.enginePrompt = data.prompt || '';
+    if(img){ img.src=data.url; img.style.display='block'; }
+    paintGenSlotsFromState();
+    setWideStill(data.url);
+    // Precision seed is imaginary/hidden — never paint Google ref into the UI ref box
+    const rpw=document.getElementById('review-prompt-wrap');
+    const rp=document.getElementById('review-prompt');
+    if(rp && d) rp.value = d;
+    if(rpw) rpw.style.display='none';
+    adjCredit('img-credits', -(data.charged != null ? data.charged : cost));
+    stopFinProgress();
+  }catch(e){
+    loudErr(superAccuracy?'review-err':'gen-err', e.message || 'Network error — please try again.');
+    if(!state.candidate) hide('review-section');
+  } finally {
+    setBtn('gen-btn',false);
+    if(loadEl) loadEl.classList.remove('show');
+    stopFinProgress();
+    saBtns.forEach(b => { b.disabled = false; b.textContent = saLabelIdle; });
+    updateGenCostUI();
+  }
+}
+function escapeHtmlSa(s){
+  return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ── Step 2: approve → build the other 3 + 360 ── */
+function approveOne(){ requireAuth(_approveOne); }
+function setReviewDisabled(on){ document.querySelectorAll('#review-section .review-row button').forEach(b=>{ b.disabled=on; }); }
+function endApprove(){ state.busy=false; setReviewDisabled(false); stopFinProgress(); }
+async function _approveOne(){
+  if(!state.candidate){ err('review-err','Generate a shot first.'); return; }
+  if(state.busy){ return; }
+  if(getImgCredits()<PACK_COST){
+    openCreditPayModal({needed:PACK_COST,onPaid:()=>_approveOne()});
+    return;
+  }
+  state.busy=true; setReviewDisabled(true);
+  hide('review-err'); hide('fin-err');
+  startFinProgress('Building the other 3 shots…');
+
+  // Phase 1 — build the other 3 shots + save the character
+  state.savedId=null;
+  const fd=new FormData();
+  fd.append('primary_image_url',state.candidate);
+  fd.append('prompt',state.prompt||'');
+  fd.append('gender',state.gender||'');
+  fd.append('name',document.getElementById('char-name').value.trim());
+  fd.append('source_mode', sourceMode());
+  try{
+    let data;
+    try {
+      data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/finalize', fd, {
+        deadlineMs: 600000,
+        onProgress: (_d, label) => setFinLabel(label),
+      });
+    } catch (e) {
+      if (e.data && e.data.needed) {
+        openCreditPayModal({needed: e.data.needed || PACK_COST, onPaid: () => _approveOne()});
+        endApprove(); return;
+      }
+      loudErr('fin-err', e.message || 'Build failed.'); endApprove(); return;
+    }
+    if((data.images||[]).length<4){
+      loudErr('fin-err',data.warning||'Not all 4 angles were generated — try Approve again.');
+      endApprove(); return;
+    }
+    hide('review-section');
+    renderFinalShots(data.images||[]);
+    show('final-section');
+    hide('char-pack-actions'); hide('refine-section'); hide('editprompt-section');
+    document.getElementById('final-section').scrollIntoView({behavior:'smooth',block:'start'});
+    state.savedId = data.character.id;
+    state.shots = data.images || [];
+    loadRoster();
+    await runCharacterSpin(true);
+  }catch(e){ loudErr('fin-err','Network error — please try again.'); endApprove(); return; }
+  endApprove();
+}
+
+function showCharacterPack(downloadUrl){
+  const dl=document.getElementById('char-pack-dl');
+  if(dl && downloadUrl){
+    dl.href=downloadUrl;
+    dl.style.display='';
+  }
+  show('char-pack-actions');
+  hide('approval-row');
+  setWideSpinVisible();
+  const spin = document.getElementById('final-spin');
+  if(spin && spin.src) spin.style.display = 'block';
+}
+
+/* ── 4 ortho angles + 360° spin (one character pack) ── */
+async function runCharacterSpin(packIncluded){
+  if(!state.savedId){ return; }
+  if(!packIncluded && getImgCredits()<REGEN_COST){
+    openCreditPayModal({needed:REGEN_COST,onPaid:()=>runCharacterSpin(false)});
+    return;
+  }
+  hide('editprompt-section'); hide('refine-section');
+  hide('final-spin-ph');
+  const v=document.getElementById('final-spin');
+  if(v){ v.style.display='none'; v.removeAttribute('src'); }
+  startFinProgress('Generating your 360° spin video…');
+  try{
+    const fd2=new FormData();
+    fd2.append('character_id',state.savedId);
+    if(packIncluded) fd2.append('pack_included','1');
+    let d2;
+    try {
+      const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
+      try { d2 = await PercfectStudioJobs.resolveGenerationResponse(res2, {
+        deadlineMs: 600000,
+        onProgress: (_d, label) => setFinLabel(label),
+      }); } catch (spinErr) {
+        if (spinErr.data && spinErr.data.needed) {
+          openCreditPayModal({needed: spinErr.data.needed, onPaid: () => runCharacterSpin(!!packIncluded)});
+          show('approval-row');
+          return;
+        }
+        throw spinErr;
+      }
+    } catch (spinErr) {
+      loudErr('fin-err', spinErr.message || '360° spin failed.');
+      stopFinProgress();
+      show('approval-row');
+      return;
+    }
+    const spinUrl = d2 && (d2.url || d2.spin_video_url);
+    if(spinUrl){
+      if(v){ v.src=spinUrl; v.style.display='block'; v.play().catch(()=>{}); }
+      if(d2.images && d2.images.length) renderFinalShots(d2.images);
+      if(d2.charged){
+        adjCredit('img-credits',-d2.charged);
+        if(d2.picture_credits!=null){
+          const el=document.getElementById('img-credits');
+          if(el) el.textContent=d2.picture_credits;
+        }
+      } else if(!packIncluded) {
+        adjCredit('img-credits',-REGEN_COST);
+      }
+      // Keep local roster in sync so hover 360 works immediately
+      if(state.savedId && CharProfile.charById){
+        const ch = CharProfile.charById(state.savedId) || { id: state.savedId };
+        ch.spin_video_url = spinUrl;
+        if(d2.images&&d2.images.length) ch.images = d2.images;
+        CharProfile._storeChar(ch);
+      }
+      await refreshCredits();
+      await loadRoster();
+      const dlUrl=d2.download_url || ('/studios/percfectcharacter/download/'+state.savedId);
+      showCharacterPack(dlUrl);
+      if(packIncluded && state.savedId){
+        if(CharProfile.chars[state.savedId]) CharProfile.chars[state.savedId].spin_video_url=spinUrl;
+        CharProfile.open(state.savedId,{celebrate:true,downloadUrl:dlUrl,packCharged:d2.charged||PACK_COST});
+      }
+    } else {
+      loudErr('fin-err',(d2 && d2.error)||'The 360° spin failed — your 4 angles are saved. Retry below or from your roster.');
+      show('approval-row');
+    }
+  }catch(e){
+    loudErr('fin-err','The 360° spin timed out — your 4 angles are saved. Retry below or from your roster.');
+    show('approval-row');
+  } finally {
+    stopFinProgress();
+  }
+}
+
+/* ── Not approved → edit the last prompt and regenerate from the front shot ── */
+function showEditPrompt(){
+  hide('refine-section');
+  const last = document.getElementById('desc').value.trim() || state.prompt || '';
+  document.getElementById('editprompt-text').value = last;
+  hide('editprompt-err');
+  show('editprompt-section');
+  document.getElementById('editprompt-section').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function redoFromPrompt(){
+  const txt = document.getElementById('editprompt-text').value.trim();
+  // Text-only redo needs a prompt; photo+prompt can re-run with empty text only if photo remains
+  if(!txt && !hasPhoto()){ loudErr('editprompt-err','Enter a prompt first.'); return; }
+  document.getElementById('desc').value = txt;
+  state.mode = sourceMode(); // keep photo seed if still attached
+  hide('editprompt-section'); hide('approval-row'); hide('final-section');
+  _generateOne();   // back to the front shot → re-approve → rebuild
+}
+
+const POSE_LABELS = ['Front','Left side','Right side','Back'];
+function renderFinalShots(images){
+  state.shots = images || [];
+  const grid = document.getElementById('final-grid');
+  if(grid){
+    grid.innerHTML = (images||[]).map((u,i)=>`
+      <div class="shot"><img src="${u}" alt="${POSE_LABELS[i]||''}" onclick="openLightbox('${u}')" style="cursor:zoom-in"><div class="shot-label">${POSE_LABELS[i]||('Shot '+(i+1))}</div></div>`).join('');
+  }
+  paintGenSlotsFromState();
+  if(images && images[0]) setWideStill(images[0]);
+}
+
+// Click any shot to view it full-size (click or Esc to close).
+function openLightbox(src){
+  if(!src) return;
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  const img=document.createElement('img'); img.src=src;
+  img.style.cssText='max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 50px rgba(0,0,0,.7)';
+  o.appendChild(img); o.onclick=()=>o.remove();
+  document.addEventListener('keydown',function esc(e){ if(e.key==='Escape'){ o.remove(); document.removeEventListener('keydown',esc); } });
+  document.body.appendChild(o);
+}
+
+/* ── Looks good? / Refine ── */
+function saveAndDone(){
+  hide('approval-row');
+  document.getElementById('final-section').scrollIntoView({behavior:'smooth',block:'end'});
+}
+function showRefine(){
+  if(!state.savedId){ return; }
+  show('refine-section');
+  document.getElementById('refine-text').value='';
+  hide('refine-err');
+  // build the picker (4 thumbnails — click to choose which to fix)
+  state.refineSlot = 1; // default Left side (often needs fix if facing wrong)
+  const picker = document.getElementById('refine-picker');
+  picker.innerHTML = state.shots.map((u,i)=>`
+    <div class="shot ${i===state.refineSlot?'primary':''}" id="rpick-${i}" onclick="pickRefine(${i})">
+      <img src="${u}" alt=""><span class="pick">${POSE_LABELS[i]||'#'+(i+1)}</span>
+    </div>`).join('');
+  document.getElementById('refine-section').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function pickRefine(i){
+  state.refineSlot = i;
+  state.shots.forEach((_,k)=>{ const e=document.getElementById('rpick-'+k); if(e) e.classList.toggle('primary', k===i); });
+}
+async function applyRefine(){
+  const correction = document.getElementById('refine-text').value.trim();
+  if(!correction){ loudErr('refine-err','Type what to fix first (only if the shot is wrong).'); return; }
+  if(state.refineSlot==null || !state.savedId){ loudErr('refine-err','Pick which photo to fix.'); return; }
+  hide('refine-err');
+  startFinProgress('Applying the fix to shot '+(state.refineSlot+1)+'…');
+  try{
+    const fd=new FormData();
+    fd.append('character_id',state.savedId);
+    fd.append('slot',state.refineSlot);
+    fd.append('correction',correction);
+    let data;
+    try {
+      data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/refine', fd, {
+        onProgress: (_d, label) => setFinLabel(label),
+      });
+    } catch (e) {
+      loudErr('refine-err', e.message || 'Refine failed.'); stopFinProgress(); return;
+    }
+    state.shots = data.images;
+    renderFinalShots(state.shots);
+    adjCredit('img-credits',-1);
+    // re-run 360 from the (possibly updated) primary shot
+    setFinLabel('Re-rendering the 360° spin…');
+    document.getElementById('final-spin').style.display='none';
+    document.getElementById('final-spin').removeAttribute('src');
+    document.getElementById('final-spin-ph').style.display='';
+    const fd2=new FormData(); fd2.append('character_id',state.savedId);
+    let d2;
+    try {
+      const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
+      d2 = await PercfectStudioJobs.resolveGenerationResponse(res2, {
+        deadlineMs: 600000,
+        onProgress: (_d, label) => setFinLabel(label),
+      });
+    } catch (spinErr) {
+      if (spinErr.data && spinErr.data.needed) {
+        openCreditPayModal({needed: spinErr.data.needed, onPaid: () => applyRefine()});
+        stopFinProgress();
+        return;
+      }
+      loudErr('refine-err', spinErr.message || 'The 360° re-render failed — your photo was updated; use the 🎥 360° button in your roster to retry.');
+      stopFinProgress();
+      return;
+    }
+    if(d2 && d2.url){
+      const v=document.getElementById('final-spin'); v.src=d2.url; v.style.display='block';
+      document.getElementById('final-spin-ph').style.display='none';
+      v.play().catch(()=>{});
+      adjCredit('img-credits',-REGEN_COST);
+      hide('refine-section');
+      showCharacterPack(d2.download_url || ('/studios/percfectcharacter/download/'+state.savedId));
+    } else {
+      loudErr('refine-err',(d2.error||'The 360° re-render failed — your photo was updated; use the 🎥 360° button in your roster to retry.'));
+    }
+    loadRoster();
+  }catch(e){ loudErr('refine-err','Network error — please try again.'); }
+  finally{ stopFinProgress(); }
+}
+function setFinLabel(t){ const e=document.getElementById('fin-label'); if(e) e.textContent=t; }
+function startFinProgress(label){ let el=0; const MAX=120; setFinLabel(label||'Building…'); show('fin-wrap'); document.getElementById('fin-bar').style.width='0%'; document.getElementById('fin-elapsed').textContent='0'; finTimer=setInterval(()=>{ el++; document.getElementById('fin-elapsed').textContent=el; document.getElementById('fin-bar').style.width=Math.min(95,(el/MAX)*100)+'%'; },1000); }
+function stopFinProgress(){ if(finTimer){clearInterval(finTimer);finTimer=null;} const b=document.getElementById('fin-bar'); if(b)b.style.width='100%'; setTimeout(()=>hide('fin-wrap'),400); }
+
+/* ── Reset ── */
+function resetBuilder(){
+  state.candidate=null; state.prompt=null; state.busy=false;
+  clearPhoto();
+  document.getElementById('desc').value='';
+  document.getElementById('char-name').value='';
+  const rp=document.getElementById('review-prompt'); if(rp) rp.value='';
+  hide('review-section'); hide('final-section'); hide('review-prompt-wrap');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ── Roster ── */
+function renderRoster(chars, canDl){
+  const list = Array.isArray(chars) ? chars : [];
+  canDownload = !!canDl;
+  CharProfile.setChars(list, canDownload);
+  const grid = document.getElementById('roster-grid');
+  const section = document.getElementById('gallery-section');
+  const errEl = document.getElementById('roster-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (!list.length) {
+    show('roster-empty');
+    if (grid) grid.innerHTML = '';
+    /* Keep section visible with empty hint so users know roster lives here */
+    if (section) section.style.display = '';
+    return;
+  }
+  hide('roster-empty');
+  if (section) section.style.display = '';
+  CharProfile.fillGrid('roster-grid', list, { showDelete: true });
+}
+
+async function loadRoster(){
+  if(!(LOGGED_IN||window.LOGGED_IN)) return;
+  try{
+    const res = await fetch('/studios/percfectcharacter/characters', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_e) { data = {}; }
+    if (!res.ok) {
+      const errEl = document.getElementById('roster-err');
+      const msg = data.error || (res.status === 401 ? 'Session expired — log in again to see your characters.' : 'Could not load your characters.');
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      if (res.status === 401 && INITIAL_CHARACTERS.length) renderRoster(INITIAL_CHARACTERS, canDownload);
+      return;
+    }
+    renderRoster(data.characters, data.can_download);
+  }catch(e){
+    const errEl = document.getElementById('roster-err');
+    if (errEl) { errEl.textContent = 'Could not load your characters — refresh the page.'; errEl.style.display = 'block'; }
+    if (INITIAL_CHARACTERS.length) renderRoster(INITIAL_CHARACTERS, canDownload);
+  }
+}
+
+window.PERCFECT_IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+CharProfile.init({ onReload: loadRoster, showDelete: true, isAdmin: !!window.PERCFECT_IS_ADMIN });
+renderRefThumbs();
+updateGenCostUI();
+if (LOGGED_IN && INITIAL_CHARACTERS.length) renderRoster(INITIAL_CHARACTERS, canDownload);
+loadRoster();
+</script>
+{% if stripe_pk %}
+<script src="https://js.stripe.com/v3/"></script>
+{% endif %}
+{% endblock %}

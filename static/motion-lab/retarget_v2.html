@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Retarget v2 — upf-gti library</title>
+<style>
+  html,body{margin:0;height:100%;background:#0a0a12;color:#eee;font-family:system-ui}
+  #ui{position:absolute;top:12px;left:12px;z-index:2;background:rgba(0,0,0,.85);padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.7;max-width:560px}
+  #log{margin-top:6px;font-family:ui-monospace;font-size:12px;color:#7cf;max-height:60vh;overflow:auto}
+  #ctrls button{background:#111;color:#eee;border:1px solid #333;padding:4px 10px;margin:2px;cursor:pointer;border-radius:3px}
+  #ctrls button:hover{background:#333}
+</style>
+</head>
+<body>
+<div id="ui">
+  <b>Retarget v2 — upf-gti/retargeting-threejs</b>
+  <div>Target: <b>Bride</b> · Donor clips: <b>poyo_H</b></div>
+  <div id="log">start</div>
+  <div id="ctrls" style="margin-top:8px"></div>
+</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+const log = (m) => { document.getElementById('log').innerHTML += '<br>· '+m; console.log(m); };
+try {
+  const THREE = await import('three');
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+  const { AnimationRetargeting } = await import('./retargeting.js');
+  log('libs loaded');
+
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0a12);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x223355, 1.2));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.8); dl.position.set(4,8,6); scene.add(dl);
+  scene.add(new THREE.GridHelper(20, 20, 0x334, 0x223));
+  const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+  camera.position.set(0, 1.4, 3);
+  // Soft WebGL — "Error creating WebGL context" = too many 3D tabs; close Field/Colosseum/controller first
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      powerPreference: 'default',
+      failIfMajorPerformanceCaveat: false,
+    });
+  } catch (webglErr) {
+    log('❌ WebGL: ' + (webglErr.message || webglErr));
+    log('FIX: Close other 3D tabs (Field, Colosseum, controller). Restart browser. Open THIS page alone.');
+    throw webglErr;
+  }
+  if (!renderer.getContext()) {
+    log('❌ WebGL context null — close other Three.js tabs and reload.');
+    throw new Error('Error creating WebGL context (no GPU context available)');
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+  renderer.setSize(innerWidth, innerHeight); document.body.appendChild(renderer.domElement);
+  log('WebGL ✓');
+  addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);});
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0,1,0); controls.update();
+
+  const loader = new GLTFLoader();
+  const findSM = (r) => { let s; r.traverse(o => { if(o.isSkinnedMesh && !s) s=o; }); return s; };
+
+  log('loading Bride (poyo_X)…');
+  const target = await loader.loadAsync('animated/poyo_X_idle.glb');
+  scene.add(target.scene);
+  const targetSM = findSM(target.scene);
+  target.scene.traverse(o => { if(o.isMesh || o.isSkinnedMesh) o.frustumCulled = false; });
+  log('Bride loaded, skeleton bones: '+targetSM.skeleton.bones.length);
+
+  const ACTIONS = ['idle','punch','kick','walk_fwd','run','jump','taunt','ko'];
+  log('loading '+ACTIONS.length+' donor clips (poyo_H)…');
+  const donors = await Promise.all(ACTIONS.map(a =>
+    loader.loadAsync('animated/poyo_H_'+a+'.glb').then(g => ({name:a, gltf:g}))
+  ));
+  log('donors loaded');
+
+  const mixer = new THREE.AnimationMixer(target.scene);
+  const clips = {};
+  // Bride's own idle unmodified
+  clips.idle = mixer.clipAction(target.animations[0]);
+  let ok=0, fail=0;
+  for(const d of donors){
+    if(d.name==='idle') continue;
+    try {
+      const donorSM = findSM(d.gltf.scene);
+      const retargeter = new AnimationRetargeting(donorSM.skeleton, targetSM.skeleton, {
+        srcEmbedWorldTransforms: true,
+        trgEmbedWorldTransforms: true,
+      });
+      const clip = retargeter.retargetAnimation(d.gltf.animations[0]);
+      clip.name = d.name;
+      clips[d.name] = mixer.clipAction(clip);
+      ok++;
+    } catch(e){ log('retarget FAIL '+d.name+': '+e.message); fail++; }
+  }
+  log('retarget: '+ok+' ok, '+fail+' fail');
+
+  let cur = null;
+  const play = n => { if(!clips[n]) return; if(cur) cur.fadeOut(0.15); clips[n].reset().fadeIn(0.15).play(); cur = clips[n]; log('▶ '+n); };
+  ACTIONS.forEach(a => { const b=document.createElement('button'); b.textContent=a; b.onclick=()=>play(a); document.getElementById('ctrls').appendChild(b); });
+  play('idle');
+
+  const clock = new THREE.Clock();
+  (function loop(){ requestAnimationFrame(loop); mixer.update(clock.getDelta()); renderer.render(scene, camera); })();
+} catch(e){
+  document.getElementById('log').innerHTML += '<br>❌ FATAL: '+e.message+'<br><pre>'+e.stack+'</pre>';
+  console.error(e);
+}
+</script>
+</body>
+</html>

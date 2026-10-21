@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Library — Percfect Studios{% endblock %}
+{% block content %}
+<div style="padding:20px;">
+    <h1>Your Library</h1>
+    <div id="library-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-top:20px;">
+        <!-- Loaded via JS -->
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/user_library_sidebar.js"></script>
+{% endblock %}

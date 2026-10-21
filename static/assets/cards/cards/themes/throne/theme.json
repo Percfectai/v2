@@ -1,0 +1,17 @@
+{
+  "key": "throne",
+  "label": "Throne",
+  "layout": "legend",
+  "series": "THRONE SERIES",
+  "outer": "#c9a227",
+  "mid": "#1a1a1a",
+  "inner": "#f5f0e6",
+  "bg1": "#0a0a0c",
+  "bg2": "#050508",
+  "accent": "#e8c547",
+  "name_color": "#ffffff",
+  "stat_border": "#e8c547",
+  "scene_url": "/static/assets/cards/themes/throne/scene.jpg",
+  "bg_url": "/static/assets/cards/themes/throne/scene.jpg",
+  "frame_url": "/static/assets/cards/themes/throne/frame.svg"
+}

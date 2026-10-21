@@ -1,0 +1,667 @@
+/* Vanessa — admin-only floating companion (never shown to customers) */
+#vanessa-root {
+  --v-bg: #120a16;
+  --v-panel: #1c1024;
+  --v-border: rgba(244, 114, 182, 0.45);
+  --v-pink: #f472b6;
+  --v-hot: #fb7185;
+  --v-text: #fdf2f8;
+  --v-muted: #d4a5c0;
+  /* BOTTOM-LEFT — library (characters/photos/videos) owns bottom-right forever */
+  position: fixed;
+  left: 1rem;
+  right: auto;
+  bottom: 1.15rem;
+  z-index: 1030;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--v-text);
+}
+#vanessa-root * { box-sizing: border-box; }
+
+#vanessa-fab {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--v-border);
+  background: linear-gradient(135deg, #f472b6 0%, #a855f7 55%, #fb7185 100%);
+  background-size: 200% 200%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 12px 36px rgba(244, 114, 182, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+  animation: vanessa-fab-idle 4s ease-in-out infinite;
+}
+#vanessa-fab:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 16px 44px rgba(244, 114, 182, 0.55);
+  animation: vanessa-fab-shimmer 2.4s ease-in-out infinite;
+}
+#vanessa-fab .v-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #86efac;
+  border: 2px solid #120a16;
+  top: 4px;
+  right: 4px;
+  animation: vanessa-dot-breathe 2.2s ease-in-out infinite;
+}
+/* Soft rings behind FAB when voice is live */
+#vanessa-fab::before,
+#vanessa-fab::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(244, 114, 182, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+#vanessa-root.listening #vanessa-fab::before,
+#vanessa-root.listening #vanessa-fab::after,
+#vanessa-root.speaking #vanessa-fab::before,
+#vanessa-root.speaking #vanessa-fab::after,
+#vanessa-root.thinking #vanessa-fab::before {
+  opacity: 1;
+  animation: vanessa-ring 1.6s ease-out infinite;
+}
+#vanessa-root.listening #vanessa-fab::after {
+  animation-delay: 0.55s;
+}
+#vanessa-root.speaking #vanessa-fab::before,
+#vanessa-root.speaking #vanessa-fab::after {
+  border-color: rgba(168, 85, 247, 0.55);
+  animation-duration: 1.1s;
+}
+#vanessa-root.speaking #vanessa-fab::after {
+  animation-delay: 0.4s;
+}
+#vanessa-root.thinking #vanessa-fab {
+  animation: vanessa-fab-think 1.1s ease-in-out infinite;
+}
+#vanessa-root.listening #vanessa-fab {
+  animation: vanessa-fab-listen 1.4s ease-in-out infinite;
+}
+#vanessa-root.speaking #vanessa-fab {
+  animation: vanessa-fab-speak 0.9s ease-in-out infinite;
+}
+
+#vanessa-panel {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: auto;
+  bottom: 68px;
+  width: min(360px, calc(100vw - 1.5rem));
+  height: min(480px, calc(100vh - 6rem));
+  background: linear-gradient(180deg, #24132e 0%, var(--v-bg) 40%);
+  border: 1px solid var(--v-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  flex-direction: column;
+  overflow: hidden;
+}
+#vanessa-root.open #vanessa-panel { display: flex; }
+#vanessa-root.open #vanessa-fab { opacity: 0.92; }
+
+#vanessa-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+}
+.vanessa-head-text { flex: 1; min-width: 0; }
+#vanessa-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+#vanessa-head h2 span { color: var(--v-pink); }
+#vanessa-head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.68rem;
+  color: var(--v-muted);
+}
+
+/* Portrait avatar (header + FAB) */
+.vanessa-avatar-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(244, 114, 182, 0.55);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, #f472b6 0%, #a855f7 55%, #fb7185 100%);
+  box-shadow: 0 4px 14px rgba(244, 114, 182, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.vanessa-avatar-btn:hover {
+  transform: scale(1.05);
+  border-color: #f9a8d4;
+  box-shadow: 0 6px 18px rgba(244, 114, 182, 0.5);
+}
+.vanessa-avatar-btn:focus-visible {
+  outline: 2px solid #f472b6;
+  outline-offset: 2px;
+}
+.vanessa-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vanessa-avatar[hidden],
+.v-fab-img[hidden] {
+  display: none !important;
+}
+.vanessa-avatar-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.vanessa-avatar-btn.has-pic .vanessa-avatar-letter { display: none; }
+#vanessa-root.listening .vanessa-avatar-btn,
+#vanessa-root.speaking .vanessa-avatar-btn {
+  animation: vanessa-avatar-live 1.2s ease-in-out infinite;
+}
+#vanessa-root.speaking .vanessa-avatar-btn {
+  border-color: rgba(168, 85, 247, 0.75);
+  animation-duration: 0.85s;
+}
+@keyframes vanessa-avatar-live {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(244, 114, 182, 0.12); }
+}
+
+.v-fab-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  z-index: 1;
+}
+.v-fab-letter {
+  position: relative;
+  z-index: 2;
+  font-weight: 800;
+}
+#vanessa-fab.has-pic {
+  background: #1a0b18;
+  overflow: hidden;
+}
+#vanessa-fab.has-pic .v-fab-letter { display: none; }
+#vanessa-fab.has-pic .v-fab-img { display: block; }
+#vanessa-fab .v-dot { z-index: 3; }
+
+.vanessa-agent-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem 0.25rem;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.15);
+}
+.v-tab {
+  flex: 1;
+  border: 1px solid rgba(244, 114, 182, 0.25);
+  background: transparent;
+  color: var(--v-muted);
+  border-radius: 99px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.v-tab.active {
+  background: rgba(244, 114, 182, 0.2);
+  color: #fff;
+  border-color: rgba(244, 114, 182, 0.5);
+}
+.v-tab[data-agent="mira"].active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.vanessa-tier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+}
+.vanessa-tier-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--v-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.vanessa-tier-switch {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 99px;
+  padding: 0.15rem;
+  border: 1px solid rgba(244, 114, 182, 0.2);
+}
+.v-tier {
+  border: none;
+  background: transparent;
+  color: var(--v-muted);
+  border-radius: 99px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.v-tier.active {
+  background: linear-gradient(135deg, #f472b6, #a855f7);
+  color: #fff;
+}
+.vanessa-tier-note {
+  margin: 0;
+  padding: 0 0.75rem 0.35rem;
+  font-size: 0.68rem;
+  color: var(--v-muted);
+}
+.vanessa-tier-row[hidden],
+.vanessa-tier-note[hidden] {
+  display: none !important;
+}
+
+/* Voice conversation bar */
+.vanessa-voice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem 0.45rem;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.12);
+}
+.v-voice-btn {
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--v-muted);
+  border-radius: 99px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.v-voice-btn:hover {
+  border-color: var(--v-pink);
+  color: #fff;
+}
+.v-voice-btn.active,
+.v-voice-btn[aria-pressed="true"] {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.35), rgba(168, 85, 247, 0.35));
+  border-color: rgba(244, 114, 182, 0.65);
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.2);
+}
+#vanessa-talk.active {
+  background: linear-gradient(135deg, #f472b6, #a855f7);
+  border-color: transparent;
+  animation: vanessa-talk-glow 1.6s ease-in-out infinite;
+}
+#vanessa-root.listening #vanessa-fab {
+  box-shadow: 0 0 0 4px rgba(244, 114, 182, 0.45), 0 12px 36px rgba(244, 114, 182, 0.55);
+}
+#vanessa-root.speaking #vanessa-fab {
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.55), 0 14px 40px rgba(168, 85, 247, 0.5);
+}
+#vanessa-root.thinking #vanessa-fab {
+  box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.35), 0 12px 32px rgba(252, 211, 77, 0.25);
+}
+
+/* Sound-wave bars next to status (pure CSS, no JS) */
+.vanessa-voice-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--v-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.vanessa-voice-status::before {
+  content: "";
+  display: none;
+  width: 14px;
+  height: 12px;
+  background:
+    linear-gradient(currentColor, currentColor) 0 50% / 2px 40% no-repeat,
+    linear-gradient(currentColor, currentColor) 4px 50% / 2px 70% no-repeat,
+    linear-gradient(currentColor, currentColor) 8px 50% / 2px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) 12px 50% / 2px 55% no-repeat;
+  opacity: 0.9;
+}
+.vanessa-voice-status.listening,
+.vanessa-voice-status.speaking,
+.vanessa-voice-status.thinking {
+  animation: vanessa-status-pop 0.35s ease-out;
+}
+.vanessa-voice-status.listening { color: #fb7185; }
+.vanessa-voice-status.speaking { color: #c4b5fd; }
+.vanessa-voice-status.thinking { color: #fcd34d; }
+.vanessa-voice-status.listening::before,
+.vanessa-voice-status.speaking::before,
+.vanessa-voice-status.thinking::before {
+  display: inline-block;
+  animation: vanessa-bars 0.85s ease-in-out infinite;
+}
+.vanessa-voice-status.speaking::before {
+  animation-duration: 0.55s;
+}
+.vanessa-voice-status.thinking::before {
+  animation-duration: 1.25s;
+}
+
+/* Panel edge glow while live */
+#vanessa-root.listening #vanessa-panel,
+#vanessa-root.speaking #vanessa-panel,
+#vanessa-root.thinking #vanessa-panel {
+  animation: vanessa-panel-glow 2s ease-in-out infinite;
+}
+#vanessa-root.speaking #vanessa-panel {
+  animation-name: vanessa-panel-glow-speak;
+}
+
+@keyframes vanessa-fab-idle {
+  0%, 100% { transform: translateY(0); box-shadow: 0 12px 36px rgba(244, 114, 182, 0.4); }
+  50% { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(244, 114, 182, 0.55); }
+}
+@keyframes vanessa-fab-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes vanessa-fab-listen {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes vanessa-fab-speak {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.08) rotate(-2deg); }
+  75% { transform: scale(1.05) rotate(2deg); }
+}
+@keyframes vanessa-fab-think {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.03); filter: brightness(1.15); }
+}
+@keyframes vanessa-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+@keyframes vanessa-dot-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.75; }
+}
+@keyframes vanessa-talk-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(244, 114, 182, 0.12); }
+}
+@keyframes vanessa-bars {
+  0%, 100% {
+    background:
+      linear-gradient(currentColor, currentColor) 0 50% / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 4px 50% / 2px 80% no-repeat,
+      linear-gradient(currentColor, currentColor) 8px 50% / 2px 50% no-repeat,
+      linear-gradient(currentColor, currentColor) 12px 50% / 2px 95% no-repeat;
+  }
+  50% {
+    background:
+      linear-gradient(currentColor, currentColor) 0 50% / 2px 90% no-repeat,
+      linear-gradient(currentColor, currentColor) 4px 50% / 2px 40% no-repeat,
+      linear-gradient(currentColor, currentColor) 8px 50% / 2px 100% no-repeat,
+      linear-gradient(currentColor, currentColor) 12px 50% / 2px 45% no-repeat;
+  }
+}
+@keyframes vanessa-status-pop {
+  from { transform: scale(0.92); opacity: 0.5; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes vanessa-panel-glow {
+  0%, 100% { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(244, 114, 182, 0.25); }
+  50% { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 24px rgba(244, 114, 182, 0.35); }
+}
+@keyframes vanessa-panel-glow-speak {
+  0%, 100% { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(168, 85, 247, 0.3); }
+  50% { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 28px rgba(168, 85, 247, 0.45); }
+}
+
+#vanessa-close {
+  border: none;
+  background: transparent;
+  color: var(--v-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+}
+#vanessa-close:hover { color: #fff; }
+
+#vanessa-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.v-msg {
+  max-width: 92%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.v-msg.bot {
+  align-self: flex-start;
+  background: rgba(244, 114, 182, 0.14);
+  border: 1px solid rgba(244, 114, 182, 0.28);
+}
+.v-msg.user {
+  align-self: flex-end;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.v-msg.sys {
+  align-self: center;
+  font-size: 0.72rem;
+  color: var(--v-muted);
+  border: 1px dashed rgba(244, 114, 182, 0.25);
+  background: transparent;
+}
+
+#vanessa-form {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  border-top: 1px solid rgba(244, 114, 182, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+}
+#vanessa-input {
+  flex: 1;
+  min-height: 42px;
+  max-height: 100px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+  background: #0c0610;
+  color: var(--v-text);
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+#vanessa-input:focus {
+  outline: none;
+  border-color: var(--v-pink);
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.25);
+}
+.vanessa-shot-preview {
+  position: relative;
+  margin: 0 0.65rem 0.35rem;
+  padding: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.vanessa-shot-preview[hidden] { display: none !important; }
+.vanessa-shot-preview img {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+.vanessa-shot-preview span {
+  font-size: 0.72rem;
+  color: var(--v-muted);
+  line-height: 1.35;
+}
+.vanessa-shot-clear {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  border: none;
+  background: transparent;
+  color: var(--v-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+}
+.vanessa-shot-clear:hover { color: #fff; }
+
+#vanessa-shot,
+#vanessa-mic {
+  border: 1px solid rgba(244, 114, 182, 0.4);
+  border-radius: 12px;
+  min-width: 42px;
+  padding: 0 0.55rem;
+  font-size: 1.05rem;
+  cursor: pointer;
+  background: #0c0610;
+  color: #fff;
+  line-height: 1;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+#vanessa-shot:hover,
+#vanessa-mic:hover {
+  border-color: var(--v-pink);
+}
+#vanessa-shot:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#vanessa-shot.busy {
+  opacity: 0.7;
+}
+#vanessa-mic:hover {
+  border-color: var(--v-pink);
+}
+#vanessa-mic.listening {
+  background: rgba(244, 114, 182, 0.25);
+  border-color: var(--v-hot);
+  box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.35);
+  animation: vanessa-pulse 1.2s ease-in-out infinite;
+}
+#vanessa-mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@keyframes vanessa-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(251, 113, 133, 0.15); }
+}
+#vanessa-send {
+  border: none;
+  border-radius: 12px;
+  padding: 0 0.9rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: linear-gradient(135deg, #f472b6, #a855f7);
+  color: #fff;
+  white-space: nowrap;
+}
+#vanessa-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* Only quiet animations if the OS asks for reduced motion (accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  #vanessa-fab,
+  #vanessa-fab:hover,
+  #vanessa-fab .v-dot,
+  #vanessa-fab::before,
+  #vanessa-fab::after,
+  #vanessa-mic.listening,
+  #vanessa-talk.active,
+  #vanessa-root.listening #vanessa-fab,
+  #vanessa-root.speaking #vanessa-fab,
+  #vanessa-root.thinking #vanessa-fab,
+  #vanessa-root.listening #vanessa-panel,
+  #vanessa-root.speaking #vanessa-panel,
+  #vanessa-root.thinking #vanessa-panel,
+  #vanessa-root.listening .vanessa-avatar-btn,
+  #vanessa-root.speaking .vanessa-avatar-btn,
+  .vanessa-voice-status.listening::before,
+  .vanessa-voice-status.speaking::before,
+  .vanessa-voice-status.thinking::before,
+  .vanessa-voice-status.listening,
+  .vanessa-voice-status.speaking,
+  .vanessa-voice-status.thinking {
+    animation: none !important;
+  }
+}
+#vanessa-err {
+  display: none;
+  padding: 0 0.75rem 0.55rem;
+  font-size: 0.75rem;
+  color: #fecaca;
+}
+
+@media (max-width: 480px) {
+  #vanessa-root { left: 0.65rem; right: auto; bottom: 0.65rem; }
+  #vanessa-panel {
+    left: 0;
+    width: calc(100vw - 1.1rem);
+    height: min(70vh, 520px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #vanessa-fab { transition: none; animation: none !important; }
+}

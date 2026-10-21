@@ -1,0 +1,72 @@
+{
+  "_owner_note": "ONE agent: Voltage · poyo_H body + 17 clips from Supabase arena-anims (live).",
+  "title": "VOLTAGE · ON THE FIELD",
+  "subtitle": "1 agent · Supabase 17-set · WASD walk · B punch · Space jump",
+  "banner": "VOLTAGE · SUPABASE · 17 CLIPS",
+  "engine": {
+    "name": "meshy-6",
+    "animation_sets": true,
+    "manifest": "/static/motion-lab/animated/manifest_remote.json",
+    "placeholder_glb": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/idle.glb",
+    "pipeline": "Supabase idle mesh + 17 clips → CharacterController"
+  },
+  "movement": {
+    "move_speed": 5.2,
+    "turn_speed": 14,
+    "bounds_radius": 16,
+    "target_height_m": 1.75,
+    "jump_velocity": 5.2,
+    "wander_radius": 8,
+    "wander_idle_ms_min": 800,
+    "wander_idle_ms_max": 2200,
+    "hop_chance": 0.12,
+    "auto_scatter_on_load": true
+  },
+  "field": {
+    "size": 40,
+    "grass": "#3d9e3a",
+    "grass_dark": "#2d7a2a",
+    "sky_top": "#5ec8ff",
+    "sky_bottom": "#c8ecff",
+    "sun_intensity": 1.35
+  },
+  "defaults": {
+    "placeholder_glb": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/idle.glb",
+    "body_engine": "meshy-6",
+    "status": "ON",
+    "force_tint": false
+  },
+  "crew": [
+    {
+      "id": "voltage",
+      "label": "Voltage",
+      "role": "Commander",
+      "status": "ON",
+      "tint": "#00ff88",
+      "force_tint": false,
+      "glb_url": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/idle.glb",
+      "anim_char": "poyo_H",
+      "body_note": "Supabase poyo_H idle + 17 clips",
+      "spawn": { "x": 0, "z": 0 },
+      "animation_set": {
+        "idle": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/idle.glb",
+        "walk_fwd": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/walk_fwd.glb",
+        "walk_back": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/walk_back.glb",
+        "strafe_left": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/strafe_left.glb",
+        "strafe_right": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/strafe_right.glb",
+        "run": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/run.glb",
+        "jump": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/jump.glb",
+        "punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/punch.glb",
+        "heavy_punch": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/heavy_punch.glb",
+        "kick": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/kick.glb",
+        "roundhouse": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/roundhouse.glb",
+        "block": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/block.glb",
+        "dodge": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/dodge.glb",
+        "cast": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/cast.glb",
+        "taunt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/taunt.glb",
+        "hurt": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/hurt.glb",
+        "ko": "https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims/poyo_H/ko.glb"
+      }
+    }
+  ]
+}

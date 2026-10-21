@@ -1,0 +1,14 @@
+{
+  "key": "temptress",
+  "label": "Temptress",
+  "outer": "#f0c14a",
+  "mid": "#9f1239",
+  "inner": "#fda4af",
+  "bg1": "#4c0519",
+  "bg2": "#1c0a0e",
+  "accent": "#f0c14a",
+  "name_color": "#f0c14a",
+  "stat_border": "#f43f5e",
+  "frame_url": "/static/assets/cards/themes/temptress/frame.svg",
+  "bg_url": "/static/assets/cards/themes/temptress/bg.svg"
+}

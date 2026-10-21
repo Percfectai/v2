@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Stage · Percfect</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    html, body { height: 100%; overflow: hidden; background: #05070d; color: #e8eefc;
+      font-family: system-ui, -apple-system, sans-serif; }
+    #c { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: fixed; left: 14px; top: 14px; z-index: 20;
+      max-width: min(340px, calc(100vw - 28px));
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      background: rgba(6, 10, 18, 0.92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    }
+    .hud h1 {
+      font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #00ff88; margin-bottom: 6px;
+    }
+    .hud p { font-size: 12px; color: #8fa3c0; line-height: 1.45; margin: 3px 0; }
+    .hud strong { color: #dce7ff; font-weight: 600; }
+    #status {
+      margin-top: 10px; font-size: 12px; color: #fbbf24;
+      min-height: 2.4em; white-space: pre-wrap; word-break: break-word;
+    }
+    #status.ok { color: #34d399; }
+    #status.err { color: #f87171; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    button {
+      padding: 8px 12px; border: 0; border-radius: 8px;
+      font-weight: 700; font-size: 12px; cursor: pointer;
+      background: #10b981; color: #042f1a;
+    }
+    button.sec {
+      background: transparent; border: 1px solid rgba(0,255,136,.45); color: #00ff88;
+    }
+    .hint {
+      position: fixed; right: 14px; bottom: 14px; z-index: 20;
+      font-size: 11px; color: #6b7c94;
+      background: rgba(6,10,18,.75); padding: 6px 10px; border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h1>Agent in body</h1>
+    <p><strong>I drive.</strong> You watch and record.</p>
+    <p>One body · feet on floor · walk / turn / idle</p>
+    <div class="row">
+      <button type="button" id="btn-hop">Agent re-enter</button>
+      <button type="button" id="btn-idle" class="sec">Hold</button>
+    </div>
+    <div id="status">Loading stage…</div>
+  </div>
+  <div class="hint">Drag to orbit · scroll zoom</div>
+  <canvas id="c"></canvas>
+
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const DEFAULT_GLB = '/motion-lab/meshy6_character.glb';    let glbUrl = params.get('glb') || DEFAULT_GLB;
+    try { glbUrl = decodeURIComponent(glbUrl); } catch (_) {}
+
+    const statusEl = document.getElementById('status');
+    function setStatus(msg, cls = '') {
+      statusEl.textContent = msg;
+      statusEl.className = cls;
+      window.__AGENT_STAGE__ = {
+        ...(window.__AGENT_STAGE__ || {}),
+        status: msg, cls, t: Date.now(),
+      };
+    }
+    window.addEventListener('error', (e) => setStatus('ERROR: ' + (e.message || e.error), 'err'));
+    window.addEventListener('unhandledrejection', (e) =>
+      setStatus('ERROR: ' + (e.reason?.message || e.reason || e), 'err')
+    );
+
+    const THREE = await import('three');
+    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+      failIfMajorPerformanceCaveat: false,
+    });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070a12);
+    scene.fog = new THREE.Fog(0x070a12, 16, 48);
+
+    const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 100);
+    camera.position.set(3.2, 2.0, 4.2);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.target.set(0, 0.95, 0);
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.minDistance = 2;
+    controls.maxDistance = 14;
+
+    scene.add(new THREE.HemisphereLight(0xc0d4ff, 0x1a1520, 0.95));
+    const key = new THREE.DirectionalLight(0xffffff, 1.15);
+    key.position.set(4, 9, 3);
+    scene.add(key);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(10, 64),
+      new THREE.MeshStandardMaterial({ color: 0x121820, roughness: 0.92, metalness: 0.04 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+    const grid = new THREE.GridHelper(16, 32, 0x00ff88, 0x1a2430);
+    grid.position.y = 0.01;
+    scene.add(grid);
+
+    let root = null;
+    let floorY = 0;
+    let agentOn = false;
+    let agentUntil = 0;
+    let agentDir = { x: 0, z: 0 };
+    let agentPhase = 0;
+    const moveSpeed = 2.4;
+
+    function plantFeet(obj, targetH = 1.78) {
+      obj.rotation.set(0, 0, 0);
+      obj.position.set(0, 0, 0);
+      obj.scale.set(1, 1, 1);
+      obj.updateMatrixWorld(true);
+      let box = new THREE.Box3().setFromObject(obj);
+      let size = box.getSize(new THREE.Vector3());
+      if (size.z >= size.y * 1.25 && size.z >= size.x * 1.05) {
+        obj.rotation.x = -Math.PI / 2;
+        obj.updateMatrixWorld(true);
+        box = new THREE.Box3().setFromObject(obj);
+        size = box.getSize(new THREE.Vector3());
+      }
+      obj.scale.setScalar(targetH / Math.max(0.001, size.y));
+      obj.updateMatrixWorld(true);
+      box = new THREE.Box3().setFromObject(obj);
+      const center = box.getCenter(new THREE.Vector3());
+      obj.position.set(-center.x, -box.min.y, -center.z);
+      obj.updateMatrixWorld(true);
+      box = new THREE.Box3().setFromObject(obj);
+      obj.position.y -= box.min.y;
+      return obj.position.y;
+    }
+
+    function hopIn() {
+      if (!root) return;
+      agentOn = true;
+      agentUntil = 0;
+      agentPhase = 0;
+      window.__AGENT_STAGE__ = {
+        ...(window.__AGENT_STAGE__ || {}),
+        agentOn: true,
+        bodyLoaded: true,
+      };
+      setStatus('Agent in body · walking', 'ok');
+    }
+
+    function hold() {
+      agentOn = false;
+      agentDir = { x: 0, z: 0 };
+      setStatus('Agent holding · still in body', 'ok');
+    }
+
+    document.getElementById('btn-hop').onclick = hopIn;
+    document.getElementById('btn-idle').onclick = hold;
+
+    async function loadBody(url) {
+      const loader = new GLTFLoader();
+      setStatus('Loading body…');
+      const gltf = await new Promise((resolve, reject) => {
+        loader.load(url, resolve, undefined, reject);
+      });
+      if (root) scene.remove(root);
+      root = gltf.scene;
+      scene.add(root);
+      floorY = plantFeet(root, 1.78);
+      if (gltf.animations?.length) {
+        const mixer = new THREE.AnimationMixer(root);
+        const clip =
+          gltf.animations.find((c) => /idle|breath|stand/i.test(c.name || '')) ||
+          gltf.animations[0];
+        mixer.clipAction(clip).play();
+        root.userData.mixer = mixer;
+      }
+      hopIn();
+      try {
+        parent.postMessage(
+          { source: 'percfect-agent-stage', type: 'glb-loaded', url },
+          '*'
+        );
+      } catch (_) {}
+    }
+
+    function agentBrain(now) {
+      if (!agentOn || !root) return;
+      if (now < agentUntil) return;
+      agentPhase = (agentPhase + 1) % 6;
+      agentUntil = now + 1500 + Math.random() * 900;
+      const phases = [
+        { x: 0, z: 1, label: 'walk forward' },
+        { x: 0, z: 0, label: 'idle' },
+        { x: 1, z: 0, label: 'walk right' },
+        { x: 0, z: -1, label: 'walk back' },
+        { x: -1, z: 0, label: 'walk left' },
+        { x: 0, z: 0, label: 'idle' },
+      ];
+      const p = phases[agentPhase];
+      agentDir = { x: p.x, z: p.z };
+      setStatus('Agent in body · ' + p.label, 'ok');
+    }
+
+    function applyMove(dt) {
+      if (!root) return;
+      if (!agentOn) {
+        root.position.y = floorY;
+        return;
+      }
+      let { x, z } = agentDir;
+      const len = Math.hypot(x, z);
+      if (len > 1e-4) {
+        x /= len;
+        z /= len;
+        root.position.x += x * moveSpeed * dt;
+        root.position.z += z * moveSpeed * dt;
+        root.rotation.y = Math.atan2(x, z);
+        const r = 5.5;
+        const d = Math.hypot(root.position.x, root.position.z);
+        if (d > r) {
+          root.position.x = (root.position.x / d) * r;
+          root.position.z = (root.position.z / d) * r;
+        }
+      }
+      root.position.y = floorY;
+    }
+
+    // Parent /3d page can dock a new GLB
+    window.addEventListener('message', (ev) => {
+      const d = ev.data;
+      if (!d) return;
+      if (d.source === 'percfect-3d' && (d.type === 'loadGlb' || d.action === 'loadGlb') && d.url) {
+        loadBody(d.url).catch((e) => setStatus('LOAD FAILED\n' + (e.message || e), 'err'));
+      }
+    });
+
+    try {
+      await loadBody(glbUrl);
+    } catch (e) {
+      // fallback default if custom glb fails
+      if (glbUrl !== DEFAULT_GLB) {
+        try {
+          await loadBody(DEFAULT_GLB);
+        } catch (e2) {
+          setStatus('LOAD FAILED\n' + (e2.message || e2), 'err');
+        }
+      } else {
+        setStatus('LOAD FAILED\n' + (e.message || e), 'err');
+      }
+    }
+
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      agentBrain(now);
+      applyMove(dt);
+      if (root?.userData?.mixer) root.userData.mixer.update(dt);
+      if (root) {
+        controls.target.x += (root.position.x - controls.target.x) * 0.08;
+        controls.target.z += (root.position.z - controls.target.z) * 0.08;
+        controls.target.y = 0.95;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

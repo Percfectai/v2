@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Percfect — AI Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #08080f;
+      --bar: rgba(8,8,15,0.92);
+      --surface: #10101a;
+      --border: #22223a;
+      --purple: #7c5cfc;
+      --purple2: #9b7bff;
+      --purple3: #c4b5fd;
+      --text: #f0f0ff;
+      --muted: #6e6e9a;
+      --bar-h: 52px;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; overflow: hidden; }
+
+    /* ── top bar ── */
+    .bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: var(--bar-h);
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0 1rem;
+      background: var(--bar);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      transition: transform 0.35s ease;
+    }
+    .bar.hidden { transform: translateY(-100%); }
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-weight: 700; font-size: 0.95rem;
+      color: var(--text); white-space: nowrap;
+    }
+    .logo em { color: var(--purple2); font-style: normal; }
+    .tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
+    .tab {
+      padding: 0.4rem 1rem; border-radius: 8px; border: none;
+      background: transparent; color: var(--muted);
+      font-family: inherit; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.on { background: rgba(124,92,252,0.2); color: var(--purple3); }
+    .bar-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .btn-sm {
+      padding: 0.35rem 0.85rem; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted);
+      font-size: 0.75rem; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-sm:hover { border-color: var(--purple); color: var(--purple3); }
+    .btn-sm.primary { background: var(--purple); border-color: var(--purple); color: #fff; }
+    .btn-sm.primary:hover { background: var(--purple2); }
+    .credits { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+
+    /* ── phone prompt bar ── */
+    .prompt-bar {
+      position: fixed; top: var(--bar-h); left: 0; right: 0; z-index: 999;
+      background: rgba(124,92,252,0.15); border-bottom: 1px solid rgba(124,92,252,0.3);
+      padding: 0.6rem 1rem; display: none; align-items: center; gap: 0.75rem;
+      backdrop-filter: blur(12px);
+    }
+    .prompt-bar.show { display: flex; }
+    .prompt-bar p { flex: 1; font-size: 0.85rem; line-height: 1.4; }
+    .prompt-bar button { flex-shrink: 0; }
+
+    /* ── views ── */
+    .view { display: none; position: fixed; top: var(--bar-h); left: 0; right: 0; bottom: 0; }
+    .view.on { display: block; }
+    .view.has-prompt { top: calc(var(--bar-h) + 48px); }
+
+    /* ── MAKE: fullscreen perchance ── */
+    #view-make { top: 0; }
+    #view-make.on ~ .bar { /* bar overlays iframe */ }
+    #view-make .iframe-wrap { width: 100%; height: 100%; }
+    #view-make iframe {
+      width: 100%; height: 100%; border: none; display: block;
+      background: #0a0a12;
+    }
+
+    /* ── MY PICS grid ── */
+    #view-pics { overflow-y: auto; padding: 1.25rem; }
+    .pics-header { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: center; }
+    .pics-header input {
+      flex: 1; min-width: 200px; padding: 0.65rem 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 0.85rem;
+    }
+    .pics-header input:focus { outline: none; border-color: var(--purple); }
+    .pics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+    .pic-card {
+      aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+      position: relative; cursor: pointer; border: 2px solid transparent;
+      background: var(--surface); transition: border-color 0.2s, transform 0.2s;
+    }
+    .pic-card:hover { border-color: var(--purple); transform: scale(1.02); }
+    .pic-card img { width: 100%; height: 100%; object-fit: cover; }
+    .pic-card .pic-x {
+      position: absolute; top: 6px; right: 6px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(0,0,0,0.7); border: none; color: #fff;
+      font-size: 0.75rem; cursor: pointer; display: none;
+    }
+    .pic-card:hover .pic-x { display: flex; align-items: center; justify-content: center; }
+    .empty-pics {
+      text-align: center; padding: 4rem 1rem; color: var(--muted);
+    }
+    .empty-pics .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+
+    /* ── ANIMATE ── */
+    #view-animate { overflow-y: auto; padding: 1.5rem; max-width: 640px; margin: 0 auto; }
+    .anim-preview {
+      width: 100%; aspect-ratio: 16/9; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      overflow: hidden; margin-bottom: 1.25rem;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 0.85rem;
+    }
+    .anim-preview img, .anim-preview video { width: 100%; height: 100%; object-fit: contain; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+    textarea, select {
+      width: 100%; padding: 0.75rem 1rem; margin-bottom: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-family: inherit; font-size: 0.9rem;
+      resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: var(--purple); }
+    .dur-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .chip {
+      padding: 0.45rem 1rem; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .chip.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+    .gen-vid-btn {
+      width: 100%; padding: 0.9rem; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--purple), #5b3fd4);
+      color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: opacity 0.2s;
+    }
+    .gen-vid-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .note { font-size: 0.75rem; color: var(--muted); margin-top: 0.75rem; text-align: center; }
+
+    /* ── QR modal ── */
+    .modal-bg {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2rem; max-width: 380px; width: 100%;
+      text-align: center;
+    }
+    .modal h2 { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .modal p { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.25rem; }
+    .modal img { border-radius: 12px; margin-bottom: 1rem; max-width: 220px; }
+    .modal .code { font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      color: var(--purple3); word-break: break-all; margin-bottom: 1rem; }
+    .modal-close {
+      padding: 0.5rem 1.5rem; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-family: inherit;
+    }
+
+    /* ── show bar toggle ── */
+    .peek {
+      position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+      z-index: 999; padding: 4px 16px; border-radius: 0 0 8px 8px;
+      background: var(--bar); border: 1px solid var(--border); border-top: none;
+      font-size: 0.65rem; color: var(--muted); cursor: pointer;
+      display: none;
+    }
+    .peek.show { display: block; }
+
+    .setup-banner {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+      display: none; align-items: center; gap: 0.75rem;
+      padding: 0.65rem 1rem; background: rgba(124,92,252,0.2);
+      border-bottom: 1px solid rgba(124,92,252,0.35);
+      font-size: 0.78rem; line-height: 1.4;
+    }
+    .setup-banner.show { display: flex; }
+    .setup-banner p { flex: 1; margin: 0; color: var(--purple3); }
+    .setup-banner code { color: #fff; font-size: 0.72rem; }
+    .setup-banner a { color: var(--purple2); }
+    .setup-banner button {
+      flex-shrink: 0; padding: 0.3rem 0.65rem; border-radius: 6px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); cursor: pointer; font-size: 0.72rem;
+    }
+    #view-make .iframe-wrap { position: relative; height: 100%; }
+    #view-make.has-setup .iframe-wrap { height: calc(100% - 52px); margin-top: 52px; }
+
+    @media (max-width: 600px) {
+      .tabs .tab { padding: 0.35rem 0.6rem; font-size: 0.72rem; }
+      .credits { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="peek" id="peek" onclick="showBar()">▲ menu</div>
+
+  <header class="bar" id="bar">
+    <div class="logo">✦ <em>PERCFECT</em></div>
+    <nav class="tabs">
+      <button class="tab on" data-view="make" onclick="switchView('make')">MAKE</button>
+      <button class="tab" data-view="pics" onclick="switchView('pics')">MY PICS</button>
+      <button class="tab" data-view="animate" onclick="switchView('animate')">ANIMATE</button>
+    </nav>
+    <div class="bar-actions">
+      <span class="credits" id="credits-display"></span>
+      <button class="btn-sm" onclick="openPhone()">📱 Phone</button>
+      <button class="btn-sm" onclick="hideBar()">⬆ Hide</button>
+    </div>
+  </header>
+
+  <div class="prompt-bar" id="prompt-bar">
+    <p id="prompt-text">Phone sent a prompt…</p>
+    <button class="btn-sm primary" onclick="copyPrompt()">Copy</button>
+    <button class="btn-sm" onclick="dismissPrompt()">✕</button>
+  </div>
+
+  <!-- MAKE -->
+  <section class="view on" id="view-make">
+    <div class="setup-banner" id="setup-banner">
+      <p><strong>First time?</strong> Create <code>percfect-imagine</code> on <a href="https://perchance.org" target="_blank">perchance.org</a> — paste LISTS + HTML from <code>percfectstudios/perchance/</code> on your Mac.</p>
+      <button onclick="dismissSetup()">Got it ✕</button>
+    </div>
+    <div class="iframe-wrap">
+      <iframe
+        id="perchance-frame"
+        src="https://perchance.org/percfect-imagine"
+        title="Percfect Generator"
+        allow="fullscreen"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
+      ></iframe>
+    </div>
+  </section>
+
+  <!-- MY PICS -->
+  <section class="view" id="view-pics">
+    <div class="pics-header">
+      <input type="url" id="add-url" placeholder="Paste image URL from generator" />
+      <button class="btn-sm" onclick="pasteUrl()">📋 Paste</button>
+      <button class="btn-sm primary" onclick="addPic()">+ Add</button>
+      <button class="btn-sm" onclick="addBulk()">+ Bulk</button>
+      <button class="btn-sm" onclick="clearPics()">Clear</button>
+    </div>
+    <div class="pics-grid" id="pics-grid"></div>
+    <div class="empty-pics" id="empty-pics">
+      <div class="icon">🖼</div>
+      <p>Generate in <strong>MAKE</strong> → right-click image → <strong>Copy image address</strong> → tap <strong>📋 Paste</strong> above.<br>Batch of 10? Add each URL or use <strong>+ Bulk</strong> (one URL per line).</p>
+    </div>
+  </section>
+
+  <!-- ANIMATE -->
+  <section class="view" id="view-animate">
+    <div class="anim-preview" id="anim-preview">Pick an image from MY PICS first</div>
+    <label>Video prompt</label>
+    <textarea id="vid-prompt" rows="3" placeholder="Describe the motion… slow zoom, hair blowing, cinematic…"></textarea>
+    <label>Length (uses video seconds)</label>
+    <div class="dur-chips" id="dur-chips">
+      <button class="chip on" data-dur="5" onclick="setDur(this,5)">5 sec</button>
+      <button class="chip" data-dur="6" onclick="setDur(this,6)">6 sec</button>
+      <button class="chip" data-dur="10" onclick="setDur(this,10)">10 sec</button>
+    </div>
+    <button class="gen-vid-btn" id="vid-btn" onclick="generateVideo()">▶ Generate Video (480p)</button>
+    <p class="note">480p only · xAI · costs video seconds only · images are free via Perchance</p>
+  </section>
+
+  <!-- QR modal -->
+  <div class="modal-bg" id="qr-modal" onclick="if(event.target===this)closePhone()">
+    <div class="modal">
+      <h2>📱 Connect your phone</h2>
+      <p>Scan to type prompts on your phone keyboard — sends straight to this screen.<br>Also sign up / log in for video credits.</p>
+      <img id="qr-img" src="" alt="QR code" width="220" height="220" />
+      <div class="code" id="qr-url"></div>
+      <p style="font-size:0.75rem;color:var(--muted)">Waiting for phone…</p>
+      <button class="modal-close" onclick="closePhone()">Close</button>
+    </div>
+  </div>
+
+<script>
+const API = 'https://percfectai.com';
+const STORAGE_KEY = 'my_percfect_pics';
+const GEN_URL = new URLSearchParams(location.search).get('gen') || 'percfect-imagine';
+
+let deviceCode = sessionStorage.getItem('tv_device') || makeCode();
+let apiKey = localStorage.getItem('percfect_api_key') || '';
+let selectedPic = null;
+let videoDur = 5;
+let pollTimer = null;
+let promptPollTimer = null;
+
+sessionStorage.setItem('tv_device', deviceCode);
+
+document.getElementById('perchance-frame').src = 'https://perchance.org/' + GEN_URL;
+
+function makeCode() {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 10; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === name));
+  document.getElementById('view-' + name).classList.add('on');
+  if (name === 'make') {
+    document.getElementById('bar').classList.add('hidden');
+    document.getElementById('peek').classList.add('show');
+  } else {
+    document.getElementById('bar').classList.remove('hidden');
+    document.getElementById('peek').classList.remove('show');
+  }
+  if (name === 'pics') renderPics();
+}
+
+function hideBar() {
+  document.getElementById('bar').classList.add('hidden');
+  document.getElementById('peek').classList.add('show');
+}
+function showBar() {
+  document.getElementById('bar').classList.remove('hidden');
+  document.getElementById('peek').classList.remove('show');
+}
+
+/* ── My Percfect Pics (localStorage) ── */
+function getPics() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function savePics(pics) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pics));
+}
+function addPicUrl(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return false;
+  const pics = getPics();
+  if (pics.some(p => p.url === url)) return false;
+  pics.unshift({ url, ts: Date.now() });
+  savePics(pics.slice(0, 200));
+  return true;
+}
+function addPic() {
+  const url = document.getElementById('add-url').value.trim();
+  if (!url) return;
+  if (addPicUrl(url)) {
+    document.getElementById('add-url').value = '';
+    renderPics();
+  }
+}
+async function pasteUrl() {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (t) {
+      document.getElementById('add-url').value = t.trim();
+      addPic();
+    }
+  } catch {
+    document.getElementById('add-url').focus();
+  }
+}
+function addBulk() {
+  const raw = prompt('Paste image URLs — one per line:');
+  if (!raw) return;
+  let n = 0;
+  raw.split(/\n+/).forEach(line => { if (addPicUrl(line.trim())) n++; });
+  if (n) renderPics();
+  else alert('No valid URLs found.');
+}
+function dismissSetup() {
+  localStorage.setItem('percfect_setup_ok', '1');
+  document.getElementById('setup-banner').classList.remove('show');
+  document.getElementById('view-make').classList.remove('has-setup');
+}
+function maybeShowSetup() {
+  if (localStorage.getItem('percfect_setup_ok')) return;
+  document.getElementById('setup-banner').classList.add('show');
+  document.getElementById('view-make').classList.add('has-setup');
+}
+function removePic(i) {
+  const pics = getPics();
+  pics.splice(i, 1);
+  savePics(pics);
+  renderPics();
+}
+function clearPics() {
+  if (confirm('Clear all My Percfect Pics?')) { savePics([]); renderPics(); }
+}
+function renderPics() {
+  const pics = getPics();
+  const grid = document.getElementById('pics-grid');
+  const empty = document.getElementById('empty-pics');
+  grid.innerHTML = '';
+  empty.style.display = pics.length ? 'none' : 'block';
+  pics.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'pic-card';
+    card.innerHTML = `<img src="${p.url}" alt="" loading="lazy" /><button class="pic-x" onclick="event.stopPropagation();removePic(${i})">✕</button>`;
+    card.onclick = () => selectPic(p.url);
+    grid.appendChild(card);
+  });
+}
+function selectPic(url) {
+  selectedPic = url;
+  switchView('animate');
+  const prev = document.getElementById('anim-preview');
+  prev.innerHTML = `<img src="${url}" alt="selected" />`;
+}
+
+/* ── Phone / QR ── */
+function openPhone() {
+  const connectUrl = API + '/connect?device=' + deviceCode;
+  document.getElementById('qr-img').src =
+    'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(connectUrl);
+  document.getElementById('qr-url').textContent = connectUrl;
+  document.getElementById('qr-modal').classList.add('open');
+  startPoll();
+  startPromptPoll();
+}
+function closePhone() {
+  document.getElementById('qr-modal').classList.remove('open');
+}
+function startPoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch(API + '/api/kodi/poll/' + deviceCode);
+      const d = await r.json();
+      if (d.status === 'activated') {
+        apiKey = d.api_key;
+        localStorage.setItem('percfect_api_key', apiKey);
+        updateCredits(d.video_credits, d.username);
+        closePhone();
+      }
+    } catch {}
+  }, 3000);
+}
+function startPromptPoll() {
+  if (promptPollTimer) clearInterval(promptPollTimer);
+  promptPollTimer = setInterval(async () => {
+    try {
+      const r = await fetch(API + '/api/tv/prompt/' + deviceCode);
+      const d = await r.json();
+      if (d.prompt) showPhonePrompt(d.prompt);
+    } catch {}
+  }, 2000);
+}
+function showPhonePrompt(text) {
+  document.getElementById('prompt-text').textContent = '📱 ' + text;
+  document.getElementById('prompt-bar').classList.add('show');
+  document.querySelectorAll('.view.on').forEach(v => v.classList.add('has-prompt'));
+  showBar();
+}
+function copyPrompt() {
+  const t = document.getElementById('prompt-text').textContent.replace(/^📱 /, '');
+  navigator.clipboard.writeText(t).catch(() => {});
+}
+function dismissPrompt() {
+  document.getElementById('prompt-bar').classList.remove('show');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('has-prompt'));
+}
+
+function updateCredits(vid, user) {
+  const el = document.getElementById('credits-display');
+  if (apiKey) el.textContent = (user ? user + ' · ' : '') + (vid ?? '?') + 's video';
+  else el.textContent = '';
+}
+
+async function refreshCredits() {
+  if (!apiKey) return;
+  try {
+    const r = await fetch(API + '/api/kodi/credits', { headers: { 'X-API-Key': apiKey } });
+    const d = await r.json();
+    updateCredits(d.video_credits, d.username);
+  } catch {}
+}
+
+/* ── Video (480p only) ── */
+function setDur(el, s) {
+  videoDur = s;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+async function generateVideo() {
+  if (!apiKey) { openPhone(); alert('Connect your phone first to get video credits.'); return; }
+  if (!selectedPic) { alert('Pick an image from MY PICS first.'); return; }
+  const prompt = document.getElementById('vid-prompt').value.trim();
+  if (!prompt) { alert('Enter a video prompt.'); return; }
+  const btn = document.getElementById('vid-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating… (~60–120s)';
+  const prev = document.getElementById('anim-preview');
+  try {
+    const r = await fetch(API + '/api/generate/video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        prompt,
+        duration: videoDur,
+        image_url: selectedPic,
+        resolution: '480p',
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    prev.innerHTML = `<video src="${d.url}" controls autoplay loop></video>`;
+    refreshCredits();
+  } catch (e) {
+    alert(e.message || 'Video failed');
+  }
+  btn.disabled = false;
+  btn.textContent = '▶ Generate Video (480p)';
+}
+
+/* ── init ── */
+maybeShowSetup();
+switchView('make');
+renderPics();
+refreshCredits();
+startPromptPoll();
+if (apiKey) startPoll();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "key": "princess",
+  "label": "Princess",
+  "layout": "tcg",
+  "series": "PRINCESS SERIES",
+  "outer": "#f0c14a",
+  "mid": "#1a1a1a",
+  "inner": "#f5f0e6",
+  "bg1": "#0a0a0c",
+  "bg2": "#050508",
+  "accent": "#ffe566",
+  "name_color": "#ffffff",
+  "stat_border": "#ffe566",
+  "scene_url": "/static/assets/cards/themes/princess/scene.jpg",
+  "bg_url": "/static/assets/cards/themes/princess/scene.jpg",
+  "frame_url": "/static/assets/cards/themes/princess/frame.svg"
+}

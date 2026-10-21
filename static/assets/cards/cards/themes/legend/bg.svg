@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <defs>
+    <pattern id="crack" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="48" fill="#6a6a70"/>
+      <path d="M0 24 Q12 20 24 26 T48 24" stroke="#4a4a52" stroke-width="1.4" fill="none"/>
+      <path d="M18 0 Q20 16 16 32 T20 48" stroke="#55555e" stroke-width="1.1" fill="none"/>
+      <path d="M4 10 L14 18 M30 34 L42 44 M8 40 L18 36" stroke="#3a3a42" stroke-width="0.9"/>
+    </pattern>
+    <radialGradient id="v" cx="50%" cy="42%" r="68%">
+      <stop offset="40%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.4"/>
+    </radialGradient>
+  </defs>
+  <rect width="300" height="420" fill="#5c5c64"/>
+  <rect width="300" height="420" fill="url(#crack)"/>
+  <rect width="300" height="420" fill="url(#v)"/>
+</svg>

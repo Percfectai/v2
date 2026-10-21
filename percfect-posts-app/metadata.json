@@ -1,0 +1,6 @@
+{
+  "name": "The Percfect Post",
+  "description": "The Percfect Post: Cross-platform social publishing with colorful network checkmarks showing where each photo was posted, instant Chrome extension photo & video web uploader, AI photo tweaking, and video studio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

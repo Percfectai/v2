@@ -1,0 +1,253 @@
+<title>Your Percfect World</title>
+<style>
+  :root{
+    --void:#04090d; --inset:#0f1a26; --line2:#263d52;
+    --ink:#eef4f9; --muted:#9fb0c0; --faint:#5b6d7c;
+    --gold:#e0a94e; --gold-hi:#ffeaa5; --electric:#2b7fd4; --cyan:#39c0e6; --ticket:#f0b54a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; min-height:100%}
+  body{ color:var(--ink); font-family:"Inter",system-ui,sans-serif;
+    background:radial-gradient(1200px 700px at 50% -10%, #10202f 0%, var(--void) 60%); }
+
+  /* top bar overlaid on the diner scene */
+  .topline{ position:absolute; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 22px 12px 16px; }
+  .logo-nav{ position:relative; }
+  .logo-btn{ display:flex; align-items:center; gap:6px; background:rgba(4,9,13,.35); border:0; cursor:pointer; padding:6px 8px; border-radius:12px; backdrop-filter:blur(3px); }
+  .logo-btn:hover{ background:rgba(4,9,13,.55); }
+  .logo-btn .logo{ height:66px; width:auto; filter:drop-shadow(0 0 16px rgba(43,127,212,.6)); }
+  .logo-btn .caret{ width:15px; height:15px; stroke:#cfe0ef; fill:none; stroke-width:2; transition:transform .18s; }
+  .logo-nav.open .caret{ transform:rotate(180deg); }
+  .dropdown{ position:absolute; top:calc(100% + 6px); left:6px; min-width:210px; padding:8px; background:rgba(13,23,34,.98);
+    border:1px solid var(--line2); border-radius:14px; backdrop-filter:blur(12px); box-shadow:0 20px 46px rgba(0,0,0,.7); display:none; }
+  .logo-nav.open .dropdown{ display:block; }
+  .dropdown a{ display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:10px; text-decoration:none; color:var(--ink);
+    font-family:"Rajdhani",sans-serif; font-weight:700; letter-spacing:.04em; font-size:15px; }
+  .dropdown a:hover{ background:rgba(43,127,212,.16); color:#5aa4ee; }
+  .dropdown .sep{ height:1px; background:#17293a; margin:6px 4px; }
+  .dropdown a .k{ margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--faint); }
+
+  .wallet{ display:flex; align-items:center; gap:10px; }
+  .chip{ display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; font-family:"JetBrains Mono",monospace; font-size:14px; border:1px solid var(--line2); background:rgba(4,9,13,.6); backdrop-filter:blur(4px); }
+  .chip.cr{ border-color:var(--cyan); color:var(--cyan); } .chip.tk{ border-color:var(--ticket); color:var(--ticket); }
+  .dot{ width:9px; height:9px; border-radius:50%; } .dot.cr{ background:var(--cyan);} .dot.tk{ background:var(--ticket);}
+  .reup{ font-family:"Rajdhani",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:13px; padding:9px 16px; border-radius:10px;
+    text-decoration:none; color:#1a1204; background:linear-gradient(180deg,var(--gold-hi),var(--gold)); border:1px solid #9a6f2c; }
+
+  /* the diner scene = the hero */
+  .diner{ width:100%; max-width:1280px; margin:0 auto; position:relative; }
+  .diner img{ width:100%; display:block; }
+  .diner::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:32%; background:linear-gradient(180deg, transparent, var(--void)); pointer-events:none; }
+
+  /* neon jukebox buttons on the counter */
+  .hub{ display:flex; gap:24px; justify-content:center; flex-wrap:wrap; padding:0 20px 80px; margin-top:-52px; position:relative; z-index:5; }
+  .jbtn{ position:relative; width:158px; height:158px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    cursor:pointer; text-decoration:none; color:#fff;
+    background:radial-gradient(circle at 50% 42%, #202027 0 26%, #0c0c10 62%, #050507 100%);
+    border:3px solid var(--c); box-shadow:0 0 16px var(--c), inset 0 0 20px rgba(0,0,0,.85), 0 16px 34px rgba(0,0,0,.7);
+    transition:transform .18s ease, box-shadow .18s ease; }
+  .jbtn::before{ content:""; position:absolute; inset:15px; border-radius:50%; pointer-events:none;
+    background:repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.05) 0 1px, transparent 1px 4px); }
+  .jbtn:hover{ transform:translateY(-7px) scale(1.04); box-shadow:0 0 30px var(--c), 0 0 66px var(--c), inset 0 0 20px rgba(0,0,0,.85), 0 22px 44px rgba(0,0,0,.75); }
+  .jbtn .lbl{ font-family:"Pacifico",cursive; font-size:25px; color:#fff; text-shadow:0 0 7px var(--c), 0 0 16px var(--c); }
+  .jbtn .ic{ width:24px; height:24px; stroke:var(--c); fill:none; stroke-width:1.9; filter:drop-shadow(0 0 5px var(--c)); }
+  .create{ --c:#38a1ff; } .build{ --c:#3fdb7a; } .play{ --c:#c06bff; } .post{ --c:#ff8a3c; } .reupd{ --c:#f4c020; }
+
+  /* jukebox player */
+  .jukebox{ position:fixed; left:20px; bottom:calc(20px + env(safe-area-inset-bottom,0px)); z-index:55; width:250px;
+    background:linear-gradient(180deg,#20101a,#0b0710); border:1px solid #7c2f4a; border-radius:16px; padding:12px 13px;
+    box-shadow:0 0 22px rgba(255,60,120,.28), 0 16px 34px rgba(0,0,0,.6); }
+  .jukebox__top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .jukebox__brand{ font-family:"Pacifico",cursive; font-size:18px; color:#ff6b9d; text-shadow:0 0 8px #ff2a6a; }
+  .jukebox__eq{ display:flex; gap:2px; align-items:flex-end; height:16px; }
+  .jukebox__eq span{ width:3px; height:5px; background:#ff6b9d; border-radius:2px; box-shadow:0 0 5px #ff2a6a; }
+  .jukebox.playing .jukebox__eq span{ animation:eq .8s ease-in-out infinite; }
+  .jukebox__eq span:nth-child(2){ animation-delay:.15s } .jukebox__eq span:nth-child(3){ animation-delay:.3s } .jukebox__eq span:nth-child(4){ animation-delay:.45s }
+  @keyframes eq{ 0%,100%{height:4px} 50%{height:16px} }
+  .jukebox__now{ font-family:"Rajdhani",sans-serif; font-weight:700; font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; }
+  .jukebox__now .faint{ color:var(--faint); font-weight:600; }
+  .jukebox__ctrls{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  .jukebox__ctrls button{ background:transparent; border:0; cursor:pointer; color:#ffd; display:grid; place-items:center; }
+  .jukebox__ctrls svg{ width:20px; height:20px; fill:#ffb3ce; }
+  .jukebox__play{ width:40px; height:40px; border-radius:50%; background:radial-gradient(circle,#2a121e,#160910); border:1px solid #ff6b9d !important; box-shadow:0 0 12px rgba(255,60,120,.5); }
+  .jukebox__play svg{ width:18px; height:18px; fill:#ff6b9d; }
+  @media (max-width:560px){ .jukebox{ width:auto; left:14px; right:auto; } .jukebox__now{ max-width:150px; } }
+
+  .libfab{ position:fixed; right:22px; bottom:calc(22px + env(safe-area-inset-bottom,0px)); z-index:55; width:60px; height:60px; border-radius:50%;
+    display:grid; place-items:center; cursor:pointer; perspective:420px; background:rgba(10,18,27,.86); border:1px solid var(--line2);
+    backdrop-filter:blur(8px); box-shadow:0 12px 30px rgba(0,0,0,.55), 0 0 22px rgba(57,192,230,.35); }
+  .libfab:hover{ border-color:var(--cyan); box-shadow:0 12px 30px rgba(0,0,0,.55), 0 0 36px rgba(57,192,230,.6); }
+  .libfab img{ width:40px; animation:spinY 6s linear infinite; filter:drop-shadow(0 0 8px rgba(57,192,230,.6)); }
+  @keyframes spinY{ from{transform:rotateY(0)} to{transform:rotateY(360deg)} }
+
+  .modal[hidden]{ display:none; }
+  .modal{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal__backdrop{ position:absolute; inset:0; background:rgba(2,6,10,.74); backdrop-filter:blur(4px); }
+  .modal__panel{ position:relative; width:min(760px,94vw); max-height:86vh; overflow:auto; border-radius:20px;
+    background:linear-gradient(180deg,#0c1723,#070e16); border:1px solid var(--line2); box-shadow:0 30px 70px rgba(0,0,0,.7); padding:20px 22px 26px; }
+  .modal__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .modal__head h3{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:22px; margin:0; background:linear-gradient(180deg,var(--gold-hi),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .modal__x{ background:transparent; border:1px solid var(--line2); color:var(--muted); width:34px; height:34px; border-radius:9px; cursor:pointer; font-size:16px; }
+  .modal__tabs{ display:flex; gap:6px; margin:10px 0 16px; flex-wrap:wrap; }
+  .modal__tabs button{ font-family:"Rajdhani",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:13px; padding:8px 16px; border-radius:999px; border:1px solid var(--line2); background:var(--inset); color:var(--muted); cursor:pointer; }
+  .modal__tabs button.on{ background:linear-gradient(180deg,#5aa4ee,var(--electric)); color:#051019; border-color:#5aa4ee; }
+  .modal__grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; }
+  .libtile{ aspect-ratio:5/7; border-radius:12px; border:1px dashed var(--line2); background:var(--inset); display:grid; place-items:center; color:var(--faint); font-family:"Rajdhani",sans-serif; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+
+  @media (max-width:520px){ .logo-btn .logo{ height:52px; } .reup{ display:none; } .jbtn{ width:132px; height:132px; } .jbtn .lbl{ font-size:22px; } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pacifico&family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<header class="topline">
+  <div class="logo-nav" id="logoNav">
+    <button class="logo-btn" id="logoBtn" aria-haspopup="true" aria-expanded="false">
+      <img class="logo" src="/static/layouts/percfect-site/home/logo-clear.png" alt="PercfectAI — menu">
+      <svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="dropdown" id="pagesMenu" role="menu">
+      <a href="/create">Create</a><a href="/build">Build</a><a href="/play">Play</a><a href="/percfectposts">Post</a><a href="/cards">Cards</a>
+      <div class="sep"></div><a href="/re-up">Re-Up</a><a href="/settings">Settings</a>
+    </div>
+  </div>
+  <div class="wallet">
+    <span class="chip cr"><span class="dot cr"></span>320</span>
+    <span class="chip tk"><span class="dot tk"></span>24</span>
+    <a href="/re-up" class="reup">Re-Up</a>
+  </div>
+</header>
+
+<div class="diner"><img src="/static/layouts/percfect-site/home/diner.jpg" alt="Your Percfect World — the diner"></div>
+
+<nav class="hub">
+  <a href="/create" class="jbtn create">
+    <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3l3.5 6M21 12l-6.5 1M15.5 21L12 15M3 12l6.5-1M8.5 3l3.5 6"/></svg>
+    <span class="lbl">Create</span>
+  </a>
+  <a href="/build" class="jbtn build">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M14 6l4 4-8 8-4-4 8-8z"/><path d="M14 6l2-2 4 4-2 2"/><path d="M6 14l-2 6 6-2"/></svg>
+    <span class="lbl">Build</span>
+  </a>
+  <a href="/play" class="jbtn play" title="Play">
+    <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+    <span class="lbl">Play</span>
+  </a>
+  <a href="/percfectposts" class="jbtn post">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M21 3L3 11l7 2 2 7 9-17z"/><path d="M10 13l4-4"/></svg>
+    <span class="lbl">Post</span>
+  </a>
+  <a href="/re-up" class="jbtn reupd">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3M20 15a8 8 0 0 1-14 3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
+    <span class="lbl">Re-up</span>
+  </a>
+</nav>
+
+<!-- Jukebox: add your 4–5 song files to make it play across the site -->
+<div class="jukebox" id="jukebox">
+  <div class="jukebox__top">
+    <span class="jukebox__brand">Jukebox</span>
+    <span class="jukebox__eq"><span></span><span></span><span></span><span></span></span>
+  </div>
+  <div class="jukebox__now" id="jbNow"><span class="faint">Track 1 —</span> add your songs</div>
+  <div class="jukebox__ctrls">
+    <button id="jbPrev" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14l-11-7z"/></svg></button>
+    <button class="jukebox__play" id="jbPlay" aria-label="Play"><svg viewBox="0 0 24 24" id="jbIcon"><path d="M8 5v14l11-7z"/></svg></button>
+    <button id="jbNext" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5l11 7-11 7z"/></svg></button>
+  </div>
+  <audio id="jbAudio"></audio>
+</div>
+
+<button class="libfab" id="libBtn" aria-label="Open Library"><img src="/static/layouts/percfect-site/home/crownp.png" alt=""></button>
+
+<div class="modal" id="libModal" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <div class="modal__head"><h3>Library</h3><button class="modal__x" data-close aria-label="Close">✕</button></div>
+    <div class="modal__tabs"><button class="on">Characters</button><button>Cards</button><button>Comics</button><button>Videos</button></div>
+    <div class="modal__grid">
+      <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
+      <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var nav=document.getElementById('logoNav'), btn=document.getElementById('logoBtn');
+  btn.addEventListener('click', function(e){ e.stopPropagation(); var open=nav.classList.toggle('open'); btn.setAttribute('aria-expanded', open); });
+  document.addEventListener('click', function(){ nav.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
+
+  var modal=document.getElementById('libModal');
+  document.getElementById('libBtn').addEventListener('click', function(){ modal.hidden=false; });
+  modal.addEventListener('click', function(e){ if(e.target.hasAttribute('data-close')) modal.hidden=true; });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') modal.hidden=true; });
+  document.querySelectorAll('.modal__tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ document.querySelectorAll('.modal__tabs button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); });
+  });
+
+  // Jukebox — drop your song files in PLAYLIST (title + src) and it plays across the site
+  var PLAYLIST = [
+    { title: "Perfect AI · Hero Cards", src: "/static/assets/audio/perfect_ai_hero_cards.mp3" },
+    { title: "Perfect AI Pop", src: "/static/assets/audio/perfect_ai_pop.mp3" },
+    { title: "Perfect AI Pop 2", src: "/static/assets/audio/perfect_ai_pop_2.mp3" }
+  ];
+  // Persist with site-wide player
+  try {
+    var _ps = JSON.parse(localStorage.getItem('percfect_playlist_v1')||'{}');
+    if (_ps.playing) { /* jukebox can sync */ }
+  } catch(e) {}
+  var jb=document.getElementById('jukebox'), audio=document.getElementById('jbAudio'),
+      now=document.getElementById('jbNow'), icon=document.getElementById('jbIcon'), i=0;
+  function load(){ var t=PLAYLIST[i]; now.innerHTML='<span class="faint">Track '+(i+1)+' —</span> '+t.title; if(t.src){ audio.src=t.src; } }
+  function syncSite(playing){
+    try {
+      localStorage.setItem('percfect_playlist_v1', JSON.stringify({
+        i: i, t: audio.currentTime||0, playing: !!playing, updated: Date.now()
+      }));
+    } catch(e) {}
+  }
+  function playPause(){
+    var t=PLAYLIST[i];
+    if(!t.src){ jb.classList.toggle('playing'); return; }
+    if(audio.paused){ audio.play(); jb.classList.add('playing'); icon.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'; syncSite(true); }
+    else { audio.pause(); jb.classList.remove('playing'); icon.innerHTML='<path d="M8 5v14l11-7z"/>'; syncSite(false); }
+  }
+  function step(d){ i=(i+d+PLAYLIST.length)%PLAYLIST.length; load(); if(!audio.paused && PLAYLIST[i].src){ audio.play(); syncSite(true); } else syncSite(!audio.paused); }
+  document.getElementById('jbPlay').addEventListener('click', playPause);
+  document.getElementById('jbPrev').addEventListener('click', function(){ step(-1); });
+  document.getElementById('jbNext').addEventListener('click', function(){ step(1); });
+  audio.addEventListener('ended', function(){ step(1); });
+  load();
+</script>
+<style>
+  /* Home: jukebox only — hide plain site music bar (handoff §1) */
+  .percfect-site-music { display: none !important; }
+</style>
+<script src="/static/js/percfect_playlist.js?v=playlist-mutex-1" defer></script>
+<script>
+  // Resume jukebox from shared playlist state when returning to Home
+  (function () {
+    try {
+      var s = JSON.parse(localStorage.getItem("percfect_playlist_v1") || "{}");
+      var audio = document.getElementById("jbAudio");
+      var jb = document.getElementById("jukebox");
+      var icon = document.getElementById("jbIcon");
+      if (!audio || !PLAYLIST) return;
+      if (typeof i === "number" && s.i != null) {
+        i = Math.max(0, Math.min(PLAYLIST.length - 1, parseInt(s.i, 10) || 0));
+        if (typeof load === "function") load();
+      }
+      if (s.playing && PLAYLIST[i] && PLAYLIST[i].src) {
+        var seek = parseFloat(s.t) || 0;
+        var go = function () {
+          try { if (seek > 0) audio.currentTime = seek; } catch (e) {}
+          audio.play().catch(function () {});
+          if (jb) jb.classList.add("playing");
+          if (icon) icon.innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+        };
+        if (audio.readyState >= 1) go();
+        else audio.addEventListener("loadedmetadata", go, { once: true });
+      }
+    } catch (e) {}
+  })();
+</script>

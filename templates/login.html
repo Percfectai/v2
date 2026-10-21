@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Log In — Percfect Studios{% endblock %}
+{% block content %}
+<div style="max-width:400px; margin:60px auto; padding:30px; background:rgba(255,255,255,0.05); border-radius:12px;">
+    <h2 style="text-align:center; margin-bottom:24px;">Log In</h2>
+    <form method="POST" action="/login">
+        <div style="margin-bottom:16px;">
+            <label style="display:block; margin-bottom:4px; color:#aaa;">Username or Email</label>
+            <input type="text" name="username" required style="width:100%; padding:10px; background:#1a1a1a; border:1px solid #333; border-radius:6px; color:#fff;">
+        </div>
+        <div style="margin-bottom:24px;">
+            <label style="display:block; margin-bottom:4px; color:#aaa;">Password</label>
+            <input type="password" name="password" required style="width:100%; padding:10px; background:#1a1a1a; border:1px solid #333; border-radius:6px; color:#fff;">
+        </div>
+        <button type="submit" style="width:100%; padding:12px; background:linear-gradient(135deg,#e91e8c,#7c3aed); border:none; border-radius:6px; color:#fff; font-size:1rem; cursor:pointer;">Log In</button>
+    </form>
+    <p style="text-align:center; margin-top:16px; color:#aaa;">Don't have an account? <a href="/register">Register</a></p>
+</div>
+{% endblock %}

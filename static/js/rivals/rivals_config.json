@@ -1,0 +1,59 @@
+{
+  "_owner_note": "NICK OWNS WORDING AND TUNING IN THIS FILE. Agents: edit code elsewhere; put persona text, combat numbers, and display labels here only. Do not bury copy in JS.",
+  "title": "ETERNAL RIVALS",
+  "subtitle": "Controllable fighter foundation · admin only · private",
+  "banner": "PRIVATE · admin-gated · not in nav · zero public links",
+  "persona": {
+    "player_label": "Player",
+    "dummy_label": "Dummy",
+    "agent_label": "Agent takeover",
+    "idle_taunt": "Waiting for a move.",
+    "ko_line": "Down. Match over.",
+    "hit_line": "Hit lands.",
+    "block_line": "Blocked."
+  },
+  "combat": {
+    "max_health": 100,
+    "attack_light_damage": 8,
+    "attack_heavy_damage": 18,
+    "attack_light_range": 1.65,
+    "attack_heavy_range": 1.9,
+    "attack_light_duration_ms": 320,
+    "attack_heavy_duration_ms": 520,
+    "block_damage_mult": 0.25,
+    "dodge_invuln_ms": 280,
+    "hit_stun_ms": 350,
+    "ko_threshold": 0
+  },
+  "movement": {
+    "move_speed": 2.8,
+    "turn_speed": 10,
+    "bounds_radius": 6.5,
+    "target_height_m": 1.85
+  },
+  "controls": {
+    "move": "WASD or arrows",
+    "attack_light": "J",
+    "attack_heavy": "K",
+    "block": "L",
+    "dodge": "Space or I"
+  },
+  "defaults": {
+    "player_glb": "/motion-lab/meshy6_character.glb",
+    "dummy_glb": "/motion-lab/meshy6_character.glb",
+    "player_spawn": { "x": -1.6, "z": 0 },
+    "dummy_spawn": { "x": 1.6, "z": 0 },
+    "agent_poll_ms": 250
+  },
+  "actions": [
+    "move",
+    "turn",
+    "idle",
+    "attack_light",
+    "attack_heavy",
+    "block",
+    "dodge",
+    "hit_react",
+    "ko"
+  ]
+}

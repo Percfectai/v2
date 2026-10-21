@@ -1,0 +1,15 @@
+{
+  "key": "loading",
+  "label": "Loading Screen",
+  "outer": "#0a0a0a",
+  "mid": "#2a2a2a",
+  "inner": "#f5f0e6",
+  "bg1": "#e76f51",
+  "bg2": "#1a1a1e",
+  "accent": "#f0c14a",
+  "name_color": "#f5f0e6",
+  "stat_border": "#c41e3a",
+  "layout": "loading",
+  "frame_url": "/static/assets/cards/themes/loading/frame.svg",
+  "bg_url": "/static/assets/cards/themes/loading/bg.svg"
+}

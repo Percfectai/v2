@@ -1,0 +1,17 @@
+{
+  "key": "nintendo",
+  "label": "Nintendo",
+  "layout": "vintage",
+  "series": "NINTENDO SERIES",
+  "outer": "#0a0a0a",
+  "mid": "#dc2626",
+  "inner": "#fef08a",
+  "bg1": "#14532d",
+  "bg2": "#0a1f14",
+  "accent": "#facc15",
+  "name_color": "#ffffff",
+  "stat_border": "#dc2626",
+  "scene_url": "/static/assets/cards/themes/nintendo/scene.jpg",
+  "bg_url": "/static/assets/cards/themes/nintendo/scene.jpg",
+  "frame_url": "/static/assets/cards/themes/nintendo/frame.svg"
+}

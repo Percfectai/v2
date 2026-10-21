@@ -1,0 +1,14 @@
+{
+  "key": "arena",
+  "label": "Arena",
+  "outer": "#d4a574",
+  "mid": "#8b4513",
+  "inner": "#f5deb3",
+  "bg1": "#3d2914",
+  "bg2": "#1a120a",
+  "accent": "#d4a574",
+  "name_color": "#f5deb3",
+  "stat_border": "#cd853f",
+  "frame_url": "/static/assets/cards/themes/arena/frame.svg",
+  "bg_url": "/static/assets/cards/themes/arena/bg.svg"
+}

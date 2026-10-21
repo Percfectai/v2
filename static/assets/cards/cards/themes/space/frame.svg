@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" fill="none">
+  <rect x="2" y="2" width="296" height="416" rx="4" stroke="#1e1b4b" stroke-width="12" fill="none"/>
+  <rect x="11" y="11" width="278" height="398" rx="2" stroke="#a78bfa" stroke-width="3" fill="none"/>
+  <rect x="16" y="16" width="268" height="388" rx="1" stroke="#312e81" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- comic corner blocks -->
+  <rect x="8" y="8" width="28" height="8" fill="#a78bfa"/>
+  <rect x="8" y="8" width="8" height="28" fill="#a78bfa"/>
+  <rect x="264" y="8" width="28" height="8" fill="#a78bfa"/>
+  <rect x="284" y="8" width="8" height="28" fill="#a78bfa"/>
+  <rect x="8" y="404" width="28" height="8" fill="#a78bfa"/>
+  <rect x="8" y="384" width="8" height="28" fill="#a78bfa"/>
+  <rect x="264" y="404" width="28" height="8" fill="#a78bfa"/>
+  <rect x="284" y="384" width="8" height="28" fill="#a78bfa"/>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "key": "dc",
+  "label": "DC",
+  "layout": "vintage",
+  "series": "DC SERIES",
+  "outer": "#0a0a0a",
+  "mid": "#1a1a1a",
+  "inner": "#f5f0e6",
+  "bg1": "#0a0a0c",
+  "bg2": "#050508",
+  "accent": "#3b82f6",
+  "name_color": "#ffffff",
+  "stat_border": "#3b82f6",
+  "scene_url": "/static/assets/cards/themes/dc/scene.jpg",
+  "bg_url": "/static/assets/cards/themes/dc/scene.jpg",
+  "frame_url": "/static/assets/cards/themes/dc/frame.svg"
+}
