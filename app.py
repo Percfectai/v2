@@ -24,17 +24,16 @@ from io import BytesIO
 from PIL import Image, ImageOps
 from dotenv import load_dotenv
 
-from perchance_princess import (
-    PERCHANCE_URL as PRINCESS_PERCHANCE_URL,
-    PRINCESSES,
-    DEFAULT_COUNT as PRINCESS_DEFAULT_COUNT,
-    DEFAULT_SIZE as PRINCESS_DEFAULT_SIZE,
-    NEG_PROMPT as PRINCESS_NEG_PROMPT,
-    normalize_princess_key,
-    PRINCESS_KEYS,
-    build_princess_prompts,
-    build_princess_prompt,
-)
+# Princess feature removed from v2 — inline stubs prevent NameError
+PRINCESS_PERCHANCE_URL = ""
+PRINCESSES = {}
+PRINCESS_DEFAULT_COUNT = 4
+PRINCESS_DEFAULT_SIZE = "768x768"
+PRINCESS_NEG_PROMPT = ""
+PRINCESS_KEYS = []
+def normalize_princess_key(raw): return raw.strip().lower() if raw else ""
+def build_princess_prompts(key, count=4): return []
+def build_princess_prompt(key, **kw): return ""
 
 # Let Pillow decode iPhone HEIC/HEIF photos. Safe no-op if the package
 # is unavailable for some reason (we still handle JPEG/PNG/WebP natively).
@@ -1970,7 +1969,7 @@ def _user_facing_gen_error(err: str) -> str:
 
 def _generate_princess_backend(prompt: str) -> bytes:
     """Princess image — Perchance API first, Pollinations fallback so production never 500s empty."""
-    from perchance_bot_engine import generate_one_sync
+    raise NotImplementedError("Princess generator removed in v2")
 
     try:
         return generate_one_sync(prompt, negative_prompt=PRINCESS_NEG_PROMPT)
@@ -14141,7 +14140,8 @@ def chatroom_delete():
 # PICTURE PERCFECT — watermark + upscale + split, all in one (2026-07-06)
 # Engine ported from Nick's proven local pipeline (SPLIT_SMART.py).
 # ══════════════════════════════════════════════════════════════════
-from picture_percfect import process_photo as _pp_process
+# picture_percfect removed in v2 — no watermark feature on site
+def _pp_process(*a, **kw): raise NotImplementedError("Not available in v2")
 
 PP_MAX_UPLOAD_MB = 25
 
