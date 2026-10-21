@@ -497,7 +497,7 @@ defaultCta, defaultHashtags, advancedSettings."""
             "rateLimitNote": "Follow platform standard API rate limits.",
             "defaultTitlePrefix": f"📢 {clean} Update:",
             "defaultCta": f"Check out our latest post on {clean}!",
-            "defaultHashtags": [f"#{re.sub(r'\s+', '', clean)}"],
+            "defaultHashtags": ["#" + re.sub(r'\s+', "", clean)],
             "advancedSettings": {"customPrivacy": "public"},
         }
         try:

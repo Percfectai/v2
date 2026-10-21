@@ -63,7 +63,6 @@ SPIN_SAMPLE_FRAMES = 24
 MIN_TURN_FLOW = 0.15  # px/frame; weaker than this = can't tell the direction
 VIEW_LABELS = ("front", "front-quarter", "side", "back-quarter", "back", "unclear")
 
-    'Return ONLY JSON: <VIEW_LABELS/>
 
 
 def _app():
