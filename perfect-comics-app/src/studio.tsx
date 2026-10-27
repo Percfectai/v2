@@ -266,7 +266,6 @@ export function Studio() {
   const [reader, setReader] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [hoverStyle, setHoverStyle] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [look, setLook] = useState("");
   const [refUrl, setRefUrl] = useState("");
@@ -727,9 +726,6 @@ export function Studio() {
             <button type="button" onClick={() => { setLibraryOpen(true); setMenu(false); }}>Library</button>
           </div>
         </div>
-        <div className="wallet">
-          <span className="chip-w cr"><span className="dot cr" />{money(ISSUE_PRICE)} a comic</span>
-        </div>
       </header>
 
       <div className="studiotabs">
@@ -830,8 +826,6 @@ export function Studio() {
                         key={s.id}
                         className={`style${issue.styleId === s.id ? " sel" : ""}`}
                         type="button"
-                        onMouseEnter={() => setHoverStyle(s.label)}
-                        onMouseLeave={() => setHoverStyle(null)}
                         onClick={() => patch((i) => ({ ...i, styleId: s.id as StyleId }))}
                       >
                         <div className="sn">{s.label}</div>
@@ -1105,34 +1099,17 @@ export function Studio() {
           )}
         </div>
 
-        <aside className="ticket">
-          <div className="ticket__still">
-            <div className="ph">Style preview</div>
-            <span className="ticket__chip">{hoverStyle ?? style.label}</span>
-          </div>
-          <div className="ticket__body">
-            <h3 className="ticket__title">Print ticket</h3>
-            <Row k={issue.isSeries ? "Series" : "Format"} v={issue.isSeries ? `${issue.seriesName || "Untitled"} #${issue.issueNumber}` : "One-shot"} />
-            <Row k="Title" v={issue.title || "My Percfect Hero"} />
-            <Row k="Genre" v={issue.genre} />
-            <Row k="Style" v={style.label} />
-            <Row k="Pages" v="Cover + 9 · 10" />
-            <Row k="Cast" v={`${issue.characters.length} / 5`} />
-            <div className="trow price"><span className="k">This comic</span><span className="v">{freeBook ? "Free" : money(ISSUE_PRICE)}</span></div>
-            <p className="help" style={{ marginTop: 8 }}>
-              {freeBook
-                ? `Comic ${bookNo} is free. Four paid comics were ${money(ISSUE_PRICE * 4)}.`
-                : `Comic ${bookNo} is ${money(ISSUE_PRICE)}. Four comics are ${money(ISSUE_PRICE * 4)} over time. The 5th is free.`}
-            </p>
-            <div className="nextpage">Rewrites left <b>{issue.rewritesLeft}</b> of {REWRITES} · Small changes left <b>{issue.smallChangesLeft}</b> of {SMALL_CHANGES}</div>
-            {error && <div className="errbox">{error}</div>}
-            {tab < 7 && (
-              <button className="btn-gen" type="button" onClick={() => setTab(tab + 1)}>
-                Next
-              </button>
-            )}
-          </div>
+        <aside className="samplecover">
+          <img src={`${import.meta.env.BASE_URL}example-cover.jpg`} alt="Example comic cover" />
         </aside>
+      </div>
+
+      <div className="pricedock">
+        {error && <div className="errbox">{error}</div>}
+        <span>{freeBook ? `Comic ${bookNo} · Free` : `${money(ISSUE_PRICE)} a comic`}</span>
+        {!reader && tab < 7 && (
+          <button className="btn-sm primary" type="button" onClick={() => setTab(tab + 1)}>Next</button>
+        )}
       </div>
 
       <button className="libfab" type="button" aria-label="Open library" onClick={() => setLibraryOpen(true)}>

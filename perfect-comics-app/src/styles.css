@@ -586,6 +586,36 @@ h1.head .cr { color: var(--color-gold-hi); }
 .btn-publish { width: 100%; margin-top: 10px; }
 button:disabled { opacity: 0.5; }
 
+.samplecover {
+  position: sticky;
+  top: 20px;
+}
+.samplecover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--color-gold);
+}
+.pricedock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(8, 10, 16, 0.92);
+  border: 1px solid var(--color-gold);
+  color: var(--color-gold-hi);
+  font-weight: 800;
+}
+.pricedock .errbox { margin: 0; max-width: 240px; }
+@media (max-width: 1023px) {
+  .pricedock { bottom: 96px; }
+}
 .ticket {
   position: sticky;
   top: 20px;
