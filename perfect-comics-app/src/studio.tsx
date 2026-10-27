@@ -743,7 +743,7 @@ export function Studio() {
           <div className="wtabs">
             {TABS.map((label, i) => (
               <button key={label} className={`wtab${tab === i ? " on" : ""}`} type="button" onClick={() => setTab(i)}>
-                <span className="num">{i + 1}</span> {label}
+                <span className="num">{i}</span> {label}
               </button>
             ))}
           </div>
