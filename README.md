@@ -42,3 +42,5 @@ Discord bots, Telegram and voice-agent trees, Perchance, the princess page produ
 The live site is https://percfectai.com on Render service `percfectai-v2` (`https://percfectai-v2.onrender.com`). `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there. The Render API key stays in the local V2 keys file and in Render. Never commit it and never paste it into chat.
 
 Full carry list: `HANDOFFS/REBUILD_CARRYOVER_MANIFEST.md`.
+
+GitHub and Actions skills for every agent are in `.grok/skills/` and `.claude/skills/` (`github`, `github-actions`, `github-actions-advanced`, `github-actions-debugger`, `github-actions-templates`, `github-automation`, `github-issue-creator`). Read the skill before using `gh` or adding a workflow.
