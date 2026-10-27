@@ -1,10 +1,12 @@
 # Percfectai/v2 — read this first
 
 **Organization:** [Percfectai](https://github.com/Percfectai) · **Repo:** [Percfectai/v2](https://github.com/Percfectai/v2)
-**Live site:** https://percfectai.com (Cloudflare → Render → gunicorn). `/ping` returns 200.
-**Do not use** `percfectstudios.onrender.com` as this app. That host is the old service.
 
-Every agent opens this file before editing. The lane list and the rules below are the current product, not the 17 October draft.
+The original site is live again: **https://percfectai.com** (Cloudflare → Render → gunicorn). `/ping` returns 200. This repo is that site, with the fat trimmed. Dead products are not in here. Do not copy them back from the old `percfectstudios` tree.
+
+A comic page is coming. It is not a live lane on the site yet. Do not treat `/comics` as shipped, and do not rebuild the old Flask book generator.
+
+Every agent opens this file before editing. The lane list below is the current product, not the 17 October draft.
 
 ## Rules
 
@@ -13,9 +15,9 @@ Every agent opens this file before editing. The lane list and the rules below ar
 - Image keys never run chat or voice. The comic writer uses `XAI_COMIC_WRITER_API_KEY` (then the other chat keys). Comic pictures use the image pool in `xai_keys.py`.
 - Render API keys stay in Render and in `HANDOFFS/keys.txt`. Never print them in chat or commit them.
 
-## Comics is in
+## Comic page — coming
 
-Perfect Comics is a live lane in this repo as of 27 October 2026. It is the 25 September studio from `nickpelectrical/perfect-comics`, not the older Flask book generator.
+A comic page is coming. The studio to use, when it is wired onto the live site, is the 25 September one from `nickpelectrical/perfect-comics`, not the older Flask book generator. Code for that studio is in this repo and is not the public page yet.
 
 | | |
 |---|---|
@@ -27,18 +29,16 @@ Perfect Comics is a live lane in this repo as of 27 October 2026. It is the 25 S
 | Stamp | Unpaid pages are saved as a JPEG with **PERCFECT PREVIEW** drawn into the pixels. The clean file stays in memory until unlock and is not written to `localStorage`. |
 | Not built | Pro selling. The site does not take 10% yet. Publish opens the local reader. |
 
-The public site returned 404 for `/comics` before this commit. After Render deploys this repo, https://percfectai.com/comics is the page.
-
 ## Lanes that stay
 
 Photos, Videos, Characters (exact flow, locked spin prompt), Arena, 3-D, Posts, Cards (own top nav), Productions (parked, under construction), shared chrome, credits, auth, Stripe.
 
-## Still out
+## Trimmed out
 
-Discord bots, Telegram and voice-agent trees, Perchance, princess page product, Kodi, prototypes, `percfectpictures2.0`, sdk, `.bak` files. Do not copy those back in from the old `percfectstudios` repo.
+Discord bots, Telegram and voice-agent trees, Perchance, the princess page product, Kodi, prototypes, `percfectpictures2.0`, sdk, and `.bak` files. They are not part of this repo. Leave them out.
 
 ## Render
 
-Service name in `render.yaml`: `percfect-studios-v2`. The site people use is https://percfectai.com. Old notes that say the only live host is `percfectstudios.onrender.com` are about the previous repo.
+The live site is https://percfectai.com on the new Render service (`render.yaml` name `percfect-studios-v2`). `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there.
 
 Full carry list: `HANDOFFS/REBUILD_CARRYOVER_MANIFEST.md`.

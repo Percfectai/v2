@@ -3,7 +3,7 @@
 **Created:** 2026-10-17 · **Author:** Claude (Opus 4.8) · **For:** Nick
 **Purpose:** The feature-by-feature list of what moves from the old `percfectstudios` repo
 into the **fresh repo / new Render / new Supabase**, trimmed of all the dead weight.
-**Status:** LIVE. Repo is `Percfectai/v2`. Site is https://percfectai.com on Render. Read `README.md` first. Comics is in (27 October 2026). This file is the carry list, not a draft waiting for a repo name.
+**Status:** LIVE. The original site is back up at https://percfectai.com on the new Render service. Repo is `Percfectai/v2`, trimmed of the dead products. Read `README.md` first. A comic page is coming. It is not a live lane yet. This file is the carry list, not a draft waiting for a repo name.
 
 > Golden rule from the handoff dictation: **perfected features get reused with the EXACT
 > same code.** Nobody rewrites a working feature. **Nobody touches the prompts but Nick.**
