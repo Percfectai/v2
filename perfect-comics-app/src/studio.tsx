@@ -101,6 +101,52 @@ function forSave(lib: Library): Library {
   };
 }
 
+function shotsOf(member: { refUrl?: string; angles?: string[] }): string[] {
+  const angles = (member.angles ?? []).filter(Boolean).slice(0, 4);
+  if (angles.length) return angles;
+  return member.refUrl ? [member.refUrl] : [];
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  const res = await fetch(src);
+  if (!res.ok) throw new Error("image");
+  const blob = await res.blob();
+  const local = URL.createObjectURL(blob);
+  try {
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("image"));
+      el.src = local;
+    });
+  } finally {
+    URL.revokeObjectURL(local);
+  }
+}
+
+/** Two characters. Top half is the first character's angles. Bottom half is the second. */
+async function pairSheet(top: string[], bottom: string[]): Promise<string> {
+  const cell = 384;
+  const canvas = document.createElement("canvas");
+  canvas.width = cell * 4;
+  canvas.height = cell * 2;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  ctx.fillStyle = "#0e1116";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const rows = [top.slice(0, 4), bottom.slice(0, 4)];
+  for (let row = 0; row < 2; row += 1) {
+    for (let col = 0; col < rows[row].length; col += 1) {
+      const img = await loadImage(rows[row][col]);
+      const scale = Math.min(cell / img.width, cell / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, col * cell + (cell - w) / 2, row * cell + (cell - h) / 2, w, h);
+    }
+  }
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 async function stamp(src: string): Promise<string> {
   try {
     const res = await fetch(src);
@@ -384,18 +430,24 @@ export function Studio() {
     const refs: string[] = [];
     let hasPrevPage = false;
     const fixing = editing && !!current.imageUrl;
-    const heroRefs = people.map((c) => c.refUrl).filter((url): url is string => !!url);
+    const onPage = people.slice(0, 4);
+    const sheets: string[] = [];
+    for (let i = 0; i < onPage.length; i += 2) {
+      const top = shotsOf(onPage[i]);
+      const bottom = onPage[i + 1] ? shotsOf(onPage[i + 1]) : [];
+      if (!top.length && !bottom.length) continue;
+      const sheet = await pairSheet(top, bottom);
+      if (sheet) sheets.push(sheet);
+    }
     if (fixing && current.imageUrl) {
-      refs.push(current.imageUrl, ...heroRefs);
-    } else if (kind === "small" && current.imageUrl) {
-      refs.push(current.imageUrl, ...heroRefs);
+      refs.push(current.imageUrl, ...sheets.slice(0, 2));
     } else {
       const prev = live.pages.find((p) => p.n === current.n - 1);
       if (current.n > 0 && prev?.imageUrl) {
         refs.push(prev.imageUrl);
         hasPrevPage = true;
       }
-      refs.push(...heroRefs.slice(0, Math.max(0, 3 - refs.length)));
+      refs.push(...sheets.slice(0, Math.max(0, 3 - refs.length)));
     }
     const actSummary = current.n === 0 ? live.summary : current.n <= 3 ? live.beginning : current.n <= 6 ? live.middle : live.ending;
     const result = await inkPage({
@@ -694,7 +746,7 @@ export function Studio() {
                 <div>
                   <div className="kicker">Character Reference</div>
                   <h1 className="head">Lock the cast.</h1>
-                  <p className="subhead">Up to five names. Each picture can send three references when it needs them. An edit always includes the picture it is fixing.</p>
+                  <p className="subhead">Two characters share one sheet: angles on the top half, the other character on the bottom. A page with those two uses the page before it and that one sheet. Four characters use the page before it, then a sheet of the first pair and a sheet of the second pair.</p>
                 </div>
                 <div className="label">Cast — {issue.characters.length} / 5</div>
                 <div className="cast__grid">

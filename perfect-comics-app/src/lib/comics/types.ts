@@ -11,6 +11,8 @@ export type CastMember = {
   look: string;
   role: Role;
   refUrl?: string;
+  /** Front, side, back, fourth. From the character page when those shots exist. */
+  angles?: string[];
 };
 
 export type ComicPage = {
