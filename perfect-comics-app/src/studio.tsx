@@ -857,10 +857,11 @@ export function Studio() {
                           <article key={c?.id || `slot-${index}`} className="castrow">
                             <div className="label">Character {index + 1}</div>
                             <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
+                            <p className="help">Tap a box to upload that reference shot.</p>
                             <div className="shotrow">
                               {POSE_LABELS.map((label, slot) => (
-                                <label key={label} className="btn-sm upload">
-                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : label}
+                                <label key={label}>
+                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : `Upload ${label}`}
                                   <input
                                     type="file"
                                     accept="image/png,image/jpeg,image/webp"
