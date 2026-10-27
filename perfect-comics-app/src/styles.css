@@ -489,7 +489,22 @@ h1.head .cr { color: var(--color-gold-hi); }
 .pstat.inking { color: var(--color-cyan); }
 .pstat.done { color: var(--color-ok); }
 .pstat.error { color: var(--color-bad); }
-.pcard__body { display: grid; grid-template-columns: 1fr 150px; gap: 14px; }
+.pagerow { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: start; }
+.castrail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.railshot { margin: 0; }
+.railshot img, .railshot span { display: grid; place-items: center; width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: #0b0f1c; }
+.railshot span { font-size: 10px; color: #94a3b8; }
+.railshot figcaption { margin-top: 4px; font-size: 10px; text-align: center; color: #cbd5e1; }
+.lookback { margin: 4px 0 0; }
+.lookback figcaption { font-size: 12px; color: #cbd5e1; margin-bottom: 6px; }
+.lookback img, .lookback .pageart img { width: min(220px, 100%); border-radius: 10px; }
+.pcard .pbox textarea { min-height: 180px; }
+.pcard__body { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; }
+@media (max-width: 720px) {
+  .pagerow { grid-template-columns: 1fr; }
+  .castrail { position: static; flex-direction: row; overflow-x: auto; }
+  .railshot { width: 72px; flex: 0 0 72px; }
+}
 @media (max-width: 640px) {
   .pcard__body { grid-template-columns: 1fr; }
 }

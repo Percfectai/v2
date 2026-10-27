@@ -296,15 +296,40 @@ def comics_rewrite():
         return jsonify({"ok": False, "error": "Bad rewrite target."}), 400
     style = _INK_STYLES.get(str(body.get("styleId") or ""), _INK_STYLES["classic"])
     invent = bool(body.get("invent"))
-    prompt = (
-        "You are the copy editor for Perfect Comics. Return ONLY the rewritten text, no JSON, no quotes.\n"
-        f"Target box: {target}\n"
+    shared = (
         f"Title: {str(body.get('title') or 'Untitled')[:80]}\n"
         f"Genre: {str(body.get('genre') or '')[:40]}\n"
         f"Art style: {style}\n"
         f"Cast: {str(body.get('cast') or 'original lead')[:800]}\n"
-        f"Context: {str(body.get('context') or '(none)')[:1500]}\n"
+        f"Issue summary: {str(body.get('context') or '(none)')[:1500]}\n"
         f"Current text: {str(body.get('current') or '(empty)')[:2500]}\n"
+    )
+    if target in ("beginning", "middle", "ending"):
+        prompt = (
+            "You write one act of a comic, then split it into the three pages of that act.\n"
+            'Return ONLY JSON: {"text":"act summary, 60-140 words","pages":["page one","page two","page three"]}.\n'
+            "pages has exactly 3 strings. Each string is 1 or 2 sentences of what we SEE on that page.\n"
+            "A new moment every page. Do not repeat a scene. No dialogue to letter.\n"
+            f"Act: {target}. Page order is the order of the pages array.\n"
+            + shared
+            + ("Invent the act from the issue summary and cast." if invent else "Keep their intent. Do not change the story's direction.")
+            + "\nAll-ages. No gore."
+        )
+        try:
+            raw = _xai_text("Return only JSON.", prompt, max_tokens=900, json_mode=True)
+        except Exception as e:
+            log.warning("comics rewrite failed: %s", e)
+            return jsonify({"ok": False, "error": "Writer failed"})
+        data = _json_block(raw)
+        text = str(data.get("text") or "").strip()
+        pages = [str(p).strip() for p in (data.get("pages") or []) if str(p).strip()]
+        if not text or len(pages) < 3:
+            return jsonify({"ok": False, "error": "The act did not split into three pages."})
+        return jsonify({"ok": True, "text": text, "pages": pages[:3]})
+    prompt = (
+        "You are the copy editor for Perfect Comics. Return ONLY the rewritten text, no JSON, no quotes.\n"
+        f"Target box: {target}\n"
+        + shared
         + (
             "Invent a vivid all-ages beat that fits genre and cast. 60–140 words."
             if invent
@@ -438,6 +463,48 @@ def comics_sheet():
         log.warning("comics sheet failed: %s", e)
         return jsonify({"ok": False, "error": "Could not put the pictures together."}), 502
     return jsonify({"ok": True, "url": url})
+
+
+_TURN_POSES = {
+    "front": "front view",
+    "left": "left side view",
+    "right": "right side view",
+    "back": "back view",
+}
+
+
+@bp.route("/comics/api/turnaround", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/turnaround", methods=["POST", "OPTIONS"])
+def comics_turnaround():
+    """One full-body shot from a prompt or one photo, in the comic's art style."""
+    denied = _spa_auth()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    pose_key = str(body.get("pose") or "").strip()
+    pose = _TURN_POSES.get(pose_key)
+    if not pose:
+        return jsonify({"ok": False, "error": "Pick front, left, right, or back."}), 400
+    style = _INK_STYLES.get(str(body.get("styleId") or ""), _INK_STYLES["classic"])
+    details = str(body.get("prompt") or body.get("look") or "").strip()
+    name = str(body.get("name") or "the character").strip()
+    photo = str(body.get("photo") or "").strip()
+    if not details and not photo:
+        return jsonify({"ok": False, "error": "Add a description or a photo first."}), 400
+    refs = [photo] if photo.startswith("http") or photo.startswith("data:") else []
+    prompt = " ".join([
+        f"One full-body character, {pose} only, standing, plain light gray background.",
+        f"This is {name}.",
+        f"Details: {details or 'the person in the attached photo'}.",
+        f"Art style: {style}.",
+        "If a photo is attached, keep that person's face and build. Do not copy the photo's background.",
+        "No scenery, no panels, no letters, no logos.",
+        "All-ages. No nudity, no sexual content, no gore.",
+    ])
+    result = _comic_image(prompt, refs, "grok-imagine-image-2.0")
+    if not result.get("ok") or not result.get("url"):
+        return jsonify({"ok": False, "error": result.get("error") or f"Could not draw the {pose}."}), 502
+    return jsonify({"ok": True, "pose": pose_key, "url": result["url"]})
 
 
 @bp.route("/comics/api/save-character", methods=["POST", "OPTIONS"])

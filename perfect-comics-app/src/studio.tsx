@@ -177,7 +177,7 @@ async function stamp(src: string): Promise<string> {
   }
 }
 
-const TABS = ["Cover", "Settings", "Summary", "Beginning", "Middle", "Ending", "Final Review"];
+const TABS = ["Characters", "Cover", "Settings", "Summary", "Beginning", "Middle", "Ending", "Final Review"];
 
 type Library = { currentId: string; issues: Issue[]; tickets: number; credits: number };
 
@@ -401,8 +401,19 @@ export function Studio() {
     }
     patch((i) => {
       const next = { ...i };
-      if (target === "summary" || target === "beginning" || target === "middle" || target === "ending") {
+      if (target === "summary") {
+        next.summary = result.text;
+      } else if (target === "beginning" || target === "middle" || target === "ending") {
         next[target] = result.text;
+        const start = target === "beginning" ? 1 : target === "middle" ? 4 : 7;
+        const beats = result.pages || [];
+        if (beats.length >= 3) {
+          next.pages = i.pages.map((p) => {
+            const slot = p.n - start;
+            if (slot < 0 || slot > 2 || !beats[slot]) return p;
+            return { ...p, prompt: beats[slot], status: p.imageUrl ? p.status : "ready" as const };
+          });
+        }
       } else if (target === "cover") {
         next.pages = i.pages.map((p) => (p.n === 0 ? { ...p, prompt: result.text, status: "ready" as const } : p));
       } else if (pageN != null) {
@@ -552,66 +563,47 @@ export function Studio() {
     }
     setError("");
     patchPage(n, (p) => ({ ...p, approved: true }));
-    if (n >= 9) setTab(6);
-    else if (n === 0) setTab(3);
-    else setTab(n + 1 <= 3 ? 3 : n + 1 <= 6 ? 4 : 5);
-  }
-
-  async function waitJob(jobId: string) {
-    const deadline = Date.now() + 8 * 60 * 1000;
-    while (Date.now() < deadline) {
-      const res = await fetch(`/studios/generation-job/${encodeURIComponent(jobId)}`, { credentials: "same-origin" });
-      const data = await res.json().catch(() => null);
-      const st = String(data?.status || "").toLowerCase();
-      if (st === "failed" || st === "error") throw new Error(data?.error || data?.result?.error || "The character shots failed.");
-      if (st === "done" || st === "completed" || st === "success") return data?.result || data;
-      await new Promise((r) => setTimeout(r, 2500));
-    }
-    throw new Error("The four shots took too long. Try again.");
+    if (n >= 9) setTab(7);
+    else if (n === 0) setTab(4);
+    else setTab(n + 1 <= 3 ? 4 : n + 1 <= 6 ? 5 : 6);
   }
 
   async function makeFourShots(index: number) {
     const member = issueRef.current?.characters[index];
-    const photo = member?.refUrl;
-    if (!photo) {
-      setError("Add your photo first. That one picture becomes the four shots.");
+    const photo = member?.refUrl || "";
+    if (!photo && !(member?.look || "").trim()) {
+      setError("Write the character, or add one photo. That makes the four shots.");
       return;
     }
     setBusy("make-four");
     setError("");
+    const poses = ["front", "left", "right", "back"] as const;
+    const images = ["", "", "", ""];
     try {
-      const one = new FormData();
-      one.append("image_url_0", photo);
-      one.append("description", member.look || member.name || "the person in the photo");
-      const started = await fetch("/studios/percfectcharacter/generate-one", { method: "POST", credentials: "same-origin", body: one });
-      const startedData = await started.json().catch(() => null);
-      if (!started.ok) throw new Error(startedData?.error || "Could not start from your photo.");
-      const frontJob = startedData?.job_id || startedData?.id;
-      const front = frontJob ? await waitJob(frontJob) : startedData;
-      const frontUrl = front?.url || front?.primary_image_url;
-      if (!frontUrl) throw new Error("No front shot came back.");
-      const pack = new FormData();
-      pack.append("primary_image_url", frontUrl);
-      pack.append("prompt", member.look || member.name || "");
-      pack.append("name", member.name || `Character ${index + 1}`);
-      pack.append("source_mode", "comic");
-      const packed = await fetch("/studios/percfectcharacter/pack", { method: "POST", credentials: "same-origin", body: pack });
-      const packedData = await packed.json().catch(() => null);
-      if (!packed.ok) throw new Error(packedData?.error || "Could not make the four shots.");
-      const packJob = packedData?.job_id || packedData?.id;
-      const done = packJob ? await waitJob(packJob) : packedData;
-      const images = (done?.images || done?.character?.images || []).filter((u: unknown) => typeof u === "string").slice(0, 4);
-      if (images.length < 4) throw new Error("The four shots did not finish.");
-      const libId = done?.character?.id;
-      patch((i) => ({
-        ...i,
-        characters: i.characters.map((c, n) => n === index ? {
-          ...c,
-          id: libId ? `lib-${libId}` : c.id,
-          refUrl: images[0],
-          angles: images,
-        } : c),
-      }));
+      for (let slot = 0; slot < poses.length; slot += 1) {
+        const res = await fetch(`${import.meta.env.BASE_URL}api/turnaround`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            styleId: issueRef.current?.styleId,
+            name: member?.name || `Character ${index + 1}`,
+            prompt: member?.look || "",
+            photo,
+            pose: poses[slot],
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!data?.ok || typeof data.url !== "string") {
+          throw new Error(data?.error || `Could not draw the ${poses[slot]} shot.`);
+        }
+        images[slot] = data.url;
+        const ready = images.slice();
+        patch((i) => ({
+          ...i,
+          characters: i.characters.map((c, n) => n === index ? { ...c, angles: ready } : c),
+        }));
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not make the four shots.");
     } finally {
@@ -702,7 +694,7 @@ export function Studio() {
   function openPage(n: number) {
     if (n !== 0) patch((i) => ({ ...i, mode: "pageByPage" }));
     setReader(false);
-    setTab(n === 0 ? 0 : n <= 3 ? 3 : n <= 6 ? 4 : 5);
+    setTab(n === 0 ? 1 : n <= 3 ? 4 : n <= 6 ? 5 : 6);
     window.setTimeout(() => {
       document.getElementById(`page-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -717,9 +709,9 @@ export function Studio() {
   const bookNo = comicNumber(lib.issues, issue.id);
   const freeBook = bookNo % 5 === 0;
   const acts: { act: Exclude<Act, "cover">; tab: number; pages: number[] }[] = [
-    { act: "beginning", tab: 3, pages: [1, 2, 3] },
-    { act: "middle", tab: 4, pages: [4, 5, 6] },
-    { act: "ending", tab: 5, pages: [7, 8, 9] },
+    { act: "beginning", tab: 4, pages: [1, 2, 3] },
+    { act: "middle", tab: 5, pages: [4, 5, 6] },
+    { act: "ending", tab: 6, pages: [7, 8, 9] },
   ];
 
   return (
@@ -742,7 +734,7 @@ export function Studio() {
 
       <div className="studiotabs">
         <button className={!reader ? "on" : ""} type="button" onClick={() => setReader(false)}>Studio</button>
-        <button className={reader ? "on" : ""} type="button" onClick={() => { setReader(true); setTab(6); }}>Reader</button>
+        <button className={reader ? "on" : ""} type="button" onClick={() => { setReader(true); setTab(7); }}>Reader</button>
       </div>
 
       {!reader && (
@@ -755,7 +747,7 @@ export function Studio() {
           <div className="wtabs">
             {TABS.map((label, i) => (
               <button key={label} className={`wtab${tab === i ? " on" : ""}`} type="button" onClick={() => setTab(i)}>
-                <span className="num">{i}</span> {label}
+                <span className="num">{i + 1}</span> {label}
               </button>
             ))}
           </div>
@@ -782,7 +774,7 @@ export function Studio() {
             </section>
           ) : (
             <>
-              <section className={`subpage${tab === 1 ? " on" : ""}`}>
+              <section className={`subpage${tab === 2 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">Settings</div>
                   <h1 className="head">Set the issue. <span className="cr">Then write it.</span></h1>
@@ -850,7 +842,7 @@ export function Studio() {
                 </div>
               </section>
 
-              <section className={`subpage${tab === 2 ? " on" : ""}`}>
+              <section className={`subpage${tab === 3 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">Summary</div>
                   <h1 className="head">The whole issue, in a breath.</h1>
@@ -867,6 +859,111 @@ export function Studio() {
               </section>
 
               <section className={`subpage${tab === 0 ? " on" : ""}`}>
+                <div>
+                  <div className="kicker">1 · Characters</div>
+                  <h1 className="head">Four characters.</h1>
+                  <p className="subhead">Each one has a prompt or one reference photo, then four shots in the comic style. Cover is next.</p>
+                </div>
+                <div className="block">
+                  <div className="label">Print style for these shots</div>
+                  <div className="styles">
+                    {STYLES.map((s) => (
+                      <button
+                        key={s.id}
+                        className={`style${issue.styleId === s.id ? " sel" : ""}`}
+                        type="button"
+                        onClick={() => patch((i) => ({ ...i, styleId: s.id as StyleId }))}
+                      >
+                        <div className="sn">{s.label}</div>
+                        <div className="sb">{s.blurb}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                                    <div className="block">
+                                      <div className="label">Characters</div>
+                                      <p className="help">Four characters, one under the other. Each one has four shots side by side: front, left side, right side, back.</p>
+                                      <div className="cast__grid">
+                                        {roster.filter((row) => row.images.length >= 4).map((row) => (
+                                          <button
+                                            key={row.id}
+                                            className="btn-sm"
+                                            type="button"
+                                            onClick={() => patch((i) => {
+                                              if (i.characters.length >= 4) return i;
+                                              if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
+                                              const member: CastMember = {
+                                                id: `lib-${row.id}`,
+                                                name: row.name,
+                                                look: "Saved in the library",
+                                                role: "regular",
+                                                refUrl: row.images[0],
+                                                angles: row.images.slice(0, 4),
+                                              };
+                                              return { ...i, characters: [...i.characters, member] };
+                                            })}
+                                          >
+                                            Use saved {row.name}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="caststack">
+                                      {[0, 1, 2, 3].map((index) => {
+                                        const c = issue.characters[index];
+                                        const angles = ["", "", "", ""].map((empty, slot) => c?.angles?.[slot] || empty);
+                                        const saved = Boolean(c?.id.startsWith("lib-"));
+                                        const touch = (apply: (characters: CastMember[]) => CastMember[]) => patch((i) => {
+                                          const characters = [...i.characters];
+                                          while (characters.length <= index) {
+                                            characters.push({ id: crypto.randomUUID(), name: `Character ${characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] });
+                                          }
+                                          return { ...i, characters: apply(characters) };
+                                        });
+                                        return (
+                                          <article key={c?.id || `slot-${index}`} className="castrow">
+                                            <div className="label">Character {index + 1}</div>
+                                            <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
+                                            <textarea className="inp" rows={3} placeholder="Details — face, outfit, hair. Or leave this and use a photo." value={c?.look || ""} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, look: e.target.value } : x))} />
+                                            <p className="help">A prompt or one photo. The four shots use the comic style you picked.</p>
+                                            {!saved && (
+                                              <label className="refshot">
+                                                {c?.refUrl ? <img src={c.refUrl} alt="" /> : <span>Reference photo{"\n"}drop or tap</span>}
+                                                <input
+                                                  type="file"
+                                                  accept="image/png,image/jpeg,image/webp"
+                                                  onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    e.target.value = "";
+                                                    void readRefPhoto(file, (dataUrl) => {
+                                                      touch((characters) => characters.map((x, n) => n === index ? { ...x, refUrl: dataUrl, angles: [] } : x));
+                                                    });
+                                                  }}
+                                                />
+                                              </label>
+                                            )}
+                                            {!saved && (
+                                              <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeFourShots(index)}>Make the four shots</button>
+                                            )}
+                                            <div className="shotrow">
+                                              {POSE_LABELS.map((label, slot) => (
+                                                <div key={label} className="shotshow">
+                                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : <span>{label}</span>}
+                                                </div>
+                                              ))}
+                                            </div>
+                                            {c && (saved ? <p className="help">Already in the library.</p> : (
+                                              <button className="btn-sm primary" type="button" disabled={!!busy || angles.filter(Boolean).length < 4} onClick={() => void saveCharacter(c)}>Save to library</button>
+                                            ))}
+                                            {c && <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id) }))}>Remove</button>}
+                                          </article>
+                                        );
+                                      })}
+                                      </div>
+                                    </div>
+              </section>
+
+              <section className={`subpage${tab === 1 ? " on" : ""}`}>
+                <PageRail issue={issue} pageN={0}>
                 <CoverBlock
                   issue={issue}
                   sheets={sheets}
@@ -875,87 +972,7 @@ export function Studio() {
                   onPrompt={(v) => patchPage(0, (p) => ({ ...p, prompt: v, status: v.trim() ? "ready" : "draft" }))}
                   onRewrite={() => onRewrite("cover", issue.pages[0]?.prompt ?? "", 0)}
                   onToggle={(id) => toggleOnPage(0, id)}
-                  belowPrompt={
-                    <div className="block">
-                      <div className="label">Characters</div>
-                      <p className="help">Four characters, one under the other. Each one has four shots side by side: front, left side, right side, back.</p>
-                      <div className="cast__grid">
-                        {roster.filter((row) => row.images.length >= 4).map((row) => (
-                          <button
-                            key={row.id}
-                            className="btn-sm"
-                            type="button"
-                            onClick={() => patch((i) => {
-                              if (i.characters.length >= 4) return i;
-                              if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
-                              const member: CastMember = {
-                                id: `lib-${row.id}`,
-                                name: row.name,
-                                look: "Saved in the library",
-                                role: "regular",
-                                refUrl: row.images[0],
-                                angles: row.images.slice(0, 4),
-                              };
-                              return { ...i, characters: [...i.characters, member] };
-                            })}
-                          >
-                            Use saved {row.name}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="caststack">
-                      {[0, 1, 2, 3].map((index) => {
-                        const c = issue.characters[index];
-                        const angles = ["", "", "", ""].map((empty, slot) => c?.angles?.[slot] || (slot === 0 ? c?.refUrl || empty : empty));
-                        const saved = Boolean(c?.id.startsWith("lib-"));
-                        const touch = (apply: (characters: CastMember[]) => CastMember[]) => patch((i) => {
-                          const characters = [...i.characters];
-                          while (characters.length <= index) {
-                            characters.push({ id: crypto.randomUUID(), name: `Character ${characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] });
-                          }
-                          return { ...i, characters: apply(characters) };
-                        });
-                        return (
-                          <article key={c?.id || `slot-${index}`} className="castrow">
-                            <div className="label">Character {index + 1}</div>
-                            <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
-                            <p className="help">One photo of this person. That picture makes the four shots.</p>
-                            {!saved && (
-                              <label className="refshot">
-                                {c?.refUrl ? <img src={c.refUrl} alt="" /> : <span>Reference photo{"\n"}drop or tap</span>}
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    e.target.value = "";
-                                    void readRefPhoto(file, (dataUrl) => {
-                                      touch((characters) => characters.map((x, n) => n === index ? { ...x, refUrl: dataUrl, angles: [] } : x));
-                                    });
-                                  }}
-                                />
-                              </label>
-                            )}
-                            {c?.refUrl && !saved && (
-                              <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeFourShots(index)}>Make the four shots</button>
-                            )}
-                            <div className="shotrow">
-                              {POSE_LABELS.map((label, slot) => (
-                                <div key={label} className="shotshow">
-                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : <span>{label}</span>}
-                                </div>
-                              ))}
-                            </div>
-                            {c && (saved ? <p className="help">Already in the library.</p> : (
-                              <button className="btn-sm primary" type="button" disabled={!!busy || angles.filter(Boolean).length < 4} onClick={() => void saveCharacter(c)}>Save to library</button>
-                            ))}
-                            {c && <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id) }))}>Remove</button>}
-                          </article>
-                        );
-                      })}
-                      </div>
-                    </div>
-                  }
+                  belowPrompt={null}
                   onInk={() => {
                     const page = issue.pages[0];
                     if (page && !page.imageUrl) void generateDrafts([0]);
@@ -971,6 +988,7 @@ export function Studio() {
                   onBuy={() => buy("all")}
                   freeBook={freeBook}
                 />
+                </PageRail>
               </section>
 
               {acts.map(({ act, tab: t, pages }) => (
@@ -1022,7 +1040,7 @@ export function Studio() {
                 </section>
               ))}
 
-              <section className={`subpage${tab === 6 ? " on" : ""}`}>
+              <section className={`subpage${tab === 7 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">Final Review</div>
                   <h1 className="head">{issue.title || "My Percfect Hero"}</h1>
@@ -1108,7 +1126,7 @@ export function Studio() {
             </p>
             <div className="nextpage">Rewrites left <b>{issue.rewritesLeft}</b> of {REWRITES} · Small changes left <b>{issue.smallChangesLeft}</b> of {SMALL_CHANGES}</div>
             {error && <div className="errbox">{error}</div>}
-            {tab < 6 && (
+            {tab < 7 && (
               <button className="btn-gen" type="button" onClick={() => setTab(tab + 1)}>
                 Next
               </button>
@@ -1217,6 +1235,27 @@ function RefLock({ pageN, pages, sheets }: { pageN: number; pages: ComicPage[]; 
   );
 }
 
+function PageRail({ issue, pageN, children }: { issue: Issue; pageN: number; children: ReactNode }) {
+  const page = issue.pages.find((p) => p.n === pageN);
+  const ids = page?.characterIds.length ? page.characterIds : issue.characters.filter((c) => c.role === "regular").map((c) => c.id);
+  const picked = issue.characters.filter((c) => ids.includes(c.id));
+  const fronts = (picked.length ? picked : issue.characters).slice(0, 4);
+  return (
+    <div className="pagerow">
+      <aside className="castrail" aria-label="Characters on this page">
+        {fronts.length === 0 && <p className="help">Add up to four characters.</p>}
+        {fronts.map((c) => (
+          <figure key={c.id} className="railshot">
+            {c.angles?.[0] ? <img src={c.angles[0]} alt="" /> : <span>Front</span>}
+            <figcaption>{c.name}</figcaption>
+          </figure>
+        ))}
+      </aside>
+      <div className="pagecol">{children}</div>
+    </div>
+  );
+}
+
 function CoverBlock({
   issue,
   sheets,
@@ -1251,22 +1290,22 @@ function CoverBlock({
   return (
     <div id="page-0">
       <div>
-        <div className="kicker">1 · Cover</div>
+        <div className="kicker">2 · Cover</div>
         <h1 className="head">Cover</h1>
-        <p className="subhead">Write the cover. Under it, up to four characters. Name any of them in the prompt.</p>
+        <p className="subhead">The characters are on the page before this. Name any of them in the cover prompt. Their front shots stay on the left.</p>
       </div>
       <div className="block">
         <div className="label">Character sheet</div>
         {sheets[0] ? (
           <img src={sheets[0]} alt="Main character sheet" style={{ width: "100%", maxWidth: 420, borderRadius: 12 }} />
         ) : (
-          <p className="help">Add the main character from your library on Character Reference. The four saved shots become this sheet, and the cover uses it for the face.</p>
+          <p className="help">Make the four shots on Characters first. Those shots become this sheet, and the cover uses it for the face.</p>
         )}
       </div>
       <div className="block">
         <div className="label">Who's on the cover</div>
         <div className="chips">
-          {issue.characters.length === 0 && <span className="help">Add a character under the prompt.</span>}
+          {issue.characters.length === 0 && <span className="help">Add characters on the Characters page.</span>}
           {issue.characters.map((c) => (
             <button key={c.id} className={`chip${page?.characterIds.includes(c.id) ? " sel" : ""}`} type="button" onClick={() => onToggle(c.id)}>{c.name}</button>
           ))}
@@ -1274,7 +1313,7 @@ function CoverBlock({
       </div>
       <PromptBox
         value={page?.prompt ?? ""}
-        placeholder="Cover idea. You can name Character 1, 2, 3, or 4 from the row below."
+        placeholder="Cover idea. Name any character from the Characters page."
         busy={busy === "write-cover-0"}
         locked={false}
         onChange={onPrompt}
@@ -1357,7 +1396,7 @@ function ActBlock({
       <div>
         <div className="kicker">{act} · pages {pages[0]}–{pages[2]}</div>
         <h1 className="head">Write the {act}.</h1>
-        <p className="subhead">First drafts are free and watermarked. You can ink every page. Edits wait until you unlock the page.</p>
+        <p className="subhead">The summary at the top writes these three pages. Fix any one page on its own, or write each page yourself.</p>
       </div>
       <PromptBox
         value={summary}
@@ -1382,8 +1421,10 @@ function ActBlock({
           </div>
           {pages.map((n) => {
             const page = issue.pages.find((p) => p.n === n)!;
+            const prev = issue.pages.find((p) => p.n === n - 1);
             return (
-              <article key={n} className="pcard" id={`page-${n}`}>
+              <PageRail key={n} issue={issue} pageN={n}>
+              <article className="pcard" id={`page-${n}`}>
                 <div className="pcard__hd">
                   <span className="pcard__no">Page {n}</span>
                   <span className={`pstat ${page.status}`}>{page.status}</span>
@@ -1398,6 +1439,12 @@ function ActBlock({
                       onChange={(v) => onPrompt(n, v)}
                       onRewrite={() => onRewritePage(n)}
                     />
+                    {prev?.imageUrl && (
+                      <figure className="lookback">
+                        <figcaption>{n === 1 ? "Cover" : `Page ${n - 1}`} — look back while you write this page</figcaption>
+                        <PageArt url={prev.imageUrl} clean={owned(issue)[prev.act]} alt="" />
+                      </figure>
+                    )}
                     <RefLock pageN={n} pages={issue.pages} sheets={sheets} />
                     <div>
                       <span className="label">Who's on this page</span>
@@ -1436,6 +1483,7 @@ function ActBlock({
                   </div>
                 </div>
               </article>
+              </PageRail>
             );
           })}
         </>

@@ -49,7 +49,7 @@ async function post<T>(path: string, data: unknown): Promise<T> {
 }
 
 export function rewriteCopy({ data }: { data: RewriteInput }) {
-  return post<{ ok: true; text: string } | { ok: false; error: string }>("/rewrite", data);
+  return post<{ ok: true; text: string; pages?: string[] } | { ok: false; error: string }>("/rewrite", data);
 }
 
 export function inkPage({ data }: { data: InkInput }) {
