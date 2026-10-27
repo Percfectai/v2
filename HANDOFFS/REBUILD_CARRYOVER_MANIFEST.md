@@ -3,7 +3,7 @@
 **Created:** 2026-10-17 · **Author:** Claude (Opus 4.8) · **For:** Nick
 **Purpose:** The feature-by-feature list of what moves from the old `percfectstudios` repo
 into the **fresh repo / new Render / new Supabase**, trimmed of all the dead weight.
-**Status:** DRAFT for Nick's approval. Nothing has been copied or deleted yet.
+**Status:** LIVE. Repo is `Percfectai/v2`. Site is https://percfectai.com on Render. Read `README.md` first. Comics is in (27 October 2026). This file is the carry list, not a draft waiting for a repo name.
 
 > Golden rule from the handoff dictation: **perfected features get reused with the EXACT
 > same code.** Nobody rewrites a working feature. **Nobody touches the prompts but Nick.**
@@ -139,7 +139,7 @@ From `supabase_schema.sql`:
 | Item | On disk | Why cut |
 |---|---|---|
 | `percfect-posts-app/node_modules` | 227 MB | build artifact; gitignore + rebuild. **Posts lane itself KEPT** (Nick, 2026-10-17) |
-| `perfect-comics-app/` | 83 MB | Comics removed from Build per dictation |
+| `perfect-comics-app/node_modules` | build artifact | gitignore it. The comics studio itself is **IN** (`perfect-comics-app/src`, `percfect_comics.py`, `static/comics`). |
 | `discord_bot/`, `discord_bridge.py` | 30 MB | dead |
 | `voice_agents/`, `telegram_voice_bot/` | 12 MB+ | dead |
 | `perchance*`, `perchance_*.py`, princess templates | — | dead product (princessdownloads is old) |
@@ -160,13 +160,13 @@ Plan: cron-job.org primary + a GH Actions fallback committed to the repo. Wire o
 
 ---
 
-## 6. What's still needed from Nick to execute
+## 6. Decided
 
-1. **New Render API key** → paste into `HANDOFFS/keys.txt` (never chat). Lets me set env + keep-alive.
-2. **New GitHub repo name** (or say "create it" — I'll make a clean empty one under `nickpelectrical`).
-3. **Run `claude /mcp` in a real terminal** to authenticate the Supabase MCP (I can't run slash-commands here).
-4. **Decision:** does **Cards** survive as a top-nav section, or get cut with Comics?
-5. **Confirm** Posts stays as a live lane (dictation lists "Post" in the menu).
+1. Live site is https://percfectai.com on the new Render service (`render.yaml` name `percfect-studios-v2`). The old host `percfectstudios.onrender.com` is not this repo.
+2. GitHub repo is `Percfectai/v2`, not a repo under `nickpelectrical`.
+3. Cards stays as its own top nav. Comics is also in, at `/comics`.
+4. Posts stays as a live lane.
+5. Render and Supabase keys stay out of chat and out of git.
 
 ---
 
