@@ -18,6 +18,36 @@ from flask_login import current_user
 log = logging.getLogger(__name__)
 bp = Blueprint("percfect_comics", __name__)
 SPA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "comics")
+
+
+def _cors_origin() -> str:
+    origin = request.headers.get("Origin") or ""
+    low = origin.lower()
+    if low in ("capacitor://localhost", "https://localhost", "http://localhost"):
+        return origin
+    if low in ("https://percfectai.com", "https://www.percfectai.com") or low.endswith(".percfectai.com"):
+        return origin
+    if low in ("https://comicbot.si", "https://www.comicbot.si") or low.endswith(".comicbot.si"):
+        return origin
+    return ""
+
+
+@bp.before_request
+def _cors_preflight():
+    if request.method == "OPTIONS" and _cors_origin():
+        return ("", 204)
+
+
+@bp.after_request
+def _add_mobile_cors(resp):
+    origin = _cors_origin()
+    if origin:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        resp.headers["Vary"] = "Origin"
+    return resp
 ASSET_EXTS = {
     ".js", ".css", ".map", ".png", ".jpg", ".jpeg", ".svg", ".webp",
     ".woff", ".woff2", ".json", ".webmanifest", ".ico", ".txt",
@@ -245,8 +275,8 @@ def comics_page():
     return _serve_spa()
 
 
-@bp.route("/comics/api/rewrite", methods=["POST"])
-@bp.route("/studios/comics/api/rewrite", methods=["POST"])
+@bp.route("/comics/api/rewrite", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/rewrite", methods=["POST", "OPTIONS"])
 def comics_rewrite():
     denied = _spa_auth()
     if denied:
@@ -284,8 +314,8 @@ def comics_rewrite():
     return jsonify({"ok": True, "text": text})
 
 
-@bp.route("/comics/api/ink", methods=["POST"])
-@bp.route("/studios/comics/api/ink", methods=["POST"])
+@bp.route("/comics/api/ink", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/ink", methods=["POST", "OPTIONS"])
 def comics_ink():
     denied = _spa_auth()
     if denied:
@@ -312,8 +342,8 @@ def comics_ink():
     return jsonify(result), (200 if result.get("ok") else 502)
 
 
-@bp.route("/comics/api/plan", methods=["POST"])
-@bp.route("/studios/comics/api/plan", methods=["POST"])
+@bp.route("/comics/api/plan", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/plan", methods=["POST", "OPTIONS"])
 def comics_plan():
     denied = _spa_auth()
     if denied:
@@ -379,8 +409,8 @@ def _collage_page(rows: list) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode("ascii")
 
 
-@bp.route("/comics/api/sheet", methods=["POST"])
-@bp.route("/studios/comics/api/sheet", methods=["POST"])
+@bp.route("/comics/api/sheet", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/sheet", methods=["POST", "OPTIONS"])
 def comics_sheet():
     denied = _spa_auth()
     if denied:
