@@ -1,16 +1,27 @@
 # Agents
 
-Read [README.md](README.md) before any edit.
+Open files in this order. Do not skip ahead.
 
-The original site is live again at https://percfectai.com. Render service: `percfectai-v2` (`https://percfectai-v2.onrender.com`). This repo, Percfectai/v2, is that site with the fat trimmed. Dead products stay out. Keys stay in the local V2 keys file. Do not commit them.
+1. [README.md](README.md). That is the product, the live URL, and the lane map.
+2. This file.
+3. One lane from the README map. Read only the files for the lane you were asked to change.
+4. [HANDOFFS/README.md](HANDOFFS/README.md) if the task is money, card prompts, or what was carried into this repo.
 
-A comic page is coming. It is not live on the site yet. Do not ship the old Flask book generator in its place, and do not send this work to `percfectstudios.onrender.com`.
+## What is true right now
 
-## Skills in this repo
+- The original site is live again at https://percfectai.com.
+- Render service is `percfectai-v2` (`https://percfectai-v2.onrender.com`). This repo deploys there.
+- `percfectstudios.onrender.com` is the old service. Do not use it.
+- The repo is the trimmed site. Dead products stay out.
+- A comic page is coming. It is not live. Do not ship the old Flask book generator in its place.
+- Prompts stay as Nick left them. `CHARACTER_SPIN_PROMPT` in `app.py` is locked.
+- Keys stay out of git and out of chat.
 
-GitHub work uses the skills committed here. Read the matching `SKILL.md` before issues, pull requests, Actions, or deploys. The same folders are in `.grok/skills/` and `.claude/skills/`.
+## Skills
 
-- `github` — `gh` for issues, pull requests, and workflow runs. Thread helper: `github/scripts/github_thread.py`
+Before GitHub issues, pull requests, Actions, or a deploy workflow, read the matching skill in `.grok/skills/` (Claude agents use `.claude/skills/`).
+
+- `github` — `gh` for issues, pull requests, and workflow runs. Helper: `github/scripts/github_thread.py`
 - `github-actions` — workflow files
 - `github-actions-advanced` — harder pipeline cases
 - `github-actions-debugger` — failed runs

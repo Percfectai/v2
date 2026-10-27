@@ -3,7 +3,7 @@
 **Created:** 2026-10-17 · **Author:** Claude (Opus 4.8) · **For:** Nick
 **Purpose:** The feature-by-feature list of what moves from the old `percfectstudios` repo
 into the **fresh repo / new Render / new Supabase**, trimmed of all the dead weight.
-**Status:** LIVE. The original site is back up at https://percfectai.com. Render service is `percfectai-v2` (`https://percfectai-v2.onrender.com`), repo `Percfectai/v2`, trimmed of the dead products. Read `README.md` first. A comic page is coming. It is not a live lane yet. This file is the carry list, not a draft waiting for a repo name. Keys are not in git.
+**Status:** LIVE reference. Read [../README.md](../README.md) first, then [AGENTS.md](../AGENTS.md). This file is the carry list only. Site: https://percfectai.com. Render: `percfectai-v2`. A comic page is coming and is not a live lane yet. Keys are not in git.
 
 > Golden rule from the handoff dictation: **perfected features get reused with the EXACT
 > same code.** Nobody rewrites a working feature. **Nobody touches the prompts but Nick.**

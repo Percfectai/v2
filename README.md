@@ -1,46 +1,47 @@
-# Percfectai/v2 — read this first
+# Percfectai/v2
 
-**Organization:** [Percfectai](https://github.com/Percfectai) · **Repo:** [Percfectai/v2](https://github.com/Percfectai/v2)
-
-The original site is live again: **https://percfectai.com** and **https://www.percfectai.com**. Render service is `percfectai-v2` (`https://percfectai-v2.onrender.com`), deploys from this repo. `/ping` returns 200. This repo is that site, with the fat trimmed. Dead products are not in here. Do not copy them back from the old `percfectstudios` tree.
-
-A comic page is coming. It is not a live lane on the site yet. Do not treat `/comics` as shipped, and do not rebuild the old Flask book generator.
-
-Every agent opens this file before editing. The lane list below is the current product, not the 17 October draft.
-
-## Rules
-
-- Perfected features stay the same code. Do not rewrite a working lane.
-- Nobody edits prompts except Nick. `CHARACTER_SPIN_PROMPT` in `app.py` is locked.
-- Image keys never run chat or voice. The comic writer uses `XAI_COMIC_WRITER_API_KEY` (then the other chat keys). Comic pictures use the image pool in `xai_keys.py`.
-- Render API keys stay in Render and in `HANDOFFS/keys.txt`. Never print them in chat or commit them.
-
-## Comic page — coming
-
-A comic page is coming. The studio to use, when it is wired onto the live site, is the 25 September one from `nickpelectrical/perfect-comics`, not the older Flask book generator. Code for that studio is in this repo and is not the public page yet.
+The original Percfect site, trimmed and live again.
 
 | | |
 |---|---|
-| Page | `/comics` and `/studios/comics` |
-| Code | `percfect_comics.py`, `perfect-comics-app/src/`, built files in `static/comics/` |
-| Book | Cover + 9 pages. Settings, characters, summary, cover, beginning, middle, ending, review. |
-| Price | Cover $2. Each 3-page act $6. Full comic $20. Every 5th finished comic is free. Credits are a local dollar balance in `localStorage` `perfect-comics-v1`. |
-| Pictures | 3 per page. Free watermarked draft, then 2 edits after that block is unlocked. Model `grok-imagine-image-2.0`, 1K, medium. At most 3 reference images. |
-| Stamp | Unpaid pages are saved as a JPEG with **PERCFECT PREVIEW** drawn into the pixels. The clean file stays in memory until unlock and is not written to `localStorage`. |
-| Not built | Pro selling. The site does not take 10% yet. Publish opens the local reader. |
+| Site | https://percfectai.com and https://www.percfectai.com |
+| Render | `percfectai-v2` at https://percfectai-v2.onrender.com |
+| Repo | https://github.com/Percfectai/v2 |
+| Old host | `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there. |
 
-## Lanes that stay
+`/ping` returns 200. A comic page is coming. It is not a live lane yet. Do not bring back the old Flask book generator.
 
-Photos, Videos, Characters (exact flow, locked spin prompt), Arena, 3-D, Posts, Cards (own top nav), Productions (parked, under construction), shared chrome, credits, auth, Stripe.
+## Read this first
 
-## Trimmed out
+1. This file.
+2. [AGENTS.md](AGENTS.md) if you are an agent.
+3. The one lane doc that matches the work, from the map below.
+4. [HANDOFFS/README.md](HANDOFFS/README.md) only when you need the carry list, card prompts, or Stripe notes.
 
-Discord bots, Telegram and voice-agent trees, Perchance, the princess page product, Kodi, prototypes, `percfectpictures2.0`, sdk, and `.bak` files. They are not part of this repo. Leave them out.
+Do not start from the old `percfectstudios` tree. Do not copy Discord, voice bots, Perchance, the princess product, Kodi, prototypes, or `.bak` files back in.
 
-## Render
+## Rules
 
-The live site is https://percfectai.com on Render service `percfectai-v2` (`https://percfectai-v2.onrender.com`). `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there. The Render API key stays in the local V2 keys file and in Render. Never commit it and never paste it into chat.
+- Keep a working lane as it is. Do not rewrite it.
+- Nick is the only person who edits prompts. `CHARACTER_SPIN_PROMPT` in `app.py` stays locked.
+- Image keys never run chat or voice.
+- Keys stay in the local V2 keys file and in Render. Never commit them and never paste them into chat.
 
-Full carry list: `HANDOFFS/REBUILD_CARRYOVER_MANIFEST.md`.
+## Map
 
-GitHub and Actions skills for every agent are in `.grok/skills/` and `.claude/skills/` (`github`, `github-actions`, `github-actions-advanced`, `github-actions-debugger`, `github-actions-templates`, `github-automation`, `github-issue-creator`). Read the skill before using `gh` or adding a workflow.
+| Lane | Start here |
+|---|---|
+| Photos and videos | `templates/percfectstudios.html`, `static/js/studio_jobs.js`, `studio_task_handlers.py` |
+| Characters | `templates/percfect_character.html`, `static/js/character_profile.js`, `CHARACTER_SPIN_PROMPT` in `app.py` |
+| Arena | `templates/proto_arena_stage.html`, `battle_agent.py`, `world_chat_api.py` |
+| 3-D | `percfect_3d_providers.py`, `percfect_api_3d.py`, `three_d_character_gen.py` |
+| Cards | `templates/proto_trading_cards.html`, `card_studio.py`, `HANDOFFS/cards_OFFICIAL_PROMPTS.md` |
+| Posts | `percfect_posts_bp.py`, `templates/percfect_posts.html`, `percfect-posts-app/src/` |
+| Productions | `percfect_productions_bp.py` — parked, under construction |
+| Credits, auth, Stripe | `credit_wallet.py`, `HANDOFFS/2026-09-24_STRIPE_MONEY_SAFETY.md` |
+| Comics (coming) | `percfect_comics.py`, `perfect-comics-app/src/studio.tsx` — not live on the site yet |
+| GitHub and Actions | `.grok/skills/` and `.claude/skills/` — read the matching `SKILL.md` before `gh` or a workflow |
+
+## Skills
+
+The same GitHub skill folders are in `.grok/skills/` and `.claude/skills/`: `github`, `github-actions`, `github-actions-advanced`, `github-actions-debugger`, `github-actions-templates`, `github-automation`, `github-issue-creator`.
