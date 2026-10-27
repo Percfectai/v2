@@ -124,27 +124,16 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   }
 }
 
-/** Two characters. Top half is the first character's angles. Bottom half is the second. */
+/** One page. Top row is one character's four saved shots. Bottom row is the other character's four. */
 async function pairSheet(top: string[], bottom: string[]): Promise<string> {
-  const cell = 384;
-  const canvas = document.createElement("canvas");
-  canvas.width = cell * 4;
-  canvas.height = cell * 2;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-  ctx.fillStyle = "#0e1116";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const rows = [top.slice(0, 4), bottom.slice(0, 4)];
-  for (let row = 0; row < 2; row += 1) {
-    for (let col = 0; col < rows[row].length; col += 1) {
-      const img = await loadImage(rows[row][col]);
-      const scale = Math.min(cell / img.width, cell / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      ctx.drawImage(img, col * cell + (cell - w) / 2, row * cell + (cell - h) / 2, w, h);
-    }
-  }
-  return canvas.toDataURL("image/jpeg", 0.85);
+  const res = await fetch(`${import.meta.env.BASE_URL}api/sheet`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ top: top.slice(0, 4), bottom: bottom.slice(0, 4) }),
+  });
+  const data = await res.json().catch(() => null);
+  return data?.ok && typeof data.url === "string" ? data.url : "";
 }
 
 async function stamp(src: string): Promise<string> {
@@ -280,9 +269,22 @@ export function Studio() {
   const [look, setLook] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refPhoto, setRefPhoto] = useState("");
+  const [roster, setRoster] = useState<{ id: string; name: string; images: string[] }[]>([]);
+  const [sheets, setSheets] = useState<string[]>([]);
 
   useEffect(() => {
     setLib(load());
+    void fetch("/api/3d/library-characters", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const rows = Array.isArray(data?.characters) ? data.characters : [];
+        setRoster(rows.map((row: { id: string; name?: string; images?: string[] }) => ({
+          id: String(row.id),
+          name: row.name || "Character",
+          images: (row.images || []).filter((url: string) => typeof url === "string" && url).slice(0, 4),
+        })));
+      })
+      .catch(() => setRoster([]));
   }, []);
 
   useEffect(() => {
@@ -295,6 +297,25 @@ export function Studio() {
   }, [lib]);
 
   const issue = lib?.issues.find((i) => i.id === lib.currentId) ?? null;
+  const sheetKey = (issue?.characters ?? []).slice(0, 4).map((c) => shotsOf(c).join(",")).join("|");
+  useEffect(() => {
+    const people = (issue?.characters ?? []).slice(0, 4);
+    let cancel = false;
+    void (async () => {
+      const made: string[] = [];
+      for (let i = 0; i < people.length; i += 2) {
+        const top = shotsOf(people[i]).slice(0, 4);
+        const bottom = people[i + 1] ? shotsOf(people[i + 1]).slice(0, 4) : [];
+        if (top.length < 4 || bottom.length < 4) continue;
+        const sheet = await pairSheet(top, bottom);
+        if (sheet) made.push(sheet);
+      }
+      if (!cancel) setSheets(made);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [sheetKey]);
 
   const issueRef = useRef<Issue | null>(null);
   issueRef.current = issue;
@@ -748,6 +769,45 @@ export function Studio() {
                   <h1 className="head">Lock the cast.</h1>
                   <p className="subhead">Two characters share one sheet: angles on the top half, the other character on the bottom. A page with those two uses the page before it and that one sheet. Four characters use the page before it, then a sheet of the first pair and a sheet of the second pair.</p>
                 </div>
+                <div className="label">From your character library</div>
+                <p className="help">Pick two saved characters. Their pictures are pasted onto one page: one character across the top, the other across the bottom. That single page is the reference.</p>
+                <div className="cast__grid">
+                  {roster.filter((row) => row.images.length >= 4).map((row) => (
+                    <article key={row.id} className="castcard">
+                      <img className="castthumb" src={row.images[0]} alt="" />
+                      <div className="nm">{row.name}</div>
+                      <div className="lk">Saved character</div>
+                      <button
+                        className="btn-sm primary"
+                        type="button"
+                        onClick={() => patch((i) => {
+                          if (i.characters.length >= 4) return i;
+                          if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
+                          const member: CastMember = {
+                            id: `lib-${row.id}`,
+                            name: row.name,
+                            look: "Library character",
+                            role: "regular",
+                            refUrl: row.images[0],
+                            angles: row.images.slice(0, 4),
+                          };
+                          return { ...i, characters: [...i.characters, member] };
+                        })}
+                      >
+                        Add to the sheet
+                      </button>
+                    </article>
+                  ))}
+                  {roster.filter((row) => row.images.length >= 4).length === 0 && (
+                    <p className="help">No finished character with four shots is on this account yet. Make one on the character page first.</p>
+                  )}
+                </div>
+                {sheets.map((src, i) => (
+                  <figure key={src.slice(0, 48)} className="block">
+                    <div className="label">Reference {i + 1} — one page</div>
+                    <img src={src} alt="Two characters, four shots each" style={{ width: "100%", maxWidth: 640, borderRadius: 12 }} />
+                  </figure>
+                ))}
                 <div className="label">Cast — {issue.characters.length} / 5</div>
                 <div className="cast__grid">
                   {issue.characters.map((c) => (

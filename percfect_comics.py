@@ -5,6 +5,7 @@ Pictures use the image silo, grok-imagine-image-2.0, 1k.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -342,6 +343,57 @@ def comics_plan():
         return jsonify({"ok": False, "error": "The page plan was too short"})
     return jsonify({"ok": True, "beats": beats[:10]})
 
+
+
+def _collage_page(rows: list) -> str:
+    """Paste saved character shots onto one JPEG. Does not touch the character builder."""
+    import io
+    from PIL import Image
+
+    cell = 512
+    cols = 4
+    canvas = Image.new("RGB", (cell * cols, cell * max(1, len(rows))), (14, 17, 22))
+    for r, urls in enumerate(rows[:2]):
+        if not isinstance(urls, list):
+            continue
+        for c, url in enumerate(urls[:4]):
+            raw = str(url or "").strip()
+            if not raw.startswith("https://"):
+                continue
+            try:
+                got = requests.get(raw, timeout=40)
+            except Exception:
+                continue
+            if not got.ok:
+                continue
+            try:
+                im = Image.open(io.BytesIO(got.content)).convert("RGB")
+            except Exception:
+                continue
+            im.thumbnail((cell, cell))
+            canvas.paste(im, (c * cell + (cell - im.width) // 2, r * cell + (cell - im.height) // 2))
+    out = io.BytesIO()
+    canvas.save(out, format="JPEG", quality=85)
+    return "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+
+
+@bp.route("/comics/api/sheet", methods=["POST"])
+@bp.route("/studios/comics/api/sheet", methods=["POST"])
+def comics_sheet():
+    denied = _spa_auth()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    top = body.get("top") if isinstance(body.get("top"), list) else []
+    bottom = body.get("bottom") if isinstance(body.get("bottom"), list) else []
+    if len(top) < 4 or len(bottom) < 4:
+        return jsonify({"ok": False, "error": "Need four pictures for each character."}), 400
+    try:
+        url = _collage_page([top[:4], bottom[:4]])
+    except Exception as e:
+        log.warning("comics sheet failed: %s", e)
+        return jsonify({"ok": False, "error": "Could not put the pictures together."}), 502
+    return jsonify({"ok": True, "url": url})
 
 
 @bp.route("/comics/<path:filename>")
