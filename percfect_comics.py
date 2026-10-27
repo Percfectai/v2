@@ -180,7 +180,8 @@ def _build_ink_prompt(data: Dict[str, Any]) -> str:
             f'Title: "{title}" in large, bold, stylized lettering across the top third of the cover.',
             f"Issue number: #{issue_number} in a clean corner box in the upper left.",
             f"Main visual: {visual}.",
-            f"The people in that scene, same faces and costumes: {cast}.",
+            f"Characters you may name in the cover description: {cast}.",
+            "When the description names one of those characters, use that character's sheet for the face and costume.",
             "Character sheet input: the first attached image is the character sheet. The top row is the main character, front then back then left then right. Use that sheet for the face and costume. Do not copy the sheet grid onto the cover.",
             f"Style: {style} digital comic book art, high detail, cinematic lighting, dramatic foreshortening, vibrant colors, professional cover quality, strong thumbnail readability.",
             "Additional elements: publisher logo area top right, barcode and price box bottom left, credits area bottom right.",
@@ -437,6 +438,49 @@ def comics_sheet():
         log.warning("comics sheet failed: %s", e)
         return jsonify({"ok": False, "error": "Could not put the pictures together."}), 502
     return jsonify({"ok": True, "url": url})
+
+
+@bp.route("/comics/api/save-character", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/save-character", methods=["POST", "OPTIONS"])
+def comics_save_character():
+    """Save four comic reference shots onto the user's character library. Does not run the character builder."""
+    denied = _spa_auth()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    name = str(body.get("name") or "").strip()[:80] or "Character"
+    look = str(body.get("look") or "").strip()[:280]
+    raw = body.get("images") if isinstance(body.get("images"), list) else []
+    images = [str(u).strip() for u in raw if isinstance(u, str) and u.strip()][:4]
+    if len(images) < 4:
+        return jsonify({"ok": False, "error": "Four shots are required: front, left side, right side, back."}), 400
+    try:
+        import app as app_mod
+        stored = [app_mod._persist_image(src) for src in images]
+    except Exception as e:
+        log.warning("comics save character persist failed: %s", e)
+        return jsonify({"ok": False, "error": "Could not store the pictures."}), 500
+    if any(not u or u.startswith("data:") for u in stored):
+        return jsonify({"ok": False, "error": "Could not store the pictures."}), 500
+    insert_row = {
+        "user_id": current_user.id,
+        "name": name,
+        "gender": "",
+        "images": stored,
+        "primary_image_url": stored[0],
+        "prompt": look,
+        "source_mode": "comic",
+    }
+    try:
+        import app as app_mod
+        row = app_mod.supabase.table("characters").insert(insert_row).execute()
+        saved = (row.data or [None])[0]
+    except Exception as e:
+        log.warning("comics save character insert failed: %s", e)
+        return jsonify({"ok": False, "error": "Could not save the character."}), 500
+    if not saved or not saved.get("id"):
+        return jsonify({"ok": False, "error": "Could not save the character."}), 500
+    return jsonify({"ok": True, "id": saved["id"], "name": name, "images": stored})
 
 
 @bp.route("/comics/<path:filename>")
