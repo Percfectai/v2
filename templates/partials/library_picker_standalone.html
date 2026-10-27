@@ -1,0 +1,15 @@
+{# Corner library picker for pages that don't extend base.html (Card Studio, Card Shop, Battle Cards).
+   Brings base.html's colors for the picker only. Set `library_only` before including to lock
+   the picker to one section, e.g. {% set library_only = 'cards' %}. #}
+<style>
+  #user-lib-fab, #user-lib-scrim, #user-lib-panel, .lib-media-lightbox {
+    --bg: #07060c; --bg-2: #100e18; --bg-3: #181522;
+    --border: #2a2438; --border-2: #3a3350;
+    --accent: #a855f7; --accent-2: #c084fc; --accent-3: #e9d5ff;
+    --text: #faf5ff; --text-muted: #a89bc4;
+    --font-main: 'Inter', sans-serif; --font-mono: 'Space Mono', monospace;
+  }
+</style>
+{% if library_only %}<script>window.PERCFECT_LIBRARY_ONLY = {{ library_only|tojson }};</script>{% endif %}
+{% include 'partials/user_library_sidebar.html' %}
+<script src="{{ url_for('static', filename='js/user_library_sidebar.js') }}?v=lib-cards-1"></script>

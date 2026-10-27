@@ -1,0 +1,75 @@
+{# Admin-only floating companions: Vanessa + Mira. Ashley & Sal stay on Support page. #}
+{% if is_admin or show_vanessa %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vanessa_popup.css') }}?v=vanessa-14" />
+<div id="vanessa-root" aria-live="polite"
+  data-vanessa-ready="{{ '1' if vanessa_agent_ready else '0' }}"
+  data-mira-ready="{{ '1' if mira_agent_ready|default(vanessa_agent_ready) else '0' }}">
+  <div id="vanessa-panel" role="dialog" aria-label="Admin companions">
+    <div id="vanessa-head">
+      <button type="button" id="vanessa-avatar-btn" class="vanessa-avatar-btn" title="Click to set a picture for her" aria-label="Set companion picture">
+        <img id="vanessa-avatar" class="vanessa-avatar" alt="" hidden />
+        <span id="vanessa-avatar-letter" class="vanessa-avatar-letter">V</span>
+      </button>
+      <div class="vanessa-head-text">
+        <h2 id="vanessa-title">Vanessa <span>· you only</span></h2>
+        <p id="vanessa-sub">Talk with me · I speak back · Ashley &amp; Sal on Support</p>
+      </div>
+      <button type="button" id="vanessa-close" aria-label="Close">×</button>
+    </div>
+    <input type="file" id="vanessa-avatar-file" accept="image/*" hidden />
+
+    <div class="vanessa-agent-tabs" role="tablist" aria-label="Companion">
+      <button type="button" class="v-tab active" data-agent="vanessa" role="tab" aria-selected="true">Vanessa</button>
+      <button type="button" class="v-tab" data-agent="mira" role="tab" aria-selected="false">Mira</button>
+    </div>
+
+    {# Model switch — Vanessa only #}
+    <div id="vanessa-tier-row" class="vanessa-tier-row">
+      <span class="vanessa-tier-label">Model</span>
+      <div class="vanessa-tier-switch" role="group" aria-label="Model tier">
+        <button type="button" class="v-tier active" data-tier="fast" title="Cheaper · talk &amp; relay">Fast</button>
+        <button type="button" class="v-tier" data-tier="smart" title="Stronger · harder thinking">Smart</button>
+      </div>
+    </div>
+    <p id="mira-tier-note" class="vanessa-tier-note" hidden>Mira uses the strong model · switch is for Vanessa only</p>
+
+    {# Voice / conversation controls #}
+    <div id="vanessa-voice-row" class="vanessa-voice-row">
+      <button type="button" id="vanessa-talk" class="v-voice-btn" aria-pressed="false" title="Hands-free conversation — I listen, reply out loud, listen again">
+        🎙 Talk
+      </button>
+      <button type="button" id="vanessa-speak-toggle" class="v-voice-btn" aria-pressed="true" title="Speak my replies out loud">
+        🔊 Speak
+      </button>
+      <span id="vanessa-voice-status" class="vanessa-voice-status" aria-live="polite">Idle</span>
+    </div>
+
+    <div id="vanessa-log">
+      <div class="v-msg bot" data-seed="vanessa">Hey boss — hit Talk and speak (admin only — only you see me). Pause when you finish a thought; I use xAI to hear you, then answer out loud. Click my face for a picture (right‑click to clear). Ashley &amp; Sal stay on Support.</div>
+      <div class="v-msg bot" data-seed="mira" hidden>Mira here — product/ops co-pilot. Talk mode uses the same admin-only xAI mic path. Ashley &amp; Sal remain on Support only.</div>
+      <div class="v-msg sys">Page: {{ request.path if request is defined else '' }}</div>
+    </div>
+    <div id="vanessa-shot-preview" class="vanessa-shot-preview" hidden>
+      <img id="vanessa-shot-img" alt="Page snapshot preview" />
+      <button type="button" id="vanessa-shot-clear" class="vanessa-shot-clear" title="Remove snapshot">×</button>
+      <span id="vanessa-shot-label">Snapshot ready — send with your next message</span>
+    </div>
+    <p id="vanessa-err"></p>
+    <form id="vanessa-form">
+      <textarea id="vanessa-input" rows="2" maxlength="4000"
+        placeholder="Talk to me, or type…"></textarea>
+      <button type="button" id="vanessa-shot" class="vanessa-shot" title="Snapshot this page" aria-label="Snapshot this page">📷</button>
+      <button type="button" id="vanessa-mic" class="vanessa-mic" title="Hold-style: speech to text" aria-label="Start speech to text" aria-pressed="false">🎤</button>
+      <button type="submit" id="vanessa-send">Send</button>
+    </form>
+  </div>
+  <button type="button" id="vanessa-fab" title="Admin companions" aria-label="Open admin companions">
+    <img id="vanessa-fab-img" class="v-fab-img" alt="" hidden />
+    <span id="vanessa-fab-letter" class="v-fab-letter">V</span>
+    <span class="v-dot" aria-hidden="true"></span>
+  </button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/vanessa_voice.js') }}?v=voice-6"></script>
+<script src="{{ url_for('static', filename='js/vanessa_popup.js') }}?v=vanessa-14"></script>
+{% endif %}

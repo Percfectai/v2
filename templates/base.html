@@ -1,88 +1,893 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Percfect Studios{% endblock %}</title>
-    <link rel="icon" href="/static/assets/brand/percfect_crown_lockup.png" type="image/png">
-    <style>
-        /* ── STUB: base.html CSS was inline here ── */
-        /* TODO: restore full inline CSS from the live site or frozen backup */
-        :root {
-            --bg: #0a0a0a;
-            --text: #fff;
-            --accent: #e91e8c;
-            --accent2: #7c3aed;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
-        }
-        a { color: var(--accent); text-decoration: none; }
-        .nav-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 24px; background: rgba(0,0,0,0.8);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            position: sticky; top: 0; z-index: 1000;
-        }
-        .nav-bar .logo { font-size: 1.4rem; font-weight: 700; }
-        .nav-bar .logo span { color: var(--accent); }
-        .nav-links { display: flex; gap: 20px; align-items: center; }
-        .nav-links a { color: #ccc; font-size: 0.9rem; }
-        .nav-links a:hover { color: #fff; }
-        .credits-pill {
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            padding: 4px 14px; border-radius: 20px; font-size: 0.8rem;
-            font-weight: 600;
-        }
-        .main-content { padding: 20px; }
-        /* Auth modal placeholder */
-        .auth-modal { display: none; }
-    </style>
-    {% block head %}{% endblock %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}PercfectAI{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+/* ── Tokens ─────────────────────────────────────────── */
+:root {
+  /* Deep base — not flat black-gray only */
+  --bg:        #07060c;
+  --bg-2:      #100e18;
+  --bg-3:      #181522;
+  --border:    #2a2438;
+  --border-2:  #3a3350;
+  /* Brand still violet, but pages can override with themes */
+  --accent:    #a855f7;
+  --accent-2:  #c084fc;
+  --accent-3:  #e9d5ff;
+  --text:      #faf5ff;
+  --text-muted:#a89bc4;
+  --success:   #34d399;
+  --danger:    #fb7185;
+  --font-main: 'Inter', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --radius:    14px;
+  --radius-lg: 22px;
+  /* Multi-hue spectrum — use on studio pages so nothing is one purple wash */
+  --hue-amber:  #fbbf24;
+  --hue-orange: #fb923c;
+  --hue-rose:   #f43f5e;
+  --hue-cyan:   #22d3ee;
+  --hue-mint:   #34d399;
+  --hue-sand:   #e8c48a;
+  --hue-stone:  #c4b5a0;
+  --hue-bronze: #d4a056;
+  --grad-brand: linear-gradient(135deg, #a855f7 0%, #ec4899 55%, #fb923c 100%);
+  --grad-arena: linear-gradient(135deg, #e8a54b 0%, #c45c2a 45%, #8b2942 100%);
+  --mesh:
+    radial-gradient(ellipse 70% 45% at 12% -8%, rgba(168, 85, 247, 0.22), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 92% 0%, rgba(236, 72, 153, 0.12), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(34, 211, 238, 0.08), transparent 55%);
+  --theme-soft: rgba(168, 85, 247, 0.12);
+}
+
+/* Arena = Colosseum: sand, stone, bronze, blood-ember — not purple chrome */
+body.theme-arena {
+  --bg: #0c0907;
+  --bg-2: #16110d;
+  --bg-3: #221a14;
+  --border: #3d2e22;
+  --border-2: #5c4330;
+  --accent: #e8a54b;
+  --accent-2: #f0c674;
+  --accent-3: #f5e0b8;
+  --text: #fff6ea;
+  --text-muted: #b8a08a;
+  --theme-soft: rgba(232, 165, 75, 0.14);
+  --mesh:
+    radial-gradient(ellipse 80% 50% at 50% -15%, rgba(232, 165, 75, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 0% 80%, rgba(139, 41, 66, 0.2), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 100% 60%, rgba(196, 92, 42, 0.12), transparent 50%);
+}
+
+/* Photos = cool cyan/violet; Videos = rose/ember; Characters = magenta */
+body.theme-photos {
+  --accent: #38bdf8; --accent-2: #7dd3fc; --accent-3: #e0f2fe;
+  --theme-soft: rgba(56, 189, 248, 0.12);
+}
+body.theme-videos {
+  --accent: #f43f5e; --accent-2: #fb7185; --accent-3: #fecdd3;
+  --theme-soft: rgba(244, 63, 94, 0.12);
+}
+body.theme-characters {
+  --accent: #ec4899; --accent-2: #f472b6; --accent-3: #fbcfe8;
+  --theme-soft: rgba(236, 72, 153, 0.12);
+}
+body.theme-motion {
+  --accent: #34d399; --accent-2: #6ee7b7; --accent-3: #d1fae5;
+  --theme-soft: rgba(52, 211, 153, 0.14);
+  --mesh:
+    radial-gradient(ellipse 70% 45% at 15% -10%, rgba(52, 211, 153, 0.2), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 10%, rgba(34, 211, 238, 0.12), transparent 50%);
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg);
+  background-image: var(--mesh);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: var(--accent-2); }
+a:hover { color: var(--accent-3); }
+
+/* ── Navbar ─────────────────────────────────────────── */
+.navbar {
+  background: rgba(5,5,8,0.88) !important;
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border) !important;
+  padding: 0.85rem 0;
+  position: sticky; top: 0; z-index: 100;
+}
+
+.navbar-brand {
+  font-family: var(--font-mono);
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--text) !important;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+.navbar-brand img {
+  height: 36px;
+  width: auto;
+  display: block;
+  max-width: 180px;
+  object-fit: contain;
+}
+.brand-accent { color: var(--accent-2); }
+
+.nav-link { color: var(--text-muted) !important; font-size: 0.875rem; transition: color 0.2s; padding: 0.4rem 0.75rem !important; }
+.nav-link:hover { color: var(--text) !important; }
+
+.navbar-toggler { border: 1px solid var(--border-2); border-radius: 10px; padding: 0.4rem 0.65rem; }
+.navbar-toggler-icon { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='rgba(244,244,255,0.7)' stroke-width='2' stroke-linecap='round' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E"); }
+
+.dropdown-menu {
+  background: var(--bg-3) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
+  padding: 0.5rem !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6) !important;
+}
+.dropdown-item { color: var(--text) !important; border-radius: 10px; padding: 0.65rem 0.9rem !important; font-size: 0.875rem; transition: background 0.15s; }
+.dropdown-item:hover, .dropdown-item:focus { background: var(--theme-soft) !important; }
+.dropdown-item small { color: var(--text-muted) !important; }
+.dropdown-icon { margin-right: 0.5rem; color: var(--accent-2); }
+.dropdown-divider { border-color: var(--border) !important; }
+
+/* ── Buttons ────────────────────────────────────────── */
+.btn-accent {
+  background: var(--accent); color: #fff !important;
+  border: none; border-radius: 12px;
+  padding: 0.55rem 1.4rem; font-weight: 700;
+  font-family: var(--font-main); font-size: 0.875rem;
+  transition: all 0.2s; cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn-accent:hover { background: var(--accent-2); transform: translateY(-1px); box-shadow: 0 8px 24px var(--theme-soft); color: #fff !important; }
+
+.btn-outline-accent {
+  background: transparent; color: var(--accent-3) !important;
+  border: 1px solid var(--border-2); border-radius: 12px;
+  padding: 0.55rem 1.4rem; font-weight: 600;
+  font-family: var(--font-main); font-size: 0.875rem;
+  transition: all 0.2s; cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn-outline-accent:hover { border-color: var(--accent); background: var(--theme-soft); color: var(--accent-3) !important; }
+
+.btn-share-x {
+  background: #000 !important; color: #fff !important;
+  border: 1px solid #333 !important; border-radius: 12px;
+  padding: 0.45rem 1rem; font-weight: 600; font-size: 0.8rem;
+  cursor: pointer; text-decoration: none; display: inline-flex;
+  align-items: center; gap: 0.35rem; transition: all 0.2s;
+}
+.btn-share-x:hover { background: #1a1a1a !important; color: #fff !important; transform: translateY(-1px); }
+
+/* ── Cards ──────────────────────────────────────────── */
+.card {
+  background: var(--bg-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  color: var(--text) !important;
+}
+.card-header { background: transparent !important; border-bottom: 1px solid var(--border) !important; padding: 1.25rem 1.5rem; }
+
+/* ── Forms ──────────────────────────────────────────── */
+.form-control, .form-select {
+  background: var(--bg-3) !important;
+  border: 1px solid var(--border-2) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-main); font-size: 0.9rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-control:focus, .form-select:focus {
+  background: var(--bg-3) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(124,92,252,0.18) !important;
+  color: var(--text) !important;
+}
+.form-control::placeholder { color: var(--text-muted) !important; opacity: 1; }
+.form-label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.4rem; font-weight: 600; letter-spacing: 0.02em; }
+textarea.form-control { resize: vertical; min-height: 96px; }
+
+/* ── Credit badge ───────────────────────────────────── */
+.credit-badge {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  background: var(--bg-3); border: 1px solid var(--border-2);
+  border-radius: 99px; padding: 0.35rem 1rem;
+  font-size: 0.8rem; font-family: var(--font-mono);
+  color: var(--text-muted); transition: all 0.2s;
+}
+.credit-badge:hover { border-color: var(--accent); }
+.credit-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); }
+
+/* ── Studio page ────────────────────────────────────── */
+.studio-hero { padding: 3rem 0 2rem; text-align: center; }
+.studio-hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
+.studio-hero .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.5rem; }
+
+.studio-panel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem; height: 100%;
+  transition: border-color 0.2s;
+}
+.studio-panel:hover { border-color: var(--border-2); }
+
+.panel-label {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent-2);
+  margin-bottom: 1.25rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+
+.output-area {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); min-height: 320px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+.output-area img, .output-area video {
+  max-width: 100%; max-height: 500px;
+  border-radius: var(--radius); display: none; object-fit: contain;
+}
+.output-placeholder { text-align: center; color: var(--text-muted); padding: 2rem; }
+.output-placeholder .icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.25; display: block; }
+.output-placeholder p { font-size: 0.85rem; opacity: 0.5; margin: 0; }
+
+.spinner-ring {
+  width: 44px; height: 44px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  display: none; position: absolute;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Style chips ────────────────────────────────────── */
+.style-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.style-chip {
+  padding: 0.3rem 0.85rem; border-radius: 99px;
+  border: 1px solid var(--border-2); background: var(--bg-3);
+  color: var(--text-muted); font-size: 0.78rem;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.style-chip:hover { border-color: var(--accent); color: var(--text); }
+.style-chip.selected, .style-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── Gallery ────────────────────────────────────────── */
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+.gallery-item {
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--bg-3); border: 1px solid var(--border);
+  aspect-ratio: 1; position: relative;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.gallery-item:hover { border-color: var(--border-2); transform: scale(1.02); }
+.gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; }
+.gallery-item .type-badge {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  background: rgba(0,0,0,0.75); border-radius: 6px;
+  padding: 0.15rem 0.5rem; font-size: 0.68rem;
+  font-family: var(--font-mono); color: var(--accent-3);
+  backdrop-filter: blur(4px);
+}
+
+/* ── Auth ───────────────────────────────────────────── */
+.auth-wrap {
+  min-height: calc(100vh - 120px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 2rem 1rem;
+}
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 2.5rem;
+}
+.auth-card h2 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 0.35rem; }
+.auth-card .auth-sub { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 2rem; }
+
+/* ── Pricing ─────────────────────────────────────────── */
+.featured-plan {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent), 0 24px 80px rgba(124,92,252,0.12) !important;
+}
+
+/* ── Dashboard ──────────────────────────────────────── */
+.dash-stat {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1.75rem;
+  transition: border-color 0.2s;
+}
+.dash-stat:hover { border-color: var(--border-2); }
+.dash-stat .label { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); margin-bottom: 0.6rem; }
+.dash-stat .value { font-size: 2.5rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-2); line-height: 1; }
+
+/* ── Alerts ─────────────────────────────────────────── */
+.alert { border-radius: var(--radius) !important; border: none !important; font-size: 0.875rem; }
+.alert-success { background: rgba(52,211,153,0.1) !important; color: var(--success) !important; border: 1px solid rgba(52,211,153,0.2) !important; }
+.alert-danger  { background: rgba(248,113,113,0.1) !important; color: var(--danger) !important;  border: 1px solid rgba(248,113,113,0.2) !important; }
+.alert-info    { background: rgba(124,92,252,0.1) !important;  color: var(--accent-3) !important; border: 1px solid rgba(124,92,252,0.2) !important; }
+.btn-close { filter: invert(1) opacity(0.5); }
+
+/* ── Footer ─────────────────────────────────────────── */
+.footer { border-top: 1px solid var(--border); margin-top: auto; padding: 1.25rem 0 1.5rem; }
+.footer .text-muted { color: var(--text-muted) !important; font-size: 0.75rem; }
+.footer-inner { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.65rem 1rem; }
+.footer-links { display:flex; flex-wrap:wrap; gap:.35rem .85rem; align-items:center; justify-content:flex-end; }
+.footer-links a { color: var(--text-muted) !important; text-decoration:none; font-size:0.72rem; font-weight:500; }
+.footer-links a:hover { color: var(--accent-3) !important; }
+.footer-note { font-size:0.68rem; color:var(--text-muted); opacity:.85; max-width:36rem; line-height:1.4; margin:0; text-align:left; }
+@media (max-width: 640px) {
+  .footer-inner { flex-direction:column; align-items:flex-start; }
+  .footer-links { justify-content:flex-start; }
+}
+.pw-rule{font-size:.7rem;padding:.2rem .6rem;border-radius:99px;border:1px solid var(--border-2);background:var(--bg-3);color:var(--text-muted);transition:all .2s;font-family:var(--font-mono)}
+.field-err{display:none;color:var(--danger);font-size:0.78rem;margin-top:0.3rem;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.shake{animation:shake 0.4s ease;}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .studio-panel { padding: 1.25rem; }
+  .studio-hero { padding: 1.75rem 0 1.25rem; }
+  .auth-card { padding: 1.75rem; }
+}
+  </style>
+  <link rel="stylesheet" href="/static/css/characters-front.css?v=cool3" />
+  <link rel="stylesheet" href="/static/css/photos-videos-front.css?v=neon1" />
+  {% block head %}{% endblock %}
 </head>
-<body>
-    <nav class="nav-bar">
-        <div class="logo"><span>P</span>erfect Studios</div>
-        <div class="nav-links">
-            <a href="/">Home</a>
-            <div class="dropdown">
-                <a href="#">Create ▾</a>
-            </div>
-            <div class="dropdown">
-                <a href="#">Build ▾</a>
-            </div>
-            <a href="/cards">Cards</a>
-            <a href="/percfectposts">Post</a>
-            <a href="/play">Play</a>
-            <a href="/reup">Re-Up</a>
-            {% if session.get('user_id') %}
-            <span class="credits-pill">{{ session.get('credits', 0) }} cr</span>
-            {% else %}
-            <a href="/login">Log In</a>
-            {% endif %}
+<body class="{% block body_class %}{% endblock %}">
+
+<nav class="navbar navbar-expand-lg">
+  <div class="container">
+    <a class="navbar-brand" href="/" title="PercfectAI">
+      <img src="/static/layouts/percfect-site/home/logo-clear.png" alt="PercfectAI"
+           onerror="this.onerror=null;this.src='/static/assets/brand/logo_percfect_studios.jpg'" />
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            Studios
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li>
+              <a class="dropdown-item" href="/percfectstudios">
+                <span class="dropdown-icon">⬡</span>
+                All studios
+                <small class="d-block text-muted">Studios · pick a page</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/percfectstudios/photos">
+                <span class="dropdown-icon">🖼</span>
+                PERCFECT PHOTOS
+                <small class="d-block text-muted">Images · batch · library pictures</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/percfectstudios/videos">
+                <span class="dropdown-icon">🎬</span>
+                PERCFECT VIDEOS
+                <small class="d-block text-muted">Video · animate · extend</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/percfectcharacter">
+                <span class="dropdown-icon">🎭</span>
+                PERCFECT CHARACTERS
+                <small class="d-block text-muted">Build, spin & roster packs</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/trading-cards">
+                <span class="dropdown-icon">🃏</span>
+                PERCFECT CARDS
+                <small class="d-block text-muted">360 on card · save 2/5 cr · Battle Cards</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/battle-cards">
+                <span class="dropdown-icon">⚔</span>
+                BATTLE CARDS
+                <small class="d-block text-muted">Two cards fight · stats drive match</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/character-shop">
+                <span class="dropdown-icon">🛒</span>
+                Premade Characters
+                <small class="d-block text-muted">Buy finished roster ready-to-use</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/percfectcharacter/arena">
+                <span class="dropdown-icon">⚔</span>
+                PERCFECT ARENA
+                <small class="d-block text-muted">Scenes · dual cast · actions</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/percfectmotion">
+                <span class="dropdown-icon">🦴</span>
+                PERCFECT MOTION
+                <small class="d-block text-muted">Extract · stage map · layover</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/studios/the-dome">
+                <span class="dropdown-icon">◉</span>
+                THE DOME
+                <small class="d-block text-muted">Living 3D stage · silent booth</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/3d">
+                <span class="dropdown-icon">🧊</span>
+                3D STAGE
+                <small class="d-block text-muted">Three.js board · GLB · world grid</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/percfectposts">
+                <span class="dropdown-icon">📣</span>
+                PERCFECT POSTS
+                <small class="d-block text-muted">One caption · every network · you publish</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="/discord">
+                <span class="dropdown-icon">💬</span>
+                PERCFECT DISCORD
+                <small class="d-block text-muted">Bot · API keys · characters drop in Discord</small>
+              </a>
+            </li>
+          </ul>
+        </li>
+        {% if current_user.is_authenticated %}
+        <li class="nav-item">
+          <a class="nav-link" href="/percfectposts">Posts</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/studios/library">Library</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Settings</a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <a class="nav-link" href="/studios/support">Support</a>
+        </li>
+      </ul>
+
+      <ul class="navbar-nav ms-auto align-items-center">
+        {% if current_user.is_authenticated %}
+          <li class="nav-item me-3 d-none d-md-flex align-items-center" style="gap:0.4rem;">
+            <span class="credit-badge" title="One wallet for images + video"><span class="dot"></span><span id="nav-img-credits">{{ current_user.credits }}</span> credits</span>
+            {# keep id for any JS that still updates vid badge — same unified number #}
+            <span id="nav-vid-credits" style="display:none" aria-hidden="true">{{ current_user.credits }}</span>
+          </li>
+          <li class="nav-item me-2">
+            {# nav library button removed 2026-07-16 (Nick) — one library UI only: the corner FAB #}
+          </li>
+          <li class="nav-item me-3">
+            <a href="/buy-credits" class="btn btn-sm btn-outline-accent">Buy Credits</a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+              {{ current_user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+              <li><a class="dropdown-item" href="/">Homebase</a></li>
+              <li><a class="dropdown-item" href="/studios/library">Library</a></li>
+              <li><a class="dropdown-item" href="/settings">Account Settings</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="/logout">Log out</a></li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="nav-item me-2">
+            <a class="nav-link" href="/login">Log in</a>
+          </li>
+          <li class="nav-item">
+            <a href="/register" class="btn btn-sm btn-accent">Get started</a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+{% block footer %}
+<footer class="footer mt-auto">
+  <div class="container footer-inner">
+    <div>
+      <div class="text-muted">© 2026 PercfectAI</div>
+      <p class="footer-note">AI images &amp; video are generated via xAI and are <strong>pre-moderated</strong> by that provider. Characters are original fan-art style creations and do <strong>not</strong> represent any real person or specific copyrighted character. Not legal, medical, or financial advice.</p>
+    </div>
+    <nav class="footer-links" aria-label="Legal">
+      <a href="/about">About</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/disclaimer">Disclaimer</a>
+      <a href="/studios/support">Support</a>
+      <a href="mailto:support@percfectai.com">Email</a>
     </nav>
+  </div>
+</footer>
+{% endblock %}
 
-    <main class="main-content">
-        {% block content %}{% endblock %}
-    </main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Library sidebar placeholder -->
-    {% block library_sidebar %}{% endblock %}
+<!-- ── Auth Modal ─────────────────────────────────────── -->
+<div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content" style="background:var(--bg-2);border:1px solid var(--border-2);border-radius:20px;">
+      <div class="modal-body p-4">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);opacity:0.5;position:absolute;top:1.25rem;right:1.25rem;"></button>
 
-    <!-- Vanessa FAB placeholder -->
-    {% block vanessa %}{% endblock %}
+        <!-- Tab switcher -->
+        <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:1.75rem;">
+          <button id="tab-signup" onclick="switchAuthTab('signup')"
+            style="flex:1;padding:0.5rem;border:none;border-radius:9px;font-family:var(--font-main);font-weight:600;font-size:0.9rem;cursor:pointer;transition:all 0.2s;background:var(--accent);color:#fff;">
+            Sign Up
+          </button>
+          <button id="tab-login" onclick="switchAuthTab('login')"
+            style="flex:1;padding:0.5rem;border:none;border-radius:9px;font-family:var(--font-main);font-weight:600;font-size:0.9rem;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--text-muted);">
+            Log in
+          </button>
+        </div>
 
-    {% block scripts %}{% endblock %}
+        <!-- Sign up form -->
+        <div id="form-signup">
+          <h5 style="font-weight:700;letter-spacing:-0.02em;margin-bottom:0.25rem;">Sign up now</h5>
+          <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.25rem;">No credit card needed. You get <strong style="color:var(--accent-3);">10 free credits</strong> instantly — buy more anytime.</p>
 
-    <!-- STUB NOTICE: This is a minimal base.html stub.
-         The real base.html had ALL CSS inline, the full auth modal,
-         Library FAB with crown-P logo, Vanessa support chat,
-         site-wide playlist, and the Studios dropdown menu.
-         Restore from the live site CSS or rebuild per the handoffs. -->
+          <div class="mb-3">
+            <label class="form-label">Email address</label>
+            <input class="form-control" type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
+            <div class="field-err" id="err-email"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input class="form-control" id="su-username" placeholder="pick a username" autocomplete="username" />
+            <div class="field-err" id="err-username"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input class="form-control" type="password" id="su-password" placeholder="Min 8 chars, uppercase, number, symbol" autocomplete="new-password" />
+            <div id="pw-rules" style="margin-top:0.4rem;display:flex;flex-wrap:wrap;gap:0.3rem;">
+              <span class="pw-rule" id="pr-len">8+ chars</span>
+              <span class="pw-rule" id="pr-upper">A–Z</span>
+              <span class="pw-rule" id="pr-num">0–9</span>
+              <span class="pw-rule" id="pr-sym">!@#...</span>
+            </div>
+            <div class="field-err" id="err-password"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Confirm Password</label>
+            <input class="form-control" type="password" id="su-confirm" placeholder="Re-enter your password" autocomplete="new-password" />
+            <div class="field-err" id="err-confirm"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Date of Birth <span style="color:var(--danger);font-size:0.75rem;">16+</span></label>
+            <input class="form-control" type="date" id="su-birthday" />
+            <div class="field-err" id="err-birthday"></div>
+          </div>
+          <label style="display:flex;gap:0.5rem;align-items:flex-start;margin-bottom:1rem;color:var(--text-muted);font-size:0.8rem;cursor:pointer;">
+            <input type="checkbox" id="su-news" style="margin-top:0.15rem;accent-color:var(--accent);" />
+            <span>Email me about new characters, cards and features. Unsubscribe anytime.</span>
+          </label>
+          <div id="su-error" class="alert alert-danger mb-3" style="display:none;font-size:0.85rem;"></div>
+          <button onclick="submitSignup()" class="btn-accent w-100 py-2" style="border-radius:10px;border:none;cursor:pointer;font-size:0.95rem;" id="su-btn">
+            Create account →
+          </button>
+        </div>
+
+        <!-- Log in form -->
+        <div id="form-login" style="display:none">
+          <h5 style="font-weight:700;letter-spacing:-0.02em;margin-bottom:0.25rem;">Welcome back</h5>
+          <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem;">Log in to continue generating</p>
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input class="form-control" id="li-username" placeholder="your username" autocomplete="username" />
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Password</label>
+            <input class="form-control" type="password" id="li-password" placeholder="your password" autocomplete="current-password" />
+          </div>
+          <div id="li-error" class="alert alert-danger mb-3" style="display:none;font-size:0.85rem;"></div>
+          <button onclick="submitLogin()" class="btn-accent w-100 py-2" style="border-radius:10px;border:none;cursor:pointer;font-size:0.95rem;" id="li-btn">
+            Log in →
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchAuthTab(tab) {
+    const isSignup = tab === 'signup';
+    document.getElementById('form-signup').style.display = isSignup ? '' : 'none';
+    document.getElementById('form-login').style.display  = isSignup ? 'none' : '';
+    document.getElementById('tab-signup').style.background = isSignup ? 'var(--accent)' : 'transparent';
+    document.getElementById('tab-signup').style.color      = isSignup ? '#fff' : 'var(--text-muted)';
+    document.getElementById('tab-login').style.background  = isSignup ? 'transparent' : 'var(--accent)';
+    document.getElementById('tab-login').style.color       = isSignup ? 'var(--text-muted)' : '#fff';
+  }
+
+  // Field error helpers
+  function fieldErr(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    // '.field-err' is display:none in CSS, so '' would fall back to hidden — use 'block'
+    el.style.display = msg ? 'block' : 'none';
+  }
+  function fieldShake(inputId) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    el.style.borderColor = 'var(--danger)';
+    el.classList.add('shake');
+    setTimeout(() => el.classList.remove('shake'), 500);
+  }
+  function clearFieldErr(id) { fieldErr(id, ''); }
+
+  // Clear field errors on input
+  ['su-email','su-username','su-password','su-confirm','su-birthday'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      const errId = 'err-' + id.replace('su-','');
+      clearFieldErr(errId);
+      if (el) el.style.borderColor = '';
+    });
+  });
+
+  // Password rule chip highlighting
+  document.addEventListener('input', function(e) {
+    if (e.target.id !== 'su-password') return;
+    const v = e.target.value;
+    const mark = (id, ok) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.background = ok ? 'rgba(52,211,153,0.15)' : 'var(--bg-3)';
+      el.style.borderColor = ok ? 'rgba(52,211,153,0.4)' : 'var(--border-2)';
+      el.style.color = ok ? 'var(--success)' : 'var(--text-muted)';
+    };
+    mark('pr-len',   v.length >= 8);
+    mark('pr-upper', /[A-Z]/.test(v));
+    mark('pr-num',   /[0-9]/.test(v));
+    mark('pr-sym',   /[^A-Za-z0-9]/.test(v));
+  });
+
+  async function submitSignup() {
+    const btn = document.getElementById('su-btn');
+    const email    = document.getElementById('su-email').value.trim();
+    const username = document.getElementById('su-username').value.trim();
+    const pw       = document.getElementById('su-password').value;
+    const confirm  = document.getElementById('su-confirm').value;
+    const dob      = document.getElementById('su-birthday').value;
+
+    // Clear all inline errors first
+    ['email','username','password','confirm','birthday'].forEach(f => clearFieldErr('err-'+f));
+    document.getElementById('su-error').style.display = 'none';
+
+    let valid = true;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fieldErr('err-email', 'Enter a valid email address.');
+      fieldShake('su-email'); valid = false;
+    }
+    if (!username) {
+      fieldErr('err-username', 'Username is required.');
+      fieldShake('su-username'); valid = false;
+    }
+    if (pw.length < 8 || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^A-Za-z0-9]/.test(pw)) {
+      fieldErr('err-password', 'Needs 8+ chars, uppercase, number, and symbol.');
+      fieldShake('su-password'); valid = false;
+    } else if (pw !== confirm) {
+      fieldErr('err-confirm', 'Passwords do not match.');
+      fieldShake('su-confirm'); valid = false;
+    }
+    if (!dob) {
+      fieldErr('err-birthday', 'Date of birth is required.');
+      fieldShake('su-birthday'); valid = false;
+    } else {
+      const age = (Date.now() - new Date(dob)) / (365.25 * 24 * 3600 * 1000);
+      if (age < 16) { fieldErr('err-birthday', 'You must be at least 16.'); fieldShake('su-birthday'); valid = false; }
+    }
+    if (!valid) return;
+
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      const res = await fetch('/auth/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email, username, password: pw, birthday: dob, marketing_opt_in: document.getElementById('su-news').checked })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error || 'Something went wrong.';
+        if (msg.toLowerCase().includes('email')) { fieldErr('err-email', msg); fieldShake('su-email'); }
+        else if (msg.toLowerCase().includes('username')) { fieldErr('err-username', msg); fieldShake('su-username'); }
+        else { document.getElementById('su-error').textContent = msg; document.getElementById('su-error').style.display = ''; }
+        btn.disabled = false; btn.textContent = 'Create account →'; return;
+      }
+      bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
+      if (typeof onAuthSuccess === 'function') onAuthSuccess(data);
+      else location.reload();
+    } catch(e) {
+      document.getElementById('su-error').textContent = 'Network error. Please try again.';
+      document.getElementById('su-error').style.display = '';
+      btn.disabled = false; btn.textContent = 'Create account →';
+    }
+  }
+
+  async function submitLogin() {
+    const btn = document.getElementById('li-btn');
+    const err = document.getElementById('li-error');
+    btn.disabled = true; btn.textContent = 'Logging in…'; err.style.display = 'none';
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username: document.getElementById('li-username').value.trim(),
+          password: document.getElementById('li-password').value,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error; err.style.display = ''; btn.disabled = false; btn.textContent = 'Log in →'; return; }
+      bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
+      if (typeof onAuthSuccess === 'function') onAuthSuccess(data);
+      else location.reload();
+    } catch(e) { err.textContent = 'Network error.'; err.style.display = ''; btn.disabled = false; btn.textContent = 'Log in →'; }
+  }
+
+  function openAuthModal(tab) {
+    switchAuthTab(tab || 'signup');
+    new bootstrap.Modal(document.getElementById('authModal')).show();
+  }
+
+  /** Post image or video to X / Twitter */
+  async function shareToX(mediaUrl, type, promptText) {
+    if (!mediaUrl) return;
+    const site = 'https://percfectai.com/percfectstudios';
+    const xHandle = {{ (twitter_handle or '')|tojson }};
+    const tag = xHandle ? '@' + xHandle : '@PercfectAI';
+    let line = 'Made with PercfectAI ✨';
+    if (promptText) {
+      const short = promptText.length > 100 ? promptText.slice(0, 97) + '…' : promptText;
+      line = '"' + short + '" — AI ' + (type === 'video' ? 'video' : 'art') + ' via PercfectAI';
+    }
+    const tweetText = line + ' ' + tag + '\n' + site;
+
+    try {
+      const proxy = '/share/fetch?url=' + encodeURIComponent(mediaUrl);
+      const resp = await fetch(proxy);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const ext = type === 'video' ? 'mp4' : 'jpg';
+        const mime = type === 'video' ? 'video/mp4' : (blob.type || 'image/jpeg');
+        const file = new File([blob], 'percfect-' + type + '.' + ext, { type: mime });
+        const shareData = { text: line, files: [file] };
+        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to X compose */ }
+
+    // Desktop fallback: X can't attach media from a link (and the media URL is
+    // temporary), so get the actual file to the user — clipboard if the browser
+    // allows it, otherwise a download — then open the composer with text only.
+    let hint = 'Attach your saved file to the post.';
+    try {
+      const resp = await fetch('/share/fetch?url=' + encodeURIComponent(mediaUrl));
+      const blob = await resp.blob();
+      let copied = false;
+      if (type !== 'video' && navigator.clipboard && window.ClipboardItem) {
+        // Clipboard images must be PNG — redraw the JPEG through a canvas.
+        const png = await new Promise((res) => {
+          const im = new Image();
+          im.onload = () => { const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext('2d').drawImage(im, 0, 0); cv.toBlob(res, 'image/png'); };
+          im.onerror = () => res(null);
+          im.src = URL.createObjectURL(blob);
+        });
+        if (png) {
+          try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]); copied = true; } catch (_c) {}
+        }
+      }
+      if (copied) {
+        hint = 'Your image is copied — press Ctrl/Cmd + V in the post to attach it.';
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'percfect-' + type + '.' + (type === 'video' ? 'mp4' : 'jpg');
+        document.body.appendChild(a); a.click(); a.remove();
+        hint = 'Your ' + (type === 'video' ? 'video' : 'image') + ' was downloaded — drag it into the post to attach it.';
+      }
+    } catch (_e) { /* keep default hint */ }
+
+    // Text only — no media URL, since the picture is now on the clipboard / downloaded.
+    const intent = 'https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText);
+    window.open(intent, '_blank', 'noopener,noreferrer,width=580,height=520');
+    alert(hint);
+  }
+
+  // Shared cross-origin download (via same-origin /share/fetch proxy). Global so every
+  // page can use it — studio, motion, arena, character.
+  async function downloadFile(url, filename) {
+    if (!url || url === '#') return;
+    try {
+      const res = await fetch('/share/fetch?url=' + encodeURIComponent(url));
+      if (!res.ok) throw new Error('proxy failed');
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = obj; a.download = filename || 'percfect.mp4';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(obj), 8000);
+    } catch (e) { window.open(url, '_blank'); }
+  }
+</script>
+
+{% include 'partials/char_profile_modal.html' %}
+{% include 'partials/user_library_sidebar.html' %}
+<script src="{{ url_for('static', filename='js/character_profile.js') }}?v=no-prop-tier-1"></script>
+<script src="{{ url_for('static', filename='js/user_library_sidebar.js') }}?v=lib-fab-2"></script>
+<script src="{{ url_for('static', filename='js/paste_drop.js') }}?v=paste-image-tag-1"></script>
+<script src="{{ url_for('static', filename='js/extend_byo.js') }}"></script>
+<script src="{{ url_for('static', filename='js/video_extend.js') }}?v=arena-extend-2"></script>
+
+{% block scripts %}{% endblock %}
+
+{% include 'partials/vanessa_popup.html' %}
+{% include 'partials/site_music.html' %}
 </body>
 </html>
