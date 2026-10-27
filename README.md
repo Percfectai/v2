@@ -11,6 +11,10 @@ The original Percfect site, trimmed and live again.
 
 `/ping` returns 200. Comics is live at `/build/comics`. Do not bring back the old Flask book generator.
 
+## One repo
+
+`Percfectai/percfectai-site` was split off on 25 October 2026 so the public hub could be hosted on GitHub Pages, apart from this Flask app. The pages in that repo are a copy of `static/layouts/percfect-site/` (home, create, cards, play, re-up). The live site https://percfectai.com is this repo on Render, not GitHub Pages. Do not add a second site repo. Change the hub here.
+
 ## Read this first
 
 1. This file.
