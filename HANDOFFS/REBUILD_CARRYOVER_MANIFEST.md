@@ -3,7 +3,7 @@
 **Created:** 2026-10-17 · **Author:** Claude (Opus 4.8) · **For:** Nick
 **Purpose:** The feature-by-feature list of what moves from the old `percfectstudios` repo
 into the **fresh repo / new Render / new Supabase**, trimmed of all the dead weight.
-**Status:** LIVE. The original site is back up at https://percfectai.com on the new Render service. Repo is `Percfectai/v2`, trimmed of the dead products. Read `README.md` first. A comic page is coming. It is not a live lane yet. This file is the carry list, not a draft waiting for a repo name.
+**Status:** LIVE. The original site is back up at https://percfectai.com. Render service is `percfectai-v2` (`https://percfectai-v2.onrender.com`), repo `Percfectai/v2`, trimmed of the dead products. Read `README.md` first. A comic page is coming. It is not a live lane yet. This file is the carry list, not a draft waiting for a repo name. Keys are not in git.
 
 > Golden rule from the handoff dictation: **perfected features get reused with the EXACT
 > same code.** Nobody rewrites a working feature. **Nobody touches the prompts but Nick.**
@@ -162,7 +162,7 @@ Plan: cron-job.org primary + a GH Actions fallback committed to the repo. Wire o
 
 ## 6. Decided
 
-1. Live site is https://percfectai.com on the new Render service (`render.yaml` name `percfect-studios-v2`). The old host `percfectstudios.onrender.com` is not this repo.
+1. Live site is https://percfectai.com on Render service `percfectai-v2` (`https://percfectai-v2.onrender.com`). The old host `percfectstudios.onrender.com` is not this repo.
 2. GitHub repo is `Percfectai/v2`, not a repo under `nickpelectrical`.
 3. Cards stays as its own top nav. Comics is also in, at `/comics`.
 4. Posts stays as a live lane.

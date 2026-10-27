@@ -2,7 +2,7 @@
 
 **Organization:** [Percfectai](https://github.com/Percfectai) · **Repo:** [Percfectai/v2](https://github.com/Percfectai/v2)
 
-The original site is live again: **https://percfectai.com** (Cloudflare → Render → gunicorn). `/ping` returns 200. This repo is that site, with the fat trimmed. Dead products are not in here. Do not copy them back from the old `percfectstudios` tree.
+The original site is live again: **https://percfectai.com** and **https://www.percfectai.com**. Render service is `percfectai-v2` (`https://percfectai-v2.onrender.com`), deploys from this repo. `/ping` returns 200. This repo is that site, with the fat trimmed. Dead products are not in here. Do not copy them back from the old `percfectstudios` tree.
 
 A comic page is coming. It is not a live lane on the site yet. Do not treat `/comics` as shipped, and do not rebuild the old Flask book generator.
 
@@ -39,6 +39,6 @@ Discord bots, Telegram and voice-agent trees, Perchance, the princess page produ
 
 ## Render
 
-The live site is https://percfectai.com on the new Render service (`render.yaml` name `percfect-studios-v2`). `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there.
+The live site is https://percfectai.com on Render service `percfectai-v2` (`https://percfectai-v2.onrender.com`). `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there. The Render API key stays in the local V2 keys file and in Render. Never commit it and never paste it into chat.
 
 Full carry list: `HANDOFFS/REBUILD_CARRYOVER_MANIFEST.md`.
