@@ -4073,10 +4073,14 @@ def index():
 
 
 @app.route("/build")
-@app.route("/studios/build")
 def build_hub_page():
-    """Build hub: Comic · Character · Card."""
+    """Build hub: Cards, Comics, Character."""
     return Response(_layout_page_html("build-hub"), mimetype="text/html")
+
+
+@app.route("/studios/build")
+def studios_build_redirect():
+    return redirect("/build")
 
 
 @app.route("/create")

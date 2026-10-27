@@ -11,8 +11,8 @@
   html,body{margin:0; min-height:100%}
   body{ color:var(--ink); font-family:"Inter",system-ui,sans-serif;
     background:
-      radial-gradient(1200px 600px at 82% -8%, rgba(124,92,196,.16), transparent 60%),
-      radial-gradient(900px 500px at 0% 20%, rgba(43,127,212,.12), transparent 55%),
+      radial-gradient(1200px 600px at 82% -8%, rgba(43,127,212,.16), transparent 60%),
+      radial-gradient(900px 500px at 0% 20%, rgba(57,192,230,.10), transparent 55%),
       var(--void); }
 
   .topline{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 26px 14px 20px; position:relative; z-index:40; }
@@ -41,16 +41,14 @@
 
   .main{ max-width:1200px; margin:0 auto; padding:12px 22px 100px; }
   .greeting{ text-align:center; padding:12px 0 30px; }
-  .greeting .gtag{ font-family:"Rajdhani",sans-serif; text-transform:uppercase; letter-spacing:.36em; font-size:12px; font-weight:700; color:var(--muted); margin:0 0 10px; }
+  .greeting .gtag{ font-family:"Rajdhani",sans-serif; text-transform:uppercase; letter-spacing:.3em; font-size:12px; font-weight:700; color:var(--muted); margin:0 0 10px; }
   .greeting .gtitle{ font-family:"Orbitron",sans-serif; font-weight:900; font-size:clamp(30px,5.5vw,52px); letter-spacing:.03em; margin:0; line-height:1;
-    background:linear-gradient(180deg,#f4ecff,#b79ce0); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 20px rgba(124,92,196,.3)); }
+    background:linear-gradient(180deg,#ffffff,#8fb6e6); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 20px rgba(43,127,212,.3)); }
 
-  /* three banners, Productions bigger in the middle */
-  .cbanners{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; align-items:start; }
+  .cbanners{ display:grid; grid-template-columns:1fr 1.5fr 1fr; gap:20px; align-items:start; }
   @media (max-width:860px){ .cbanners{ grid-template-columns:1fr; } }
   .ccell{ display:flex; flex-direction:column; gap:12px; }
-  .cbanner-cap{ margin:0; text-align:center; color:var(--muted); font-size:13.5px; line-height:1.55; }
-  .cbanner-cap.ph{ color:var(--faint); font-style:italic; }
+  .cbanner-cap{ margin:0; text-align:center; font-family:"Rajdhani",sans-serif; font-weight:700; font-size:18px; letter-spacing:.02em; color:var(--ink); }
   .cbanner{ position:relative; display:block; aspect-ratio:3/2; border-radius:18px; overflow:hidden;
     border:1px solid var(--line2); box-shadow:0 16px 40px rgba(0,0,0,.55); transition:transform .18s, box-shadow .18s, border-color .18s; }
   .cbanner img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -61,7 +59,6 @@
   .cbanner:hover::after{ opacity:1; transform:translateY(0); }
   .cbanner.feature{ box-shadow:0 20px 48px rgba(0,0,0,.6), 0 0 26px rgba(43,127,212,.25); }
 
-  /* library launcher + modal (shared chrome) */
   .libfab{ position:fixed; right:22px; bottom:calc(22px + env(safe-area-inset-bottom,0px)); z-index:50; width:64px; height:64px; border-radius:50%;
     display:grid; place-items:center; cursor:pointer; perspective:420px; background:rgba(10,18,27,.86); border:1px solid var(--line2);
     backdrop-filter:blur(8px); box-shadow:0 12px 30px rgba(0,0,0,.55), 0 0 22px rgba(57,192,230,.3); }
@@ -95,7 +92,7 @@
 <header class="topline">
   <div class="logo-nav" id="logoNav">
     <button class="logo-btn" id="logoBtn" aria-haspopup="true" aria-expanded="false">
-      <img class="logo" src="/static/layouts/percfect-site/create/logo-clear.png" alt="PercfectAI — menu">
+      <img class="logo" src="/static/layouts/percfect-site/build-hub/logo-clear.png" alt="PercfectAI — menu">
       <svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div class="dropdown" id="pagesMenu" role="menu">
@@ -118,33 +115,33 @@
 
 <main class="main">
   <section class="greeting">
-    <p class="gtag">Character · Comics · Cards</p>
+    <p class="gtag">Design Your Characters · Make Them Heroes · Bring Them to Life</p>
     <h1 class="gtitle">BUILD</h1>
   </section>
 
   <div class="cbanners">
     <div class="ccell">
-      <a href="/studios/percfectcharacter" class="cbanner"><img src="/static/assets/cards/shop_proto_refs/banner_characters.jpg" alt="Build your character"></a>
-      <p class="cbanner-cap">Build your character. One first shot, then the four stills.</p>
+      <a href="/studios/trading-cards" class="cbanner"><img src="/static/layouts/percfect-site/build-hub/card.jpg" alt="Cards"></a>
+      <p class="cbanner-cap">Cards</p>
     </div>
     <div class="ccell">
-      <a href="/build/comics" class="cbanner feature"><img src="/static/assets/homepage/style-comic.jpg" alt="Comics"></a>
-      <p class="cbanner-cap">Make a comic. Approve each page before the next one is drawn.</p>
+      <a href="/build/comics" class="cbanner feature"><img src="/static/layouts/percfect-site/build-hub/comic.jpg" alt="Comics"></a>
+      <p class="cbanner-cap">Comics</p>
     </div>
     <div class="ccell">
-      <a href="/cards" class="cbanner"><img src="/static/assets/brand/banners/percfect_cards.jpg" alt="Cards"></a>
-      <p class="cbanner-cap">Cards. Studio, battle cards, and the shop.</p>
+      <a href="/studios/percfectcharacter" class="cbanner"><img src="/static/layouts/percfect-site/build-hub/character.jpg" alt="Character"></a>
+      <p class="cbanner-cap">Character</p>
     </div>
   </div>
 </main>
 
-<button class="libfab" id="libBtn" aria-label="Open Library"><img src="/static/layouts/percfect-site/create/crownp.png" alt=""></button>
+<button class="libfab" id="libBtn" aria-label="Open Library"><img src="/static/layouts/percfect-site/build-hub/crownp.png" alt=""></button>
 
 <div class="modal" id="libModal" hidden>
   <div class="modal__backdrop" data-close></div>
   <div class="modal__panel">
     <div class="modal__head"><h3>Library</h3><button class="modal__x" data-close aria-label="Close">✕</button></div>
-    <div class="modal__tabs"><button class="on">Characters</button><button>Cards</button><button>Comics</button><button>Videos</button></div>
+    <div class="modal__tabs"><button class="on">Characters</button><button>Cards</button><button>Comics</button></div>
     <div class="modal__grid">
       <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
       <div class="libtile">empty</div><div class="libtile">empty</div><div class="libtile">empty</div>
