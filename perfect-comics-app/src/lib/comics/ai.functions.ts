@@ -13,6 +13,7 @@ type InkInput = {
   kind: "cover" | "interior" | "small" | "rewrite";
   page: number;
   title: string;
+  issueNumber?: number;
   styleId: string;
   beat: string;
   cast: string;

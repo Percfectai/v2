@@ -476,6 +476,7 @@ export function Studio() {
         kind: fixing || kind === "small" ? "small" : current.n === 0 ? "cover" : "interior",
         page: current.n,
         title: live.title || "My Percfect Hero",
+        issueNumber: live.issueNumber || 1,
         styleId: live.styleId,
         beat: current.prompt || live.summary || live.title,
         cast: people.map((c) => `${c.name}: ${c.look}`).join("; "),

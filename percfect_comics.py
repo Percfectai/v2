@@ -170,14 +170,22 @@ def _build_ink_prompt(data: Dict[str, Any]) -> str:
             _INK_SAFETY,
         ])
     if kind == "cover" or page == 0:
+        try:
+            issue_number = max(1, int(data.get("issueNumber") or 1))
+        except (TypeError, ValueError):
+            issue_number = 1
+        visual = beat or cast
         return " ".join([
-            f'Comic book COVER for "{title}". This is a single full-bleed splash, not a panel grid, not an interior page.',
-            f"Art style: {style}.",
-            f"Characters, keep their faces and costumes exactly like this description: {cast}.",
-            f"What the cover shows: {beat or title}.",
-            "No title lettering, no logos, no captions. Leave the top third clear of faces and action so a title can sit there later.",
-            "If a character photo is attached, match that face and costume. Do not copy its background or pose.",
-            _INK_SAFETY,
+            "Professional comic book cover, standard US size portrait, full-bleed artwork.",
+            f'Title: "{title}" in large, bold, stylized lettering across the top third of the cover.',
+            f"Issue number: #{issue_number} in a clean corner box in the upper left.",
+            f"Main visual: {visual}.",
+            f"The people in that scene, same faces and costumes: {cast}.",
+            f"Style: {style} digital comic book art, high detail, cinematic lighting, dramatic foreshortening, vibrant colors, professional cover quality, strong thumbnail readability.",
+            "Additional elements: publisher logo area top right, barcode and price box bottom left, credits area bottom right.",
+            "No white borders, clear space for the title, rule-of-thirds composition.",
+            "If character sheets are attached, match those faces and costumes. Do not copy the sheet grid onto the cover.",
+            "All-ages. No nudity, no sexual content, no gore. Original characters only.",
         ])
     act = "beginning" if page <= 3 else "middle" if page <= 6 else "ending"
     lines = [
