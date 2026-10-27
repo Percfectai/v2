@@ -275,6 +275,13 @@ h1.head .cr { color: var(--color-gold-hi); }
 .reflock figure { margin: 0; background: #0b0f1c; border: 1px solid #243044; border-radius: 12px; padding: 8px; }
 .reflock img, .reflock .reflock__ph { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: #111827; display: grid; place-items: center; color: #94a3b8; font-size: 12px; }
 .reflock figcaption { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #67e8f9; }
+.caststack { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
+.castrow { border: 1px solid var(--color-line2); border-radius: 16px; padding: 12px; background: var(--color-inset); }
+.shotrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.shotrow label { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; min-height: 140px; aspect-ratio: 3/4; border: 1px dashed var(--color-line2); border-radius: 12px; overflow: hidden; background: #0b0f1c; cursor: pointer; }
+.shotrow img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.shotrow span { position: relative; z-index: 1; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #e2e8f0; background: rgba(0,0,0,.55); padding: 4px 6px; border-radius: 6px; }
+.shotrow input { display: none; }
 
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .choice {

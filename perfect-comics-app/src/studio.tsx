@@ -824,7 +824,7 @@ export function Studio() {
                   belowPrompt={
                     <div className="block">
                       <div className="label">Characters</div>
-                      <p className="help">Four shots each, same as the character page: front, left side, right side, back. A saved library character fills these in. Otherwise add the four pictures here and save them to the library.</p>
+                      <p className="help">Four characters, one under the other. Each one has four shots side by side: front, left side, right side, back.</p>
                       <div className="cast__grid">
                         {roster.filter((row) => row.images.length >= 4).map((row) => (
                           <button
@@ -849,14 +849,23 @@ export function Studio() {
                           </button>
                         ))}
                       </div>
-                      {issue.characters.slice(0, 4).map((c, index) => {
-                        const angles = ["", "", "", ""].map((empty, slot) => c.angles?.[slot] || (slot === 0 ? c.refUrl || empty : empty));
-                        const saved = c.id.startsWith("lib-");
+                      <div className="caststack">
+                      {[0, 1, 2, 3].map((index) => {
+                        const c = issue.characters[index];
+                        const angles = ["", "", "", ""].map((empty, slot) => c?.angles?.[slot] || (slot === 0 ? c?.refUrl || empty : empty));
+                        const saved = Boolean(c?.id.startsWith("lib-"));
+                        const touch = (apply: (characters: CastMember[]) => CastMember[]) => patch((i) => {
+                          const characters = [...i.characters];
+                          while (characters.length <= index) {
+                            characters.push({ id: crypto.randomUUID(), name: `Character ${characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] });
+                          }
+                          return { ...i, characters: apply(characters) };
+                        });
                         return (
-                          <article key={c.id} className="block">
+                          <article key={c?.id || `slot-${index}`} className="castrow">
                             <div className="label">Character {index + 1}</div>
-                            <input className="inp" value={c.name} onChange={(e) => patch((i) => ({ ...i, characters: i.characters.map((x) => x.id === c.id ? { ...x, name: e.target.value } : x) }))} />
-                            <div className="reflock">
+                            <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
+                            <div className="shotrow">
                               {POSE_LABELS.map((label, slot) => (
                                 <label key={label} className="btn-sm upload">
                                   {angles[slot] ? <img src={angles[slot]} alt={label} /> : label}
@@ -867,15 +876,12 @@ export function Studio() {
                                       const file = e.target.files?.[0];
                                       e.target.value = "";
                                       void readRefPhoto(file, (dataUrl) => {
-                                        patch((i) => ({
-                                          ...i,
-                                          characters: i.characters.map((x) => {
-                                            if (x.id !== c.id) return x;
-                                            const next = [...(x.angles || ["", "", "", ""])];
-                                            while (next.length < 4) next.push("");
-                                            next[slot] = dataUrl;
-                                            return { ...x, refUrl: next[0] || dataUrl, angles: next };
-                                          }),
+                                        touch((characters) => characters.map((x, n) => {
+                                          if (n !== index) return x;
+                                          const next = [...(x.angles || ["", "", "", ""])];
+                                          while (next.length < 4) next.push("");
+                                          next[slot] = dataUrl;
+                                          return { ...x, refUrl: next[0] || dataUrl, angles: next };
                                         }));
                                       });
                                     }}
@@ -884,19 +890,14 @@ export function Studio() {
                                 </label>
                               ))}
                             </div>
-                            {saved ? <p className="help">Already in the library.</p> : (
+                            {c && (saved ? <p className="help">Already in the library.</p> : (
                               <button className="btn-sm primary" type="button" disabled={!!busy || angles.filter(Boolean).length < 4} onClick={() => void saveCharacter(c)}>Save to library</button>
-                            )}
-                            <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id) }))}>Remove</button>
+                            ))}
+                            {c && <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id) }))}>Remove</button>}
                           </article>
                         );
                       })}
-                      {issue.characters.length < 4 && (
-                        <button className="btn-sm primary" type="button" onClick={() => patch((i) => ({
-                          ...i,
-                          characters: [...i.characters, { id: crypto.randomUUID(), name: `Character ${i.characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] }],
-                        }))}>Add a character</button>
-                      )}
+                      </div>
                     </div>
                   }
                   onInk={() => {
