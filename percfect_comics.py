@@ -358,6 +358,12 @@ def comics_plan():
 
 
 
+@bp.route("/comics/<path:filename>")
+@bp.route("/studios/comics/<path:filename>")
+def comics_file(filename):
+    return _serve_spa(filename)
+
+
 def init_app(flask_app) -> None:
     if bp.name not in getattr(flask_app, "blueprints", {}):
         flask_app.register_blueprint(bp)
