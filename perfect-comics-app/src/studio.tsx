@@ -306,7 +306,8 @@ export function Studio() {
       for (let i = 0; i < people.length; i += 2) {
         const top = shotsOf(people[i]).slice(0, 4);
         const bottom = people[i + 1] ? shotsOf(people[i + 1]).slice(0, 4) : [];
-        if (top.length < 4 || bottom.length < 4) continue;
+        if (top.length < 4) continue;
+        if (bottom.length && bottom.length < 4) continue;
         const sheet = await pairSheet(top, bottom);
         if (sheet) made.push(sheet);
       }
@@ -456,7 +457,8 @@ export function Studio() {
     for (let i = 0; i < onPage.length; i += 2) {
       const top = shotsOf(onPage[i]);
       const bottom = onPage[i + 1] ? shotsOf(onPage[i + 1]) : [];
-      if (!top.length && !bottom.length) continue;
+      if (top.length < 4) continue;
+      if (bottom.length && bottom.length < 4) continue;
       const sheet = await pairSheet(top, bottom);
       if (sheet) sheets.push(sheet);
     }
@@ -1174,7 +1176,15 @@ function CoverBlock({
       <div>
         <div className="kicker">Cover</div>
         <h1 className="head">One dramatic splash.</h1>
-        <p className="subhead">A single cover image. No panels. No lettering on the art.</p>
+        <p className="subhead">A single cover image. The character sheet is the face.</p>
+      </div>
+      <div className="block">
+        <div className="label">Character sheet</div>
+        {sheets[0] ? (
+          <img src={sheets[0]} alt="Main character sheet" style={{ width: "100%", maxWidth: 420, borderRadius: 12 }} />
+        ) : (
+          <p className="help">Add the main character from your library on Character Reference. The four saved shots become this sheet, and the cover uses it for the face.</p>
+        )}
       </div>
       <div className="block">
         <div className="label">Who's on the cover</div>
@@ -1197,7 +1207,7 @@ function CoverBlock({
       {page?.imageUrl && <PageArt url={page.imageUrl} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
       <p className="help">The first draft is free and watermarked. That is picture 1 of 3. Unlock it for 2 edits. All three use the 2.0 model.</p>
       {!page?.imageUrl && (
-        <button className="btn-genpage" type="button" disabled={!!busy} onClick={onInk}>Generate this cover</button>
+        <button className="btn-genpage" type="button" disabled={!!busy || !sheets[0]} onClick={onInk}>Generate this cover</button>
       )}
       {page?.imageUrl && !page.approved && (
         <button className="btn-publish" type="button" onClick={onApprove}>Approve cover and open page 1</button>

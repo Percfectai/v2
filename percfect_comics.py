@@ -181,10 +181,10 @@ def _build_ink_prompt(data: Dict[str, Any]) -> str:
             f"Issue number: #{issue_number} in a clean corner box in the upper left.",
             f"Main visual: {visual}.",
             f"The people in that scene, same faces and costumes: {cast}.",
+            "Character sheet input: the first attached image is the character sheet. The top row is the main character, front then back then left then right. Use that sheet for the face and costume. Do not copy the sheet grid onto the cover.",
             f"Style: {style} digital comic book art, high detail, cinematic lighting, dramatic foreshortening, vibrant colors, professional cover quality, strong thumbnail readability.",
             "Additional elements: publisher logo area top right, barcode and price box bottom left, credits area bottom right.",
             "No white borders, clear space for the title, rule-of-thirds composition.",
-            "If character sheets are attached, match those faces and costumes. Do not copy the sheet grid onto the cover.",
             "All-ages. No nudity, no sexual content, no gore. Original characters only.",
         ])
     act = "beginning" if page <= 3 else "middle" if page <= 6 else "ending"
@@ -426,10 +426,13 @@ def comics_sheet():
     body = request.get_json(silent=True) or {}
     top = body.get("top") if isinstance(body.get("top"), list) else []
     bottom = body.get("bottom") if isinstance(body.get("bottom"), list) else []
-    if len(top) < 4 or len(bottom) < 4:
-        return jsonify({"ok": False, "error": "Need four pictures for each character."}), 400
+    if len(top) < 4:
+        return jsonify({"ok": False, "error": "The main character needs four pictures."}), 400
+    rows = [top[:4]]
+    if len(bottom) >= 4:
+        rows.append(bottom[:4])
     try:
-        url = _collage_page([top[:4], bottom[:4]])
+        url = _collage_page(rows)
     except Exception as e:
         log.warning("comics sheet failed: %s", e)
         return jsonify({"ok": False, "error": "Could not put the pictures together."}), 502
