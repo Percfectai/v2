@@ -1,11 +1,173 @@
-{% extends "base.html" %}
-{% block title %}Card Studio — Percfect Studios{% endblock %}
-{% block content %}
-<div id="card-studio">
-    <!-- STUB: Restore from HANDOFFS/13_CARDS.md -->
-    <h1>Card Studio</h1>
-</div>
-{% endblock %}
-{% block scripts %}
-<script src="/static/js/trading-cards.js"></script>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Percfect · Card Press Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Black+Ops+One&family=Cinzel:wght@700&family=Great+Vibes&family=IBM+Plex+Mono:wght@500;600&family=Oswald:ital,wght@0,500;0,700;1,700&family=Playfair+Display:ital,wght@1,700&display=swap" rel="stylesheet" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <link rel="stylesheet" href="/static/css/trading-cards.css?v=three-6" />
+  <style>
+    /* Match Home/Build chrome — logo left + wallet right, no toolbar */
+    .studio-top {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 4px 14px; border-bottom: 1px solid rgba(94,231,255,.18);
+      position: relative; z-index: 20;
+    }
+    .studio-brand {
+      display: flex; align-items: center; gap: 0; text-decoration: none; color: inherit;
+      background: none; border: 0; padding: 0; cursor: pointer;
+    }
+    .studio-brand img.logo {
+      height: 88px; width: auto; max-width: min(320px, 60vw);
+      object-fit: contain; display: block;
+      filter: drop-shadow(0 0 16px rgba(43,127,212,.5));
+    }
+    @media (max-width: 700px) { .studio-brand img.logo { height: 64px; } }
+    .studio-wallet {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    }
+    .studio-wallet .chip {
+      font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+      padding: .3rem .65rem; border-radius: 999px;
+      border: 1px solid rgba(94,231,255,.35); color: #5ee7ff;
+      background: rgba(8,12,22,.7);
+    }
+    .studio-wallet .chip.tk { font-size: .65rem; color: rgba(200,215,240,.55); border-color: rgba(200,215,240,.2); }
+    .studio-wallet a.reup {
+      font-size: .62rem; color: rgba(200,215,240,.55); text-decoration: none;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
+    .studio-wallet a.reup:hover { color: #5ee7ff; }
+    .studio-dd {
+      position: absolute; top: 100%; left: 0; margin-top: 6px;
+      min-width: 200px; padding: 8px; border-radius: 12px;
+      background: #0c1018; border: 1px solid rgba(94,231,255,.25);
+      box-shadow: 0 16px 40px rgba(0,0,0,.5); display: none; z-index: 50;
+    }
+    .studio-dd.open { display: block; }
+    .studio-dd a {
+      display: block; padding: .45rem .65rem; border-radius: 8px;
+      color: rgba(230,235,245,.85); text-decoration: none; font-size: .8rem; font-weight: 600;
+    }
+    .studio-dd a:hover, .studio-dd a.on { background: rgba(94,231,255,.1); color: #5ee7ff; }
+    .studio-dd .sep { height: 1px; margin: 6px 0; background: rgba(94,231,255,.15); }
+    /* Hide old nav toolbar if any CSS still expects it */
+    .studio-nav { display: none !important; }
+  </style>
+</head>
+<body class="card-press-studio">
+  <main class="studio-page">
+    <header class="studio-top">
+      <button type="button" class="studio-brand" id="logoMenuBtn" aria-haspopup="true" aria-expanded="false" title="Pages">
+        <img class="logo" src="/static/layouts/percfect-site/home/logo-clear.png" alt="PERCFECT STUDIOS"
+             onerror="this.src='/static/assets/brand/logo_percfect_studios.jpg'" />
+      </button>
+      <div class="studio-dd" id="pagesMenu" role="menu">
+        <a href="/">Home</a>
+        <a href="/build">Build</a>
+        <a href="/create">Create</a>
+        <a href="/percfectposts">Post</a>
+        <a href="/play">Play</a>
+        <a class="on" href="/studios/trading-cards">Card Press</a>
+        <a href="/studios/card-shop">Card Shop</a>
+        <a href="/studios/battle-cards">Battle</a>
+        <div class="sep"></div>
+        <a href="/re-up">Re-Up · credits</a>
+        <a href="/settings">Settings</a>
+      </div>
+      <div class="studio-wallet">
+        {% if logged_in %}
+        <span class="chip"><span id="crBal">{{ balance|default(0) }}</span> credits</span>
+        {% if tickets is defined and tickets is not none %}
+        <span class="chip tk">{{ tickets }} tickets</span>
+        {% endif %}
+        <a class="reup" href="/re-up">Re-Up</a>
+        {% else %}
+        <a class="chip" href="/login?next=/studios/trading-cards">Log in</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- Nick 2026-09-28: no toolbars. Left = FRONT (edit on the card), center = final card spinning
+         (preview only, mirrors both sides live), right = BACK (edit on the card). -->
+    <section class="studio-stage studio-three">
+      <div class="studio-col">
+        <p class="studio-col-label">Front · edit on the card</p>
+        <div class="tc-flat" id="front-stage"></div>
+        <div class="studio-under">
+          <input id="scene-text" class="press-idea" maxlength="80" placeholder="Theme (optional): Hogwarts, villain, princess…" />
+          <button type="button" class="studio-btn primary" id="btn-poses">Generate 6 Styles · 2 credits</button>
+        </div>
+      </div>
+
+      <div class="studio-col studio-center">
+        <p class="studio-col-label">Final card</p>
+        <div class="tc-stage" id="card-stage">
+          <div class="tc-card3d is-spinning" id="card3d">
+            <div class="tc-face" id="front-preview"></div>
+            <div class="tc-face tc-face-back" id="back-preview"></div>
+          </div>
+        </div>
+        <div class="studio-under">
+          <button type="button" class="studio-btn primary" id="btn-save">Save card</button>
+          <button type="button" class="studio-btn" id="btn-dl-front">Download front</button>
+          <button type="button" class="studio-btn" id="btn-dl-back">Download back</button>
+          <button type="button" class="studio-btn ghost" id="btn-new">New</button>
+        </div>
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <label class="studio-drop">
+          Admin quick card: upload a picture straight onto the card (no AI, no credits)
+          <input id="drop-art" type="file" accept="image/*" hidden />
+        </label>
+        {% else %}
+        <a class="studio-drop" href="/studios/percfectcharacter">Build a character first →</a>
+        {% endif %}
+        <p class="studio-status" id="card-status"></p>
+      </div>
+
+      <div class="studio-col">
+        <p class="studio-col-label">Back · edit on the card</p>
+        <div class="tc-flat" id="back-stage"></div>
+        <div class="studio-under">
+          <input id="skill-idea" class="press-idea" maxlength="300" placeholder="Your idea for their powers (optional)" />
+          <button type="button" class="studio-btn" id="btn-skills">✍ Write skills with AI</button>
+        </div>
+      </div>
+
+      <!-- Old controls, hidden: trading-cards.js still wires them. -->
+      <div style="display:none">
+        <select id="font-select"></select>
+        <div id="sliders"></div>
+        <div id="finishes"></div>
+        <button type="button" id="btn-spin">Stop</button>
+        <button type="button" id="btn-flip">Flip</button>
+        <button type="button" id="btn-preview">Preview</button>
+        <button type="button" id="btn-scene-mine">Use my background</button>
+        <input id="file-bg" type="file" accept="image/*" />
+        <button type="button" id="btn-bg-photos">Pick a background</button>
+        <input id="cut-bg" type="checkbox" checked />
+      </div>
+    </section>
+  </main>
+  {% include 'partials/library_picker_standalone.html' %}
+  <script>
+  (function () {
+    var btn = document.getElementById('logoMenuBtn');
+    var menu = document.getElementById('pagesMenu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', function () { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); });
+  })();
+  </script>
+  <script>window.CARD_STUDIO_ADMIN = {{ 'true' if (current_user.is_authenticated and current_user.is_admin) else 'false' }};</script>
+  <script src="/static/js/trading-cards.js?v=three-6"></script>
+{% include 'partials/site_music.html' %}
+</body>
+</html>

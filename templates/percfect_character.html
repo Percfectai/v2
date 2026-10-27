@@ -20,14 +20,11 @@
     <!-- LEFT: name · sex · description · Start building -->
     <div class="chars-col chars-col-prompt">
       <label class="chars-label" for="char-name">Name</label>
-      <input class="form-control chars-input" id="char-name" placeholder="Character name" maxlength="80" autocomplete="off" />
+      <input class="form-control chars-input" id="char-name" placeholder="Character name (roster only — not sent to generate)" maxlength="80" autocomplete="off" />
 
-      <span class="chars-label">Sex</span>
-      <div class="chars-mf" role="group" aria-label="Sex">
-        <button type="button" class="chars-mf-btn" id="gender-male" onclick="setGender('male')">Male</button>
-        <button type="button" class="chars-mf-btn" id="gender-female" onclick="setGender('female')">Female</button>
-        <button type="button" class="chars-mf-btn" id="gender-other" onclick="setGender('other')">Other</button>
-      </div>
+      {# Sex/gender lives on the profile card after save — never before the prompt,
+         never injected into the xAI image prompt. "Other" previously broke gens when
+         older backends echoed it into the prompt. #}
 
       <label class="chars-label" for="desc">Description</label>
       <textarea class="form-control chars-prompt" id="desc" rows="5" placeholder="Face, outfit, vibe…" autocomplete="off"></textarea>
@@ -39,18 +36,16 @@
       <div id="gen-err" class="gen-error" style="display:none"></div>
     </div>
 
-    <!-- MIDDLE: 4 generation boxes (no camera refs) -->
+    <!-- MIDDLE: 360° spin video screen (moved here from the wide strip) -->
     <div class="chars-col chars-col-gens">
-      <div class="chars-gen-four" id="gen-four" aria-label="Generated shots">
-        <button type="button" class="chars-gen-slot" id="gen-slot-0" data-slot="0" onclick="charFocusGen(0)"><span class="slot-ph">1</span><img id="gen-slot-img-0" alt="" /></button>
-        <button type="button" class="chars-gen-slot" id="gen-slot-1" data-slot="1" onclick="charFocusGen(1)"><span class="slot-ph">2</span><img id="gen-slot-img-1" alt="" /></button>
-        <button type="button" class="chars-gen-slot" id="gen-slot-2" data-slot="2" onclick="charFocusGen(2)"><span class="slot-ph">3</span><img id="gen-slot-img-2" alt="" /></button>
-        <button type="button" class="chars-gen-slot" id="gen-slot-3" data-slot="3" onclick="charFocusGen(3)"><span class="slot-ph">4</span><img id="gen-slot-img-3" alt="" /></button>
-      </div>
-      {# Legacy one-shot display (JS hooks) — mirrored into gen-slot-0 #}
-      <div class="output-area" id="one-out" style="display:none" aria-hidden="true">
-        <div class="loading-overlay" id="one-loading"><div class="spinner"></div><p>Building…</p></div>
-        <img id="one-img" src="" alt="" />
+      <div class="chars-wide" id="chars-wide">
+        <span class="chars-wide-badge" id="chars-wide-badge" style="display:none">360° spin</span>
+        <span class="chars-wide-ph" id="chars-wide-ph">Like the first shot? Make it a character → 4 stills + 360° here</span>
+        <img id="chars-wide-img" alt="" onclick="if(this.src)openLightbox(this.src)" style="display:none;cursor:zoom-in" />
+        <div class="output-area spin-out" id="final-spin-out" style="min-height:auto;background:transparent;border:none">
+          <div class="output-placeholder" id="final-spin-ph" style="display:none"><p class="ph-text"></p></div>
+          <video id="final-spin" controls loop muted playsinline style="display:none;width:100%;max-height:58vh;border-radius:12px;background:#000"></video>
+        </div>
       </div>
     </div>
 
@@ -73,9 +68,8 @@
         <button type="button" class="chars-precision-q" id="precision-q" title="About Percfect Precision" aria-label="About Percfect Precision" onclick="toggleCharTip(event,'precision')">?</button>
         <div class="char-tip chars-precision-tip" id="tip-precision">
           Having trouble finding your character? AI doesn’t like re-creating specific characters.
-          We try to help recreate you a more accurate match with a <strong>95% proven accuracy</strong>.
-          Type <strong>only the character’s name</strong> in the prompt box. We do the rest 😉 ·
-          <strong>5 credits</strong>
+          Type <strong>only the character’s name</strong> — we handle the rest 😉 ·
+          <strong>5 credits</strong> · 95% proven accuracy
         </div>
       </div>
       {# Second hook for review path #}
@@ -87,20 +81,22 @@
       <div class="progress-wrap" id="fin-wrap" style="display:none">
         <div class="progress-top"><span id="fin-label">Building…</span><span class="progress-time"><span id="fin-elapsed">0</span>s</span></div>
         <div class="progress-track"><div class="progress-bar" id="fin-bar"></div></div>
-        <div class="progress-hint">Usually 60–120 seconds · do not refresh</div>
+        <div class="progress-hint">Queued → Rendering → Done · do not refresh</div>
       </div>
     </div>
 
-    <!-- Wide stage: selected still / 360° spin -->
+    <!-- Bottom: the 4 generated shots (moved here from the middle) -->
     <div class="chars-wide-row">
-      <div class="chars-wide" id="chars-wide">
-        <span class="chars-wide-badge" id="chars-wide-badge" style="display:none">360° spin</span>
-        <span class="chars-wide-ph" id="chars-wide-ph">Like the first shot? Make it a character → 4 stills + 360° here</span>
-        <img id="chars-wide-img" alt="" onclick="if(this.src)openLightbox(this.src)" style="display:none;cursor:zoom-in" />
-        <div class="output-area spin-out" id="final-spin-out" style="min-height:auto;background:transparent;border:none">
-          <div class="output-placeholder" id="final-spin-ph" style="display:none"><p class="ph-text"></p></div>
-          <video id="final-spin" controls loop muted playsinline style="display:none;width:100%;max-height:58vh;border-radius:12px;background:#000"></video>
-        </div>
+      <div class="chars-gen-four" id="gen-four" aria-label="Generated shots">
+        <button type="button" class="chars-gen-slot" id="gen-slot-0" data-slot="0" onclick="charFocusGen(0)"><span class="slot-ph">1</span><img id="gen-slot-img-0" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-1" data-slot="1" onclick="charFocusGen(1)"><span class="slot-ph">2</span><img id="gen-slot-img-1" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-2" data-slot="2" onclick="charFocusGen(2)"><span class="slot-ph">3</span><img id="gen-slot-img-2" alt="" /></button>
+        <button type="button" class="chars-gen-slot" id="gen-slot-3" data-slot="3" onclick="charFocusGen(3)"><span class="slot-ph">4</span><img id="gen-slot-img-3" alt="" /></button>
+      </div>
+      {# Legacy one-shot display (JS hooks) — mirrored into gen-slot-0 #}
+      <div class="output-area" id="one-out" style="display:none" aria-hidden="true">
+        <div class="loading-overlay" id="one-loading"><div class="spinner"></div><p>Building…</p></div>
+        <img id="one-img" src="" alt="" />
       </div>
     </div>
 
@@ -111,9 +107,13 @@
           <textarea class="form-control" id="review-prompt" rows="2" style="display:none" aria-hidden="true"></textarea>
         </div>
         <div class="review-row chars-make-row">
-          <button type="button" class="btn-accent chars-make-btn" id="make-char-btn" onclick="approveOne()">Make it a character? ({{ pack_cost|default(40) }})</button>
+          <button type="button" class="btn-accent chars-make-btn" id="make-char-btn" onclick="approveOne()">Make it a character? ({{ pack_cost|default(19) }}) · 360 + 4 stills</button>
+          <button type="button" class="btn-outline-accent" id="not-char-btn" onclick="rejectFirstShot()">Not this character</button>
           <button type="button" class="btn-outline-accent" onclick="regenFront()">↻ Start building again</button>
         </div>
+        <p class="hero-card-hint" id="hero-card-hint-review">
+          After the pack: <strong>Build your hero card</strong> — pick theme, 4 stats, secret abilities.
+        </p>
         <div id="review-err" class="gen-error" style="display:none"></div>
       </div>
 
@@ -148,8 +148,28 @@
           </div>
           <div id="refine-err" class="gen-error" style="display:none"></div>
         </div>
+
+        {# Hero card — only after pack saves character id #}
+        <div class="hero-card-cta" id="hero-card-cta" style="display:none" aria-label="Build hero card">
+          <div class="hero-card-cta-label">Hero card</div>
+          <p class="hero-card-cta-copy">
+            Put <strong id="hero-card-name">this character</strong> on a Percfect Card —
+            front still · theme · 4 stats · flip for secret abilities. Pay to mint on Cards.
+          </p>
+          <a id="hero-card-btn"
+             href="/studios/trading-cards"
+             class="btn-accent hero-card-btn w-100 d-block"
+             style="text-align:center">
+            🃏 Build your hero card →
+          </a>
+        </div>
+
+        {# Make character 3D — only after pack saves character id #}
+        <button type="button" id="make3d-btn" class="btn-accent w-100 mt-3" style="display:none"
+                onclick="window.Stage3D && Stage3D.make(this.dataset.charId)">🧊 Make character 3D</button>
+
         <button type="button" class="btn-outline-accent w-100 mt-3" onclick="resetBuilder()">＋ Create another character</button>
-        <a href="/studios/percfectcharacter/arena" class="btn-accent w-100 mt-2 d-block" style="text-align:center">⚔ Enter PERCFECT ARENA →</a>
+        <a href="/studios/percfectcharacter/arena" class="btn-outline-accent w-100 mt-2 d-block" style="text-align:center">⚔ Enter PERCFECT ARENA →</a>
       </div>
       <div id="fin-err" class="gen-error" style="display:none"></div>
     </div>
@@ -163,7 +183,10 @@
       <p class="section-label" style="margin:0">Your PERCFECT CHARACTERS</p>
       <p class="library-hint" style="margin:.35rem 0 0;font-size:.8rem;color:var(--text-muted)">Scroll to see your full roster · tap a card for profile · select &amp; manage</p>
     </div>
-    <a href="/studios/percfectcharacter/arena" class="btn-accent arena-btn">⚔ Enter PERCFECT ARENA →</a>
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+      <a href="/studios/trading-cards" class="btn-outline-accent arena-btn" style="text-decoration:none" title="Pick a roster character for a hero card">🃏 Hero cards</a>
+      <a href="/studios/percfectcharacter/arena" class="btn-accent arena-btn">⚔ Enter PERCFECT ARENA →</a>
+    </div>
   </div>
   <div id="roster-empty" class="roster-empty" style="display:none">No characters yet — start building above.</div>
   <div id="roster-err" class="gen-error" style="display:none"></div>
@@ -171,12 +194,21 @@
 </div>
 
 {% include 'partials/credit_pay_modal.html' %}
+{% include 'partials/stage_3d.html' %}
 
 {% endblock %}
 
 {% block scripts %}
 <style>
-/* ── PERCFECT CHARACTERS board (Photos/Videos DNA) ── */
+/* ── PERCFECT CHARACTERS board — neon cool front (features unchanged) ── */
+body.theme-characters {
+  background-color:#03020a !important;
+  background-image:
+    radial-gradient(900px 520px at 80% -5%, rgba(255,79,216,.28), transparent 60%),
+    radial-gradient(800px 480px at -5% 30%, rgba(61,231,255,.14), transparent 55%),
+    radial-gradient(700px 400px at 50% 110%, rgba(123,92,255,.18), transparent 50%) !important;
+  background-attachment:fixed !important;
+}
 .visually-hidden {
   position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;
   overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
@@ -188,17 +220,18 @@
 }
 .char-hero-top::before {
   content:''; position:absolute; top:-10%; left:50%; transform:translateX(-50%);
-  width:700px; height:700px; border-radius:50%;
-  background:radial-gradient(circle,rgba(217,70,239,.16) 0%,transparent 65%);
+  width:780px; height:780px; border-radius:50%;
+  background:radial-gradient(circle,rgba(255,79,216,.28) 0%,rgba(123,92,255,.12) 40%,transparent 65%);
   pointer-events:none;
 }
 .char-page-title {
   position:relative;
   font-size:clamp(2.2rem,6vw,4rem); font-weight:900;
   letter-spacing:-.05em; line-height:1.05; margin:0;
+  filter:drop-shadow(0 0 28px rgba(255,79,216,.45));
 }
 .hero-grad {
-  background:linear-gradient(135deg,#fff 0%,var(--accent-3) 40%,var(--accent) 100%);
+  background:linear-gradient(100deg,#fff 0%,#ff4fd8 35%,#c44cff 70%,#7ab8ff 100%);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
 .char-board-wrap { max-width:1100px; margin:0 auto 2rem; }
@@ -213,11 +246,19 @@
   gap:1rem;
   align-items:stretch;
 }
+.chars-col-prompt,
+.chars-col-gens,
+.chars-col-adv {
+  padding:.9rem;
+  border:2px solid rgba(196,76,255,.75);
+  border-radius:20px;
+  background:rgba(8,6,22,.92);
+  box-shadow:0 0 40px rgba(196,76,255,.35), 0 0 80px rgba(255,79,216,.12), inset 0 1px 0 rgba(255,255,255,.08);
+}
 .chars-col-prompt { grid-area:prompt; display:flex; flex-direction:column; min-width:0; gap:.45rem; }
 .chars-col-gens { grid-area:gens; min-width:0; display:flex; flex-direction:column; min-height:16rem; }
 .chars-col-adv {
   grid-area:adv; min-width:0; display:flex; flex-direction:column; gap:.65rem;
-  padding:.85rem; border:1px solid var(--border-2); border-radius:14px; background:var(--bg-3);
 }
 .chars-progress-row { grid-area:progress; }
 .chars-wide-row { grid-area:wide; }
@@ -225,50 +266,113 @@
 
 .chars-label {
   font-family:var(--font-mono); font-size:.68rem; font-weight:700;
-  letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin:0;
+  letter-spacing:.1em; text-transform:uppercase; color:#f5d0fe; margin:0;
 }
 .chars-input, .chars-prompt {
-  width:100%; border-radius:12px !important; border:1px solid var(--border-2) !important;
-  background:var(--bg-3) !important; color:var(--text) !important;
+  width:100%; border-radius:14px !important; border:2px solid rgba(61,231,255,.85) !important;
+  background:rgba(2,8,24,.95) !important; color:#fff !important;
   font-size:.95rem !important; padding:.7rem .9rem !important;
+  box-shadow:0 0 20px rgba(61,231,255,.35), inset 0 0 24px rgba(0,80,160,.25) !important;
 }
 .chars-prompt { flex:1 1 auto; min-height:8rem !important; resize:vertical; }
 .chars-mf { display:flex; gap:.4rem; width:100%; }
 .chars-mf-btn {
-  flex:1 1 0; border:1px solid var(--border-2); background:var(--bg-2); color:var(--text-muted);
+  flex:1 1 0; border:1px solid rgba(196,76,255,.55); background:rgba(8,4,24,.8); color:#e9d5ff;
   border-radius:12px; padding:.55rem .3rem; font-size:.82rem; font-weight:800; cursor:pointer;
 }
-.chars-mf-btn.active, .chars-mf-btn:hover { border-color:var(--accent); color:#fff; background:var(--accent); }
+.chars-mf-btn.active, .chars-mf-btn:hover { border-color:#ff4fd8; color:#fff; background:linear-gradient(90deg,#7b5cff,#ff4fd8); box-shadow:0 0 16px rgba(255,79,216,.4); }
 .chars-start-btn {
-  width:100%; margin-top:.35rem; border:none; border-radius:14px; padding:.8rem;
+  width:100%; margin-top:.35rem; border:1px solid rgba(255,180,255,.85); border-radius:14px; padding:.8rem;
   font-weight:800; font-size:.95rem; cursor:pointer; color:#fff;
-  background:linear-gradient(135deg,#d946ef,#a855f7) !important;
-  box-shadow:0 4px 24px rgba(217,70,239,.35);
+  background:linear-gradient(90deg,#7b5cff,#ff4fd8) !important;
+  box-shadow:0 0 28px rgba(255,79,216,.55), 0 8px 24px rgba(123,92,255,.35);
 }
 .chars-start-btn:disabled { opacity:.55; cursor:wait; }
 
 .chars-gen-four {
-  display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
-  gap:.45rem; flex:1 1 auto; min-height:16rem; height:100%;
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:.55rem; width:100%;
 }
+.chars-gen-four .chars-gen-slot { aspect-ratio:3/4; min-height:0; }
 .chars-gen-slot {
-  position:relative; min-height:0; border:2px dashed var(--border-2); border-radius:12px;
-  background:var(--bg-3); overflow:hidden; cursor:pointer; padding:0;
+  position:relative; min-height:0; border:2px solid #3de7ff; border-radius:16px;
+  clip-path:polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+  background:
+    linear-gradient(rgba(61,231,255,.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,231,255,.12) 1px, transparent 1px),
+    #050818;
+  background-size:12px 12px, 12px 12px, auto;
+  box-shadow:0 0 24px rgba(61,231,255,.55), inset 0 0 30px rgba(0,120,200,.3);
+  overflow:hidden; cursor:pointer; padding:0;
 }
-.chars-gen-slot.filled { border-style:solid; border-color:var(--accent); }
-.chars-gen-slot.active { box-shadow:0 0 0 2px var(--accent); }
-.chars-gen-slot img { display:none; width:100%; height:100%; object-fit:contain; object-position:center; background:#0a0a12; }
+.chars-gen-slot.filled { border-style:solid; border-color:#ff4fd8; box-shadow:0 0 28px rgba(255,79,216,.5); }
+.chars-gen-slot.active { box-shadow:0 0 0 3px #ff4fd8, 0 0 32px rgba(255,79,216,.7); }
+/* Fill the tile — white-bg character art should use the whole square (trading-card look) */
+.chars-gen-slot img { display:none; width:100%; height:100%; object-fit:cover; object-position:center top; background:#0a0a12; }
 .chars-gen-slot.filled img { display:block; }
 .chars-gen-slot .slot-ph {
   position:absolute; inset:0; display:grid; place-items:center;
-  font-family:var(--font-mono); font-size:.72rem; color:var(--text-muted); font-weight:700;
+  font-family:var(--font-mono); font-size:1.2rem; color:#3de7ff; font-weight:800;
+  text-shadow:0 0 16px rgba(61,231,255,.9);
 }
 .chars-gen-slot.filled .slot-ph { display:none; }
+/* Preview only: transparent PERCFECT WM on first built photo until pack purchase (4+360 clean) */
+.chars-gen-slot.wm-preview::after,
+.chars-wide.wm-preview::after {
+  content: "PERCFECT";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono), system-ui, sans-serif;
+  font-weight: 900;
+  font-size: clamp(0.85rem, 4vw, 1.35rem);
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.42);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  background:
+    repeating-linear-gradient(
+      -28deg,
+      transparent 0,
+      transparent 48px,
+      rgba(255, 255, 255, 0.06) 48px,
+      rgba(255, 255, 255, 0.06) 50px
+    );
+  mix-blend-mode: soft-light;
+}
+.chars-wide.wm-preview::after {
+  font-size: clamp(1.4rem, 6vw, 2.6rem);
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.38);
+  background:
+    repeating-linear-gradient(
+      -28deg,
+      transparent 0,
+      transparent 72px,
+      rgba(255, 255, 255, 0.07) 72px,
+      rgba(255, 255, 255, 0.07) 76px
+    );
+}
+.chars-gen-slot.wm-preview .slot-ph { z-index: 1; }
 
 .chars-main-ref {
   flex:1 1 auto; min-height:12rem; width:100%;
-  border:2px dashed var(--border-2); border-radius:14px; background:var(--bg-2);
+  border:2px solid rgba(196,76,255,.8); border-radius:18px; background:rgba(8,4,24,.9);
+  box-shadow:0 0 30px rgba(196,76,255,.4);
   overflow:hidden; position:relative;
+}
+.chars-main-ref:not(.has-ref)::before {
+  content:""; position:absolute; left:50%; top:46%; width:140px; height:140px;
+  transform:translate(-50%,-50%); border-radius:50%;
+  border:2px solid rgba(196,76,255,.85);
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 12px, rgba(196,76,255,.45) 13px),
+    repeating-linear-gradient(90deg, transparent, transparent 12px, rgba(196,76,255,.45) 13px);
+  box-shadow:0 0 36px rgba(196,76,255,.55);
+  pointer-events:none; z-index:0;
 }
 .chars-main-ref-cell {
   position:absolute; inset:0; min-height:100% !important; aspect-ratio:auto !important;
@@ -285,10 +389,11 @@
 
 .chars-precision-wrap { position:relative; flex-shrink:0; margin-top:auto; }
 .chars-precision-btn {
-  width:100%; border:1px solid rgba(232,121,249,.45);
-  background:linear-gradient(135deg,rgba(217,70,239,.22),rgba(168,85,247,.18));
-  color:var(--accent-3); border-radius:12px; padding:.7rem 1.6rem .7rem .55rem;
+  width:100%; border:1px solid rgba(255,180,255,.85);
+  background:linear-gradient(90deg,#7b5cff,#ff4fd8);
+  color:#fff; border-radius:14px; padding:.7rem 1.6rem .7rem .55rem;
   font-size:.82rem; font-weight:800; cursor:pointer;
+  box-shadow:0 0 24px rgba(255,79,216,.45);
 }
 .chars-precision-btn:hover { filter:brightness(1.08); }
 .chars-precision-q {
@@ -315,7 +420,9 @@
   font-size:.65rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
   background:rgba(0,0,0,.65); color:#fff; padding:.25rem .5rem; border-radius:8px;
 }
-.chars-wide img { max-width:100%; max-height:58vh; object-fit:contain; }
+.chars-wide img { width:100%; max-width:100%; max-height:58vh; object-fit:contain; object-position:center; }
+.chars-wide video,
+#final-spin { width:100% !important; max-height:58vh !important; object-fit:contain; object-position:center; background:#000; }
 
 .chars-make-row { display:flex; flex-wrap:wrap; gap:.55rem; justify-content:center; margin-top:.5rem; }
 .chars-make-btn {
@@ -514,12 +621,55 @@
 
 .shots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; }
 .shot { aspect-ratio:1; border-radius:12px; overflow:hidden; border:1px solid var(--border); background:var(--bg-3); }
-.shot img { width:100%; height:100%; object-fit:contain; object-position:center; background:#0a0a12; }
+.shot img { width:100%; height:100%; object-fit:cover; object-position:center top; background:#0a0a12; }
 @media(max-width:560px){ .shots-grid{ grid-template-columns:repeat(2,1fr);} }
 
 .review-row { display:flex; gap:.6rem; margin-top:.9rem; }
 .approved-pill { display:inline-flex; align-items:center; gap:.4rem; color:var(--success); background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.25); border-radius:99px; padding:.3rem .9rem; font-size:.78rem; font-weight:600; margin-bottom:.9rem; }
 .gen-error { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:var(--danger); border-radius:10px; padding:.75rem 1rem; font-size:.85rem; margin-top:.5rem; }
+
+/* Build your hero card — post-pack CTA (Characters → Cards) */
+.hero-card-hint {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.hero-card-hint strong { color: var(--accent-2); font-weight: 700; }
+.hero-card-cta {
+  margin: 1.1rem 0 0.35rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  background:
+    radial-gradient(ellipse 80% 80% at 100% 0%, rgba(255, 193, 7, 0.12), transparent 55%),
+    rgba(124, 58, 237, 0.1);
+  text-align: center;
+}
+.hero-card-cta-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fcd34d;
+  margin-bottom: 0.35rem;
+}
+.hero-card-cta-copy {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.hero-card-cta-copy strong { color: var(--text); }
+.hero-card-btn {
+  font-weight: 800 !important;
+  font-size: 1rem !important;
+  padding: 0.75rem 1.25rem !important;
+  border-radius: 12px !important;
+  box-shadow: 0 6px 24px rgba(255, 193, 7, 0.22);
+}
 
 .progress-wrap { margin:1rem 0; padding:1rem 1.25rem; background:var(--bg-3); border:1px solid var(--border); border-radius:14px; }
 .progress-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem; font-size:.85rem; font-weight:600; }
@@ -655,7 +805,7 @@
 /* Keep three equal photo squares on all widths */
 </style>
 
-<script src="/static/js/studio_jobs.js?v=gen-opt-3"></script>
+<script src="/static/js/studio_jobs.js?v=char-pack-360-1"></script>
 <script>
 const LOGGED_IN = {{ 'true' if user else 'false' }};
 const INITIAL_CHARACTERS = {{ initial_characters|tojson }};
@@ -704,7 +854,7 @@ function updateGenCostUI(){
   const lab = document.getElementById('gen-btn-label');
   if(lab) lab.textContent = 'Start building';
   const make = document.getElementById('make-char-btn');
-  if(make) make.textContent = 'Make it a character? (' + PACK_COST + ')';
+  if(make) make.textContent = 'Make it a character? (' + PACK_COST + ') · 360 + 4 clean stills';
 }
 function toggleCharTip(e, id){
   if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -735,6 +885,8 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.char-q, .ref-cell-q').forEach(b => b.classList.remove('open'));
 });
 let finTimer = null;
+/** Bumped by resetBuilder so late in-flight job results cannot repaint a cleared builder. */
+let builderEpoch = 0;
 let _creditPayCallback = null;
 let _embeddedCheckout = null;
 
@@ -845,14 +997,32 @@ async function startEmbeddedCheckout(packageKey){
 }
 document.getElementById('creditPayModal')?.addEventListener('hidden.bs.modal',resetCreditPayModal);
 
-/* ── Gender ── */
+/* Gender is optional profile data — not required for generate, never in image prompt. */
 function setGender(g){
-  state.gender=g;
-  document.getElementById('gender-male')?.classList.toggle('active', g==='male');
-  document.getElementById('gender-female')?.classList.toggle('active', g==='female');
-  document.getElementById('gender-other')?.classList.toggle('active', g==='other');
+  state.gender = g || null;
 }
 
+/** Preview = few credits first shot; pack purchase = clean 4 + 360 (no WM). */
+function ownsCharacterPack(){
+  return !!(state.savedId && state.shots && state.shots.length >= 4);
+}
+function syncPreviewWatermark(){
+  // WM only on first built preview — never after they buy the pack
+  const wm = !!(state.candidate && !ownsCharacterPack());
+  const slot0 = document.getElementById('gen-slot-0');
+  if (slot0) slot0.classList.toggle('wm-preview', wm && slot0.classList.contains('filled'));
+  for (let i = 1; i < 4; i++) {
+    const s = document.getElementById('gen-slot-' + i);
+    if (s) s.classList.remove('wm-preview');
+  }
+  const wide = document.getElementById('chars-wide');
+  if (wide) {
+    const still = document.getElementById('chars-wide-img');
+    const showingStill = still && still.style.display !== 'none' && still.src;
+    // Wide stage: WM on first-shot still only; spin video after pack = clean
+    wide.classList.toggle('wm-preview', wm && !!showingStill && !ownsCharacterPack());
+  }
+}
 function paintGenSlot(i, url){
   const slot = document.getElementById('gen-slot-' + i);
   const img = document.getElementById('gen-slot-img-' + i);
@@ -864,6 +1034,7 @@ function paintGenSlot(i, url){
     img.removeAttribute('src');
     slot.classList.remove('filled');
   }
+  if (i === 0) syncPreviewWatermark();
 }
 function paintGenSlotsFromState(){
   const shots = state.shots || [];
@@ -875,6 +1046,7 @@ function paintGenSlotsFromState(){
   } else {
     for(let i=0;i<4;i++) paintGenSlot(i, null);
   }
+  syncPreviewWatermark();
 }
 function charFocusGen(i){
   const shots = state.shots || [];
@@ -903,11 +1075,12 @@ function setWideStill(url){
   document.getElementById('chars-wide-badge').style.display = 'none';
   if(!url){
     if(wideImg){ wideImg.style.display='none'; wideImg.removeAttribute('src'); }
-    if(wide) wide.classList.remove('has-media');
+    if(wide){ wide.classList.remove('has-media'); wide.classList.remove('wm-preview'); }
     return;
   }
   if(wideImg){ wideImg.src=url; wideImg.style.display='block'; }
   if(wide) wide.classList.add('has-media');
+  syncPreviewWatermark();
 }
 function setWideSpinVisible(){
   const wide = document.getElementById('chars-wide');
@@ -1206,25 +1379,25 @@ function regenFront(){
   generateOne();
 }
 /**
- * Percfect Precision (5 credits total on generate):
- *  1) Search Google/Bing: a portrait of {name}
- *  2) Seed is an *imaginary* ref — kept in memory only, NOT shown in the UI ref box
- *  3) Auto-generate with that seed + default character prompt (name never to xAI)
+ * Percfect Precision — MAGIC product (Nick):
+ *  Internally: search "portrait of {name}" (e.g. portrait of bowser) → seed → generate.
+ *  User sees: type name → Percfect Precision → first shot appears. NO Google ref
+ *  in the box, NO search UI, NO sauce. Never show seed_image_url to the page.
+ *  NEVER edit CHARACTER_* / SUPER_ACCURACY strings — Nick only.
  */
 function superAccuracyRegen(){ requireAuth(_superAccuracyRegen); }
 async function _superAccuracyRegen(){
+  const epoch = builderEpoch;
   const rp = document.getElementById('review-prompt');
   let d = (rp && rp.value.trim()) || descText();
   const errId = (document.getElementById('review-section')?.style.display !== 'none' && state.candidate)
     ? 'review-err' : 'gen-err';
-  if(!state.gender){ loudErr(errId,'Pick male or female first.'); return; }
   if(!d){
-    loudErr(errId,'Type a name/prompt first — Percfect Precision searches for a portrait of that.');
+    loudErr(errId,'Type the character name first.');
     document.getElementById('desc')?.focus();
     return;
   }
   document.getElementById('desc').value = d;
-  // Pay 5 credits first (covers search + generate)
   if(getImgCredits() < SUPER_ACCURACY_COST){
     openCreditPayModal({ needed: SUPER_ACCURACY_COST, onPaid: () => _superAccuracyRegen() });
     return;
@@ -1234,47 +1407,62 @@ async function _superAccuracyRegen(){
     return;
   }
   hide('gen-err'); hide('review-err');
+  // Magic: clear visible ref so they never see Google still (seed is memory-only)
+  try { clearPhoto(); } catch (_e) {}
   const saBtns = [
     document.getElementById('super-accuracy-btn'),
     document.getElementById('super-accuracy-main-btn'),
   ].filter(Boolean);
-  saBtns.forEach(b => { b.disabled = true; b.textContent = 'Finding portrait…'; });
+  saBtns.forEach(b => { b.disabled = true; b.textContent = 'Working…'; });
   setBtn('gen-btn', true);
   show('review-section');
   const loadEl = document.getElementById('one-loading');
   if(loadEl) loadEl.classList.add('show');
-  startFinProgress('Searching a portrait of "' + d.slice(0, 40) + (d.length > 40 ? '…' : '') + '"…');
+  // Generic status only — never "Searching Google" / "picture of…"
+  startFinProgress('Percfect Precision…');
   document.getElementById('gen-four')?.scrollIntoView({behavior:'smooth',block:'center'});
   try{
-    // Step 1 — fetch web seed (no charge). Invisible / imaginary ref — do not paint UI.
     const seedFd = new FormData();
     seedFd.append('description', d);
     const seedData = await PercfectStudioJobs.postQueued(
       '/studios/percfectcharacter/precision-seed',
       seedFd,
       {
-        deadlineMs: 90000,
-        onProgress: (_x, label) => setFinLabel(label || 'Searching a portrait of…'),
+        kind: 'character_precision_seed',
+        deadlineMs: 120000,
+        onProgress: (_x, label) => {
+          if (epoch !== builderEpoch) return;
+          finProgress(_x);
+          // Keep labels magical — map technical poll text away from "search"
+          setFinLabel('Percfect Precision…');
+        },
       }
     );
+    if (epoch !== builderEpoch) return;
     const seedUrl = seedData.seed_image_url || seedData.reference_image_url || seedData.url;
     if(!seedUrl){
-      throw new Error(seedData.error || 'Could not find a portrait of that on the web.');
+      throw new Error(seedData.error || 'Could not build that character — try a clearer name.');
     }
-    // Step 2 — keep seed in memory only (NOT loadImageUrl / NOT visible ref box)
-    setFinLabel('Reference found — generating…');
-    saBtns.forEach(b => { b.textContent = 'Generating…'; });
-    // Step 3 — auto generate with hidden seed (charges 5)
+    // Seed stays in memory only — NEVER loadImageUrl / never paint ref box
+    setFinLabel('Creating your character…');
+    saBtns.forEach(b => { b.textContent = 'Creating…'; });
     await _generateOne({
       superAccuracy: true,
       description: d,
       seedImageUrl: seedUrl,
-      searchQuery: seedData.search_query || ('a portrait of ' + d),
+      searchQuery: seedData.search_query || ('A portrait of ' + d),
       sourcePageImage: seedData.source_page_image || '',
       skipPrecisionSeed: true,
     });
   }catch(e){
-    loudErr(errId, e.message || 'Percfect Precision failed — try again.');
+    if (epoch !== builderEpoch) return;
+    // Soften search errors so Google is never named in the UI
+    let msg = e.message || 'Percfect Precision failed — try again.';
+    msg = String(msg)
+      .replace(/google|bing|serp|web search|picture of|portrait of/gi, 'lookup')
+      .replace(/Could not find a picture of/gi, 'Could not build')
+      .replace(/searching/gi, 'working');
+    loudErr(errId, msg);
     if(!state.candidate) hide('review-section');
     stopFinProgress();
     setBtn('gen-btn', false);
@@ -1285,8 +1473,8 @@ async function _superAccuracyRegen(){
 function loudErr(id,msg){ err(id,msg); const e=document.getElementById(id); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); }
 async function _generateOne(opts){
   opts = opts || {};
+  const epoch = builderEpoch;
   const superAccuracy = !!opts.superAccuracy;
-  if(!state.gender){ loudErr(superAccuracy?'review-err':'gen-err','Pick male or female first.'); return; }
   const d = (opts.description != null ? String(opts.description) : descText()).trim();
   const photo = hasPhoto();
   if(superAccuracy){
@@ -1304,7 +1492,7 @@ async function _generateOne(opts){
     return;
   }
   const fd=new FormData();
-  fd.append('gender',state.gender);
+  // Do NOT send gender on generate — profile/pack only. Name field never goes here.
   if(superAccuracy){
     // Precision: prompt box was for Google only (seed step). xAI must NEVER see it.
     // Gen = default one-ref character prompt + Google seed photo only.
@@ -1351,8 +1539,13 @@ async function _generateOne(opts){
     }
     const data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/generate-one', fd, {
       deadlineMs: superAccuracy ? 180000 : 150000,
-      onProgress: (_d, label) => setFinLabel(label || 'Building…'),
+      onProgress: (_d, label) => {
+        if (epoch !== builderEpoch) return;
+        finProgress(_d);
+        setFinLabel(label || 'Building…');
+      },
     });
+    if (epoch !== builderEpoch) return;
     if(!data.url){
       loudErr(superAccuracy?'review-err':'gen-err', data.error || 'Generation failed. Please try again.');
       if(!state.candidate) hide('review-section');
@@ -1367,7 +1560,7 @@ async function _generateOne(opts){
     if(img){ img.src=data.url; img.style.display='block'; }
     paintGenSlotsFromState();
     setWideStill(data.url);
-    // Precision seed is imaginary/hidden — never paint Google ref into the UI ref box
+    // Precision seed stays secret (memory only) — never paint Google into ref UI
     const rpw=document.getElementById('review-prompt-wrap');
     const rp=document.getElementById('review-prompt');
     if(rp && d) rp.value = d;
@@ -1375,9 +1568,11 @@ async function _generateOne(opts){
     adjCredit('img-credits', -(data.charged != null ? data.charged : cost));
     stopFinProgress();
   }catch(e){
+    if (epoch !== builderEpoch) return;
     loudErr(superAccuracy?'review-err':'gen-err', e.message || 'Network error — please try again.');
     if(!state.candidate) hide('review-section');
   } finally {
+    if (epoch !== builderEpoch) return;
     setBtn('gen-btn',false);
     if(loadEl) loadEl.classList.remove('show');
     stopFinProgress();
@@ -1389,11 +1584,28 @@ function escapeHtmlSa(s){
   return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-/* ── Step 2: approve → build the other 3 + 360 ── */
+/* ── Reject first preview: disappears, never saved (no pack charge) ── */
+function rejectFirstShot(){
+  state.candidate = null;
+  state.shots = null;
+  state.savedId = null;
+  paintGenSlotsFromState();
+  setWideStill(null);
+  hide('review-section');
+  hide('final-section');
+  hide('review-err');
+  syncPreviewWatermark();
+  document.getElementById('desc')?.focus();
+}
+
+/* ── Step 2: purchase pack → 360 FIRST, then 4 stills from video (no WM) ──
+ * Cost: 1 image + 1× 6s 480p video. Preview was already few credits.
+ */
 function approveOne(){ requireAuth(_approveOne); }
-function setReviewDisabled(on){ document.querySelectorAll('#review-section .review-row button').forEach(b=>{ b.disabled=on; }); }
+function setReviewDisabled(on){ document.querySelectorAll('#review-section .review-row button, #review-section .chars-make-row button').forEach(b=>{ b.disabled=on; }); }
 function endApprove(){ state.busy=false; setReviewDisabled(false); stopFinProgress(); }
 async function _approveOne(){
+  const epoch = builderEpoch;
   if(!state.candidate){ err('review-err','Generate a shot first.'); return; }
   if(state.busy){ return; }
   if(getImgCredits()<PACK_COST){
@@ -1402,9 +1614,8 @@ async function _approveOne(){
   }
   state.busy=true; setReviewDisabled(true);
   hide('review-err'); hide('fin-err');
-  startFinProgress('Building the other 3 shots…');
+  startFinProgress('360° spin first… then 4 clean stills from the video');
 
-  // Phase 1 — build the other 3 shots + save the character
   state.savedId=null;
   const fd=new FormData();
   fd.append('primary_image_url',state.candidate);
@@ -1415,31 +1626,68 @@ async function _approveOne(){
   try{
     let data;
     try {
-      data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/finalize', fd, {
+      // Single pack job: 360 first → snapshot 4 from video (1 img + 6s video credits)
+      data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/pack', fd, {
+        kind: 'character_pack',
         deadlineMs: 600000,
-        onProgress: (_d, label) => setFinLabel(label),
+        onProgress: (_d, label) => {
+          if (epoch !== builderEpoch) return;
+          finProgress(_d);
+          const st = String((_d && _d.status) || '').toLowerCase();
+          if (st === 'processing' || st === 'running') setFinLabel('Creating 360°… then snapping 4 stills');
+          else setFinLabel(label || 'Building pack…');
+        },
       });
     } catch (e) {
+      if (epoch !== builderEpoch) return;
       if (e.data && e.data.needed) {
         openCreditPayModal({needed: e.data.needed || PACK_COST, onPaid: () => _approveOne()});
         endApprove(); return;
       }
-      loudErr('fin-err', e.message || 'Build failed.'); endApprove(); return;
+      loudErr('fin-err', e.message || 'Pack build failed.'); endApprove(); return;
     }
-    if((data.images||[]).length<4){
-      loudErr('fin-err',data.warning||'Not all 4 angles were generated — try Approve again.');
+    if (epoch !== builderEpoch) return;
+    const images = data.images || [];
+    const spinUrl = data.spin_video_url || data.url || '';
+    if(!data.character || !data.character.id){
+      loudErr('fin-err', data.error || 'Pack did not return a character.');
       endApprove(); return;
     }
     hide('review-section');
-    renderFinalShots(data.images||[]);
     show('final-section');
     hide('char-pack-actions'); hide('refine-section'); hide('editprompt-section');
-    document.getElementById('final-section').scrollIntoView({behavior:'smooth',block:'start'});
     state.savedId = data.character.id;
-    state.shots = data.images || [];
+    state.shots = images.length ? images : [state.candidate];
+    setHeroCardCta(data.character);
+    // Show 360 first when ready
+    if (spinUrl) {
+      const v = document.getElementById('final-spin');
+      const badge = document.getElementById('chars-wide-badge');
+      const wideImg = document.getElementById('chars-wide-img');
+      if (wideImg) { wideImg.style.display = 'none'; }
+      if (v) {
+        v.src = spinUrl;
+        v.style.display = 'block';
+        try { v.play(); } catch (_e) {}
+      }
+      if (badge) { badge.style.display = 'inline'; badge.textContent = '360° spin'; }
+      document.getElementById('chars-wide')?.classList.add('has-media');
+      document.getElementById('chars-wide')?.classList.remove('wm-preview');
+    }
+    if (images.length) renderFinalShots(images);
+    else paintGenSlotsFromState();
+    syncPreviewWatermark();
+    paintGenSlotsFromState();
+    if (data.charged) adjCredit('img-credits', -data.charged);
     loadRoster();
-    await runCharacterSpin(true);
-  }catch(e){ loudErr('fin-err','Network error — please try again.'); endApprove(); return; }
+    document.getElementById('final-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+    if (spinUrl) showCharacterPack(data.download_url);
+    syncPreviewWatermark();
+    if (epoch !== builderEpoch) return;
+  }catch(e){
+    if (epoch !== builderEpoch) return;
+    loudErr('fin-err','Network error — please try again.'); endApprove(); return;
+  }
   endApprove();
 }
 
@@ -1454,10 +1702,41 @@ function showCharacterPack(downloadUrl){
   setWideSpinVisible();
   const spin = document.getElementById('final-spin');
   if(spin && spin.src) spin.style.display = 'block';
+  if (state.savedId) {
+    setHeroCardCta({ id: state.savedId, name: document.getElementById('char-name')?.value || '' });
+  }
+}
+
+/**
+ * After pack save: "Build your hero card" → Trading Cards with this character selected.
+ * Cards page already honors ?char= / ?p1=
+ */
+function setHeroCardCta(character) {
+  const wrap = document.getElementById('hero-card-cta');
+  const btn = document.getElementById('hero-card-btn');
+  const nameEl = document.getElementById('hero-card-name');
+  if (!wrap || !btn) return;
+  const id = character && (character.id != null ? character.id : null);
+  if (id == null || id === '') {
+    wrap.style.display = 'none';
+    const b3d = document.getElementById('make3d-btn');
+    if (b3d) b3d.style.display = 'none';
+    return;
+  }
+  const nm = (character && character.name)
+    || document.getElementById('char-name')?.value?.trim()
+    || 'this character';
+  if (nameEl) nameEl.textContent = nm;
+  btn.href = '/studios/trading-cards?char=' + encodeURIComponent(String(id));
+  btn.setAttribute('aria-label', 'Build hero card for ' + nm);
+  wrap.style.display = 'block';
+  const b3d = document.getElementById('make3d-btn');
+  if (b3d) { b3d.dataset.charId = String(id); b3d.style.display = 'block'; }
 }
 
 /* ── 4 ortho angles + 360° spin (one character pack) ── */
 async function runCharacterSpin(packIncluded){
+  const epoch = builderEpoch;
   if(!state.savedId){ return; }
   if(!packIncluded && getImgCredits()<REGEN_COST){
     openCreditPayModal({needed:REGEN_COST,onPaid:()=>runCharacterSpin(false)});
@@ -1477,8 +1756,13 @@ async function runCharacterSpin(packIncluded){
       const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
       try { d2 = await PercfectStudioJobs.resolveGenerationResponse(res2, {
         deadlineMs: 600000,
-        onProgress: (_d, label) => setFinLabel(label),
+        onProgress: (_d, label) => {
+          if (epoch !== builderEpoch) return;
+          finProgress(_d);
+          setFinLabel(label);
+        },
       }); } catch (spinErr) {
+        if (epoch !== builderEpoch) return;
         if (spinErr.data && spinErr.data.needed) {
           openCreditPayModal({needed: spinErr.data.needed, onPaid: () => runCharacterSpin(!!packIncluded)});
           show('approval-row');
@@ -1487,11 +1771,13 @@ async function runCharacterSpin(packIncluded){
         throw spinErr;
       }
     } catch (spinErr) {
+      if (epoch !== builderEpoch) return;
       loudErr('fin-err', spinErr.message || '360° spin failed.');
       stopFinProgress();
       show('approval-row');
       return;
     }
+    if (epoch !== builderEpoch) return;
     const spinUrl = d2 && (d2.url || d2.spin_video_url);
     if(spinUrl){
       if(v){ v.src=spinUrl; v.style.display='block'; v.play().catch(()=>{}); }
@@ -1513,7 +1799,9 @@ async function runCharacterSpin(packIncluded){
         CharProfile._storeChar(ch);
       }
       await refreshCredits();
+      if (epoch !== builderEpoch) return;
       await loadRoster();
+      if (epoch !== builderEpoch) return;
       const dlUrl=d2.download_url || ('/studios/percfectcharacter/download/'+state.savedId);
       showCharacterPack(dlUrl);
       if(packIncluded && state.savedId){
@@ -1525,9 +1813,11 @@ async function runCharacterSpin(packIncluded){
       show('approval-row');
     }
   }catch(e){
+    if (epoch !== builderEpoch) return;
     loudErr('fin-err','The 360° spin timed out — your 4 angles are saved. Retry below or from your roster.');
     show('approval-row');
   } finally {
+    if (epoch !== builderEpoch) return;
     stopFinProgress();
   }
 }
@@ -1568,9 +1858,19 @@ function openLightbox(src){
   if(!src) return;
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:relative;max-width:92vw;max-height:92vh;';
   const img=document.createElement('img'); img.src=src;
-  img.style.cssText='max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 50px rgba(0,0,0,.7)';
-  o.appendChild(img); o.onclick=()=>o.remove();
+  img.style.cssText='max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 0 50px rgba(0,0,0,.7);display:block';
+  wrap.appendChild(img);
+  // Preview first shot: transparent WM in lightbox too until pack is owned
+  if (!ownsCharacterPack() && state.candidate && (src === state.candidate || src === document.getElementById('gen-slot-img-0')?.src)) {
+    const wm=document.createElement('div');
+    wm.textContent='PERCFECT';
+    wm.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-family:ui-monospace,monospace;font-weight:900;font-size:clamp(1.5rem,6vw,3rem);letter-spacing:.18em;color:rgba(255,255,255,.4);text-shadow:0 1px 3px rgba(0,0,0,.6);background:repeating-linear-gradient(-28deg,transparent 0,transparent 72px,rgba(255,255,255,.07) 72px,rgba(255,255,255,.07) 76px);border-radius:10px';
+    wrap.appendChild(wm);
+  }
+  o.appendChild(wrap); o.onclick=()=>o.remove();
   document.addEventListener('keydown',function esc(e){ if(e.key==='Escape'){ o.remove(); document.removeEventListener('keydown',esc); } });
   document.body.appendChild(o);
 }
@@ -1599,6 +1899,7 @@ function pickRefine(i){
   state.shots.forEach((_,k)=>{ const e=document.getElementById('rpick-'+k); if(e) e.classList.toggle('primary', k===i); });
 }
 async function applyRefine(){
+  const epoch = builderEpoch;
   const correction = document.getElementById('refine-text').value.trim();
   if(!correction){ loudErr('refine-err','Type what to fix first (only if the shot is wrong).'); return; }
   if(state.refineSlot==null || !state.savedId){ loudErr('refine-err','Pick which photo to fix.'); return; }
@@ -1612,11 +1913,17 @@ async function applyRefine(){
     let data;
     try {
       data = await PercfectStudioJobs.postQueued('/studios/percfectcharacter/refine', fd, {
-        onProgress: (_d, label) => setFinLabel(label),
+        onProgress: (_d, label) => {
+          if (epoch !== builderEpoch) return;
+          finProgress(_d);
+          setFinLabel(label);
+        },
       });
     } catch (e) {
+      if (epoch !== builderEpoch) return;
       loudErr('refine-err', e.message || 'Refine failed.'); stopFinProgress(); return;
     }
+    if (epoch !== builderEpoch) return;
     state.shots = data.images;
     renderFinalShots(state.shots);
     adjCredit('img-credits',-1);
@@ -1631,9 +1938,14 @@ async function applyRefine(){
       const res2=await fetch('/studios/percfectcharacter/generate-spin',{method:'POST',body:fd2});
       d2 = await PercfectStudioJobs.resolveGenerationResponse(res2, {
         deadlineMs: 600000,
-        onProgress: (_d, label) => setFinLabel(label),
+        onProgress: (_d, label) => {
+          if (epoch !== builderEpoch) return;
+          finProgress(_d);
+          setFinLabel(label);
+        },
       });
     } catch (spinErr) {
+      if (epoch !== builderEpoch) return;
       if (spinErr.data && spinErr.data.needed) {
         openCreditPayModal({needed: spinErr.data.needed, onPaid: () => applyRefine()});
         stopFinProgress();
@@ -1643,6 +1955,7 @@ async function applyRefine(){
       stopFinProgress();
       return;
     }
+    if (epoch !== builderEpoch) return;
     if(d2 && d2.url){
       const v=document.getElementById('final-spin'); v.src=d2.url; v.style.display='block';
       document.getElementById('final-spin-ph').style.display='none';
@@ -1654,22 +1967,133 @@ async function applyRefine(){
       loudErr('refine-err',(d2.error||'The 360° re-render failed — your photo was updated; use the 🎥 360° button in your roster to retry.'));
     }
     loadRoster();
-  }catch(e){ loudErr('refine-err','Network error — please try again.'); }
-  finally{ stopFinProgress(); }
+  }catch(e){
+    if (epoch !== builderEpoch) return;
+    loudErr('refine-err','Network error — please try again.');
+  }
+  finally{
+    if (epoch !== builderEpoch) return;
+    stopFinProgress();
+  }
 }
 function setFinLabel(t){ const e=document.getElementById('fin-label'); if(e) e.textContent=t; }
-function startFinProgress(label){ let el=0; const MAX=120; setFinLabel(label||'Building…'); show('fin-wrap'); document.getElementById('fin-bar').style.width='0%'; document.getElementById('fin-elapsed').textContent='0'; finTimer=setInterval(()=>{ el++; document.getElementById('fin-elapsed').textContent=el; document.getElementById('fin-bar').style.width=Math.min(95,(el/MAX)*100)+'%'; },1000); }
-function stopFinProgress(){ if(finTimer){clearInterval(finTimer);finTimer=null;} const b=document.getElementById('fin-bar'); if(b)b.style.width='100%'; setTimeout(()=>hide('fin-wrap'),400); }
+/* Stage-driven progress (queued → rendering → done) — replaces the old seconds counter. */
+let finStage = null;
+function startFinProgress(label){
+  setFinLabel(label||'Building…'); show('fin-wrap');
+  const b=document.getElementById('fin-bar'); if(b)b.style.width='0%';
+  // hide the legacy seconds readout entirely
+  const sec=document.getElementById('fin-elapsed'); if(sec&&sec.parentElement) sec.parentElement.style.display='none';
+  if(finTimer){clearInterval(finTimer);finTimer=null;}
+  finStage = (window.PercfectStudioJobs && PercfectStudioJobs.makeStageProgress)
+    ? PercfectStudioJobs.makeStageProgress({ bar:'fin-bar' })
+    : null;
+  if(finStage) finStage({status:'queued'});
+}
+function finProgress(data){ if(finStage&&data) finStage(data); }
+function stopFinProgress(){
+  if(finTimer){clearInterval(finTimer);finTimer=null;}
+  if(finStage&&finStage.done) finStage.done();
+  const b=document.getElementById('fin-bar'); if(b)b.style.width='100%';
+  setTimeout(()=>hide('fin-wrap'),400);
+}
 
-/* ── Reset ── */
+/* ── Reset — full clean first-visit builder (Create another character) ── */
 function resetBuilder(){
-  state.candidate=null; state.prompt=null; state.busy=false;
+  // Detach any in-flight generate / finalize / spin / refine so late results cannot repaint UI
+  builderEpoch += 1;
+
+  // Stop progress immediately (do not leave bar animating)
+  if(finTimer){ clearInterval(finTimer); finTimer = null; }
+  hide('fin-wrap');
+  const finBar = document.getElementById('fin-bar');
+  if(finBar) finBar.style.width = '0%';
+
+  // Core state
+  state.candidate = null;
+  state.prompt = null;
+  state.enginePrompt = null;
+  state.busy = false;
+  state.shots = null;
+  state.savedId = null;
+  state.refineSlot = null;
+  state.pendingSlot = null;
+  state.mode = 'describe';
+
+  // Reference slot: clear state.refs AND re-render empty drop UI
   clearPhoto();
-  document.getElementById('desc').value='';
-  document.getElementById('char-name').value='';
-  const rp=document.getElementById('review-prompt'); if(rp) rp.value='';
-  hide('review-section'); hide('final-section'); hide('review-prompt-wrap');
-  window.scrollTo({top:0,behavior:'smooth'});
+
+  // Form fields
+  const desc = document.getElementById('desc'); if(desc) desc.value = '';
+  const nameEl = document.getElementById('char-name'); if(nameEl) nameEl.value = '';
+  const rp = document.getElementById('review-prompt'); if(rp) rp.value = '';
+  const ep = document.getElementById('editprompt-text'); if(ep) ep.value = '';
+  const rt = document.getElementById('refine-text'); if(rt) rt.value = '';
+
+  // Four pack / gen slots empty
+  document.querySelectorAll('.chars-gen-slot').forEach(el => el.classList.remove('active'));
+  paintGenSlotsFromState();
+
+  // Legacy one-shot display + loading overlay
+  const oneImg = document.getElementById('one-img');
+  if(oneImg){ oneImg.style.display = 'none'; oneImg.removeAttribute('src'); }
+  document.getElementById('one-loading')?.classList.remove('show');
+
+  // Wide stage + 360 spin cleared
+  setWideStill(null);
+  const spin = document.getElementById('final-spin');
+  if(spin){
+    try{ spin.pause(); }catch(_e){}
+    spin.style.display = 'none';
+    spin.removeAttribute('src');
+  }
+  const spinPh = document.getElementById('final-spin-ph');
+  if(spinPh) spinPh.style.display = 'none';
+  const badge = document.getElementById('chars-wide-badge');
+  if(badge) badge.style.display = 'none';
+
+  // Final / refine grids
+  const grid = document.getElementById('final-grid');
+  if(grid) grid.innerHTML = '';
+  const refinePicker = document.getElementById('refine-picker');
+  if(refinePicker) refinePicker.innerHTML = '';
+
+  // Sections + errors
+  hide('review-section');
+  hide('final-section');
+  hide('review-prompt-wrap');
+  hide('char-pack-actions');
+  hide('approval-row');
+  hide('editprompt-section');
+  hide('refine-section');
+  hide('gen-err');
+  hide('review-err');
+  hide('fin-err');
+  hide('editprompt-err');
+  hide('refine-err');
+  const heroCta = document.getElementById('hero-card-cta');
+  if (heroCta) heroCta.style.display = 'none';
+  const b3d = document.getElementById('make3d-btn');
+  if (b3d) b3d.style.display = 'none';
+  const heroBtn = document.getElementById('hero-card-btn');
+  if (heroBtn) {
+    heroBtn.href = '/studios/trading-cards';
+    heroBtn.removeAttribute('aria-label');
+  }
+
+  // Buttons back to idle
+  setBtn('gen-btn', false);
+  setReviewDisabled(false);
+  const saBtns = [
+    document.getElementById('super-accuracy-btn'),
+    document.getElementById('super-accuracy-main-btn'),
+  ].filter(Boolean);
+  saBtns.forEach(b => { b.disabled = false; b.textContent = 'Percfect Precision'; });
+
+  updateGenCostUI();
+  refreshCredits();
+
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 /* ── Roster ── */

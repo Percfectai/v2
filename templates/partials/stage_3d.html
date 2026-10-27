@@ -1,0 +1,215 @@
+{# 3D stage: a revolving empty stage; the finished 3D character lands on it and the
+   viewer drags to spin it 360°. Used by "Make character 3D" on the Characters page.
+   JS: Stage3D.make(characterId) builds a model; Stage3D.open(glbUrl) just shows one. #}
+<style>
+  .s3d-overlay { position: fixed; inset: 0; z-index: 2000; display: none;
+    background: radial-gradient(ellipse at 50% 35%, #1d1530 0%, #07060c 70%); }
+  .s3d-overlay.open { display: block; }
+  .s3d-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    cursor: grab; touch-action: none; }
+  .s3d-canvas:active { cursor: grabbing; }
+  .s3d-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+    justify-content: space-between; gap: .75rem; padding: 14px 16px; pointer-events: none; }
+  .s3d-title { font-weight: 800; letter-spacing: .06em; color: #fff; font-size: .95rem;
+    text-transform: uppercase; }
+  .s3d-close { pointer-events: auto; background: rgba(255,255,255,.08); color: #fff;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; width: 40px; height: 40px;
+    font-size: 1.2rem; line-height: 1; cursor: pointer; }
+  .s3d-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px;
+    display: flex; flex-direction: column; align-items: center; gap: .6rem; pointer-events: none; }
+  .s3d-msg { color: rgba(255,255,255,.85); font-size: .9rem; text-align: center; max-width: 460px; }
+  .s3d-bar { width: min(320px, 80vw); height: 4px; border-radius: 4px; overflow: hidden;
+    background: rgba(255,255,255,.12); }
+  .s3d-bar > i { display: block; height: 100%; width: 35%; border-radius: 4px;
+    background: linear-gradient(90deg, #7c5cfc, #c084fc); animation: s3d-slide 1.4s ease-in-out infinite; }
+  @keyframes s3d-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+  .s3d-actions { display: flex; gap: .5rem; pointer-events: auto; }
+  .s3d-hint { color: rgba(255,255,255,.5); font-size: .75rem; }
+</style>
+
+<div class="s3d-overlay" id="s3d" role="dialog" aria-modal="true" aria-label="3D character stage">
+  <canvas class="s3d-canvas" id="s3d-canvas"></canvas>
+  <div class="s3d-top">
+    <div class="s3d-title">Percfect 3D</div>
+    <button type="button" class="s3d-close" id="s3d-close" aria-label="Close">✕</button>
+  </div>
+  <div class="s3d-bottom">
+    <div class="s3d-bar" id="s3d-bar" style="display:none"><i></i></div>
+    <div class="s3d-msg" id="s3d-msg"></div>
+    <div class="s3d-actions">
+      <a class="btn-accent" id="s3d-download" style="display:none" download="character.glb">⬇ Download .glb</a>
+    </div>
+    <div class="s3d-hint" id="s3d-hint" style="display:none">Drag to spin · scroll to zoom</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const overlay = $("s3d"), canvas = $("s3d-canvas");
+let renderer, scene, camera, controls, stage, model, raf = 0, pollTimer = 0;
+
+function msg(text, busy) {
+  $("s3d-msg").textContent = text || "";
+  $("s3d-bar").style.display = busy ? "block" : "none";
+}
+
+function build() {
+  if (renderer) return;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(35, 1, 0.05, 100);
+  camera.position.set(0, 1.5, 5.2);
+
+  controls = new OrbitControls(camera, canvas);
+  controls.target.set(0, 0.95, 0);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+  controls.minDistance = 2.2;
+  controls.maxDistance = 9;
+  controls.maxPolarAngle = Math.PI * 0.55;
+  // Dragging takes over from the slow stage spin; it resumes after a pause.
+  let idle = 0;
+  controls.addEventListener("start", () => { stage.userData.spin = false; clearTimeout(idle); });
+  controls.addEventListener("end", () => { idle = setTimeout(() => (stage.userData.spin = true), 2500); });
+
+  scene.add(new THREE.HemisphereLight(0xd9d2ff, 0x1a1426, 0.9));
+  const key = new THREE.SpotLight(0xffffff, 60, 20, Math.PI / 6, 0.4);
+  key.position.set(2.5, 6, 3.5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xb48cff, 1.2);
+  rim.position.set(-3, 3, -4);
+  scene.add(rim);
+
+  // The stage: a round platform with a glowing rim; it slowly revolves.
+  stage = new THREE.Group();
+  stage.userData.spin = true;
+  const deck = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.25, 1.35, 0.18, 96),
+    new THREE.MeshStandardMaterial({ color: 0x1b1726, roughness: 0.35, metalness: 0.6 }));
+  deck.position.y = -0.09;
+  deck.receiveShadow = true;
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.3, 0.025, 16, 160),
+    new THREE.MeshBasicMaterial({ color: 0x9b7bff }));
+  ring.rotation.x = Math.PI / 2;
+  const marks = new THREE.Mesh(  // a few spokes so you can see it turning
+    new THREE.RingGeometry(0.55, 1.1, 48, 1, 0, Math.PI * 2),
+    new THREE.MeshBasicMaterial({ color: 0x2a2340, side: THREE.DoubleSide, wireframe: true }));
+  marks.rotation.x = -Math.PI / 2;
+  marks.position.y = 0.002;
+  stage.add(deck, ring, marks);
+  scene.add(stage);
+
+  const resize = () => {
+    const w = overlay.clientWidth, h = overlay.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / Math.max(1, h);
+    camera.updateProjectionMatrix();
+  };
+  window.addEventListener("resize", resize);
+  stage.userData.resize = resize;
+}
+
+function loop() {
+  raf = requestAnimationFrame(loop);
+  if (stage.userData.spin) stage.rotation.y += 0.004;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function open() {
+  overlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+  build();
+  stage.userData.resize();
+  cancelAnimationFrame(raf);
+  loop();
+}
+
+function close() {
+  overlay.classList.remove("open");
+  document.body.style.overflow = "";
+  cancelAnimationFrame(raf);
+  clearTimeout(pollTimer);
+}
+
+function place(url) {
+  msg("Loading your 3D character…", true);
+  new GLTFLoader().load(url, (gltf) => {
+    if (model) stage.remove(model);
+    model = gltf.scene;
+    model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    // Scale to ~1.8 tall, centre it, feet on the deck. Measure only after the
+    // whole tree's matrices are current (rigged models have scaled armatures).
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    const size = box.getSize(new THREE.Vector3());
+    const s = 1.8 / Math.max(size.y, 1e-3);
+    model.scale.multiplyScalar(s);
+    model.updateMatrixWorld(true);
+    const b2 = new THREE.Box3().setFromObject(model, true);
+    const c = b2.getCenter(new THREE.Vector3());
+    model.position.x -= c.x;
+    model.position.z -= c.z;
+    model.position.y -= b2.min.y;
+    stage.add(model);
+    msg("");
+    $("s3d-hint").style.display = "block";
+    const dl = $("s3d-download");
+    dl.href = url;
+    dl.style.display = "inline-block";
+  }, undefined, () => msg("Couldn't load the 3D model. Try again in a moment."));
+}
+
+async function poll(jobId) {
+  try {
+    const r = await fetch("/studios/percfectcharacter/make-3d/" + encodeURIComponent(jobId),
+                          { credentials: "same-origin" });
+    const d = await r.json().catch(() => ({}));
+    if (d.status === "success" && d.outputs && d.outputs.glb) return place(d.outputs.glb);
+    if (d.status === "failed" || !r.ok) return msg(d.error || "3D model failed. Credits refunded.");
+  } catch (e) { /* network blip: try again */ }
+  pollTimer = setTimeout(() => poll(jobId), 5000);
+}
+
+async function make(characterId) {
+  open();
+  if (model) { stage.remove(model); model = null; }
+  $("s3d-download").style.display = "none";
+  $("s3d-hint").style.display = "none";
+  msg("Building your 3D character… this takes a few minutes.", true);
+  try {
+    const r = await fetch("/studios/percfectcharacter/make-3d", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ character_id: characterId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return msg(d.error || "Couldn't start the 3D model.");
+    poll(d.job_id);
+  } catch (e) {
+    msg("Couldn't reach Percfect. Check your connection and try again.");
+  }
+}
+
+$("s3d-close").onclick = close;
+overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlay.classList.contains("open")) close(); });
+
+window.Stage3D = { make, open: (url) => { open(); if (url) place(url); }, close };
+</script>
