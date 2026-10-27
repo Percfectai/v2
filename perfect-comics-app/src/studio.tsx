@@ -366,10 +366,10 @@ export function Studio() {
       setError("Write what happens on this page first.");
       return;
     }
-    if (kind !== "cover" && kind !== "small" && current.n > 0) {
+    if (kind !== "small" && kind !== "rewrite" && current.n > 0) {
       const prev = live.pages.find((p) => p.n === current.n - 1);
-      if (!prev?.imageUrl) {
-        setError(`Ink ${pageLabel(current.n - 1)} first so this page can follow it.`);
+      if (!prev?.approved) {
+        setError(`Approve ${pageLabel(current.n - 1)} first. The next page copies that picture.`);
         return;
       }
     }
@@ -391,11 +391,11 @@ export function Studio() {
       refs.push(current.imageUrl, ...heroRefs);
     } else {
       const prev = live.pages.find((p) => p.n === current.n - 1);
-      if ((kind === "rewrite" || kind === "interior") && prev?.imageUrl && heroRefs.length < 3) {
+      if (current.n > 0 && prev?.imageUrl) {
         refs.push(prev.imageUrl);
         hasPrevPage = true;
       }
-      refs.push(...heroRefs);
+      refs.push(...heroRefs.slice(0, Math.max(0, 3 - refs.length)));
     }
     const actSummary = current.n === 0 ? live.summary : current.n <= 3 ? live.beginning : current.n <= 6 ? live.middle : live.ending;
     const result = await inkPage({
@@ -428,7 +428,8 @@ export function Studio() {
   async function generateDrafts(only?: number[]) {
     const live = issueRef.current;
     if (!live || busy) return;
-    const nums = (only ?? live.pages.map((p) => p.n)).filter((n) => !live.pages.find((p) => p.n === n)?.imageUrl);
+    const allowed = live.pages.filter((p) => !p.imageUrl && (p.n === 0 || live.pages.find((prev) => prev.n === p.n - 1)?.approved)).map((p) => p.n);
+    const nums = (only ?? allowed.slice(0, 1)).filter((n) => allowed.includes(n));
     if (!nums.length) return;
     setError("");
     if (nums.some((n) => !live.pages.find((p) => p.n === n)?.prompt.trim())) {
@@ -462,6 +463,20 @@ export function Studio() {
       const after = issueRef.current?.pages.find((p) => p.n === n);
       if (after?.status === "error") break;
     }
+  }
+
+  function approvePage(n: number) {
+    const live = issueRef.current;
+    const page = live?.pages.find((p) => p.n === n);
+    if (!page?.imageUrl) {
+      setError("Generate this page before you approve it.");
+      return;
+    }
+    setError("");
+    patchPage(n, (p) => ({ ...p, approved: true }));
+    if (n >= 9) setTab(7);
+    else if (n === 0) setTab(4);
+    else setTab(n + 1 <= 3 ? 4 : n + 1 <= 6 ? 5 : 6);
   }
 
   function addCharacter() {
@@ -745,6 +760,7 @@ export function Studio() {
                 <CoverBlock
                   issue={issue}
                   busy={busy}
+                  onApprove={() => approvePage(0)}
                   onPrompt={(v) => patchPage(0, (p) => ({ ...p, prompt: v, status: v.trim() ? "ready" : "draft" }))}
                   onRewrite={() => onRewrite("cover", issue.pages[0]?.prompt ?? "", 0)}
                   onToggle={(id) => toggleOnPage(0, id)}
@@ -785,6 +801,7 @@ export function Studio() {
                       const page = issue.pages.find((p) => p.n === n);
                       if (page && !page.imageUrl) void ink(page, "interior");
                     }}
+                    onApprove={(n) => approvePage(n)}
                     onSmall={(n, note) => {
                       const page = issue.pages.find((p) => p.n === n);
                       if (page) void ink(page, "small", note);
@@ -794,7 +811,19 @@ export function Studio() {
                       if (page) void ink({ ...page }, "rewrite");
                     }}
                     onBuy={() => buy("all")}
-                    onGenerate={() => void generateDrafts(pages)}
+                    onGenerate={() => {
+                      const next = pages.find((n) => {
+                        const page = issue.pages.find((p) => p.n === n);
+                        const prev = issue.pages.find((p) => p.n === n - 1);
+                        return page && !page.imageUrl && prev?.approved;
+                      });
+                      if (next == null) {
+                        setError("Approve the page before this one. The next page copies that picture.");
+                        return;
+                      }
+                      const page = issue.pages.find((p) => p.n === next);
+                      if (page) void ink(page, "interior");
+                    }}
                     freeBook={freeBook}
                   />
                 </section>
@@ -841,9 +870,7 @@ export function Studio() {
                     </button>
                   ))}
                 </div>
-                <button className="btn-gen" type="button" disabled={!!busy || !issue.pages.some((p) => !p.imageUrl)} onClick={() => void generateDrafts()}>
-                  {busy === "plan" ? "Planning drafts…" : busy?.startsWith("ink-") ? `Inking ${pageLabel(Number(busy.slice(4)))}…` : nextPart ? "Generate drafts" : "Drafts are in"}
-                </button>
+                <p className="help">Each page is drawn after you approve the one before it. A mistake on page 2 would be copied onto every page after it.</p>
                 {due(owned(issue)) > 0 ? (
                   <button className="btn-publish" type="button" onClick={() => buy("all")}>
                     {freeBook ? "Claim this free comic · 2 edits per page" : `Purchase full comic · ${money(due(owned(issue)))} · 2 edits per page`}
@@ -988,10 +1015,12 @@ function CoverBlock({
   onSmall,
   onRewriteImage,
   onBuy,
+  onApprove,
   freeBook,
 }: {
   issue: Issue;
   busy: string | null;
+  onApprove: () => void;
   onPrompt: (v: string) => void;
   onRewrite: () => void;
   onToggle: (id: string) => void;
@@ -1030,8 +1059,12 @@ function CoverBlock({
       {page?.imageUrl && <PageArt url={page.imageUrl} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
       <p className="help">The first draft is free and watermarked. That is picture 1 of 3. Unlock it for 2 edits. All three use the 2.0 model.</p>
       {!page?.imageUrl && (
-        <button className="btn-genpage" type="button" disabled={!!busy} onClick={onInk}>Generate draft</button>
+        <button className="btn-genpage" type="button" disabled={!!busy} onClick={onInk}>Generate this cover</button>
       )}
+      {page?.imageUrl && !page.approved && (
+        <button className="btn-publish" type="button" onClick={onApprove}>Approve cover and open page 1</button>
+      )}
+      {page?.approved && <p className="help">Cover approved. Page 1 uses this picture as its reference.</p>}
       {page?.imageUrl && !owned(issue).cover && (
         <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock this free comic · 2 edits a page" : `Unlock this comic · ${money(ISSUE_PRICE)}`}</button>
       )}
@@ -1068,6 +1101,7 @@ function ActBlock({
   onRewriteImage,
   onBuy,
   onGenerate,
+  onApprove,
   freeBook,
 }: {
   act: "beginning" | "middle" | "ending";
@@ -1085,6 +1119,7 @@ function ActBlock({
   onRewriteImage: (n: number) => void;
   onBuy: () => void;
   onGenerate: () => void;
+  onApprove: (n: number) => void;
   freeBook: boolean;
 }) {
   const [notes, setNotes] = useState<Record<number, string>>({});
@@ -1104,17 +1139,14 @@ function ActBlock({
         onChange={onSummary}
         onRewrite={onRewriteSummary}
       />
-      <div className="mode">
-        <button className={`mode__btn${issue.mode === "quick" ? " on" : ""}`} type="button" onClick={() => onMode("quick")}>Quick comic</button>
-        <button className={`mode__btn${issue.mode === "pageByPage" ? " on" : ""}`} type="button" onClick={() => onMode("pageByPage")}>Page by page</button>
-      </div>
+      <p className="help">Approve a page before the next one is drawn. The next page copies the picture you approved.</p>
       <button className="btn-genpage" type="button" disabled={!!busy || pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl)} onClick={onGenerate}>
-        {pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl) ? "Drafts are in" : "Generate these drafts"}
+        {pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl) ? "These pages are drawn" : "Generate the next page"}
       </button>
       {pages.some((n) => issue.pages.find((p) => p.n === n)?.imageUrl) && !owned(issue)[act] && (
         <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock this free comic · 2 edits a page" : `Unlock this comic · ${money(ISSUE_PRICE)}`}</button>
       )}
-      {issue.mode === "pageByPage" && (
+      {true && (
         <>
           <div className="actsum">
             <div className="t">{act} summary</div>
@@ -1146,9 +1178,18 @@ function ActBlock({
                         ))}
                       </div>
                     </div>
-                    {!page.imageUrl && (
-                      <button className="btn-genpage" type="button" disabled={!!busy} onClick={() => onInk(n)}>Generate this draft</button>
+                    {!page.imageUrl && !issue.pages.find((p) => p.n === n - 1)?.approved && (
+                      <p className="help">Approve {n === 1 ? "the cover" : `page ${n - 1}`} before this page can be drawn.</p>
                     )}
+                    {!page.imageUrl && !!issue.pages.find((p) => p.n === n - 1)?.approved && (
+                      <button className="btn-genpage" type="button" disabled={!!busy} onClick={() => onInk(n)}>Generate this page</button>
+                    )}
+                    {page.imageUrl && !page.approved && (
+                      <button className="btn-publish" type="button" onClick={() => onApprove(n)}>
+                        {n < 9 ? `Approve page ${n} and open the next` : "Approve the last page"}
+                      </button>
+                    )}
+                    {page.approved && <p className="help">Approved. The next page uses this picture.</p>}
                     {page.imageUrl && owned(issue)[act] && (
                       <div className="editrow">
                         <input className="inp" placeholder="Small change — green hat instead of red, keep the rest" value={notes[n] ?? ""} onChange={(e) => setNotes((s) => ({ ...s, [n]: e.target.value }))} />

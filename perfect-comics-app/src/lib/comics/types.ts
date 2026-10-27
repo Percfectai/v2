@@ -25,6 +25,8 @@ export type ComicPage = {
   cleanUrl?: string;
   /** Paid edits left on this page. Granted when its block is unlocked. */
   editsLeft?: number;
+  /** Page-by-page only. The next page stays closed until this is true. */
+  approved?: boolean;
   error?: string;
 };
 
