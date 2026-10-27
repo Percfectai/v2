@@ -390,16 +390,16 @@ export function Studio() {
     })();
     const refs: string[] = [];
     let hasPrevPage = false;
-    const sourceArt = current.cleanUrl || (owned(live)[part] ? current.imageUrl : undefined);
-    const fixing = editing && !!sourceArt;
+    const fixing = editing && !!current.imageUrl;
     const heroRefs = people.map((c) => c.refUrl).filter((url): url is string => !!url);
-    if (fixing && sourceArt) {
-      refs.push(sourceArt, ...heroRefs);
+    if (fixing && current.imageUrl) {
+      refs.push(current.imageUrl, ...heroRefs);
+    } else if (kind === "small" && current.imageUrl) {
+      refs.push(current.imageUrl, ...heroRefs);
     } else {
       const prev = live.pages.find((p) => p.n === current.n - 1);
-      const prevArt = prev ? (prev.cleanUrl || (owned(live)[prev.act] ? prev.imageUrl : undefined)) : undefined;
-      if ((kind === "rewrite" || kind === "interior") && prevArt && heroRefs.length < 3) {
-        refs.push(prevArt);
+      if ((kind === "rewrite" || kind === "interior") && prev?.imageUrl && heroRefs.length < 3) {
+        refs.push(prev.imageUrl);
         hasPrevPage = true;
       }
       refs.push(...heroRefs);
@@ -426,24 +426,9 @@ export function Studio() {
       setError(result.error);
       return;
     }
-    const paid = owned(live)[part];
-    const clean = result.url;
-    const shown = paid ? clean : await stamp(clean);
-    if (!paid && !shown.startsWith("data:")) {
-      patchPage(current.n, (p) => ({ ...p, status: "error", error: "Couldn't stamp the preview." }));
-      setError("Couldn't stamp the preview.");
-      return;
-    }
     patch((i) => ({
       ...i,
-      pages: i.pages.map((p) => (p.n === current.n ? {
-        ...p,
-        status: "done",
-        imageUrl: shown,
-        cleanUrl: paid ? undefined : clean,
-        editsLeft: editing ? Math.max(0, (p.editsLeft ?? 0) - 1) : p.editsLeft,
-        error: undefined,
-      } : p)),
+      pages: i.pages.map((p) => (p.n === current.n ? { ...p, status: "done", imageUrl: result.url, editsLeft: editing ? Math.max(0, (p.editsLeft ?? 0) - 1) : p.editsLeft, error: undefined } : p)),
     }));
   }
 
@@ -606,7 +591,7 @@ export function Studio() {
               <div className="reader">
                 {issue.pages.map((p) => (
                   <figure key={p.n}>
-                    {p.imageUrl ? <PageArt url={viewUrl(issue, p)} clean={owned(issue)[p.act]} alt={pageLabel(p.n)} /> : <div className="picph">Not inked</div>}
+                    {p.imageUrl ? <PageArt url={p.imageUrl} clean={owned(issue)[p.act]} alt={pageLabel(p.n)} /> : <div className="picph">Not inked</div>}
                     <figcaption>{pageLabel(p.n)}</figcaption>
                   </figure>
                 ))}
@@ -857,7 +842,7 @@ export function Studio() {
                       onClick={() => openPage(p.n)}
                     >
                       <div className="rev__img">
-                        {p.imageUrl ? <PageArt url={viewUrl(issue, p)} clean={owned(issue)[p.act]} alt="" /> : pageLabel(p.n)}
+                        {p.imageUrl ? <PageArt url={p.imageUrl} clean={owned(issue)[p.act]} alt="" /> : pageLabel(p.n)}
                       </div>
                       <div className="rev__cap">{pageLabel(p.n)} · {p.imageUrl ? "inked" : "not inked"}</div>
                       <div className="rev__beat">{p.prompt.trim() || "No prompt yet"}</div>
@@ -1050,7 +1035,7 @@ function CoverBlock({
         onChange={onPrompt}
         onRewrite={onRewrite}
       />
-      {page?.imageUrl && <PageArt url={viewUrl(issue, page)} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
+      {page?.imageUrl && <PageArt url={page.imageUrl} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
       <p className="help">The first draft is free and watermarked. That is picture 1 of 3. Unlock it for 2 edits. All three use the 2.0 model.</p>
       {!page?.imageUrl && (
         <button className="btn-genpage" type="button" disabled={!!busy} onClick={onInk}>Generate draft</button>
@@ -1185,7 +1170,7 @@ function ActBlock({
                     {page.error && <div className="errbox">{page.error}</div>}
                   </div>
                   <div>
-                    {page.imageUrl ? <PageArt url={viewUrl(issue, page)} clean={owned(issue)[act]} alt="" className="pageimg" /> : <div className="picph">Page {n}<br />not inked</div>}
+                    {page.imageUrl ? <PageArt url={page.imageUrl} clean={owned(issue)[act]} alt="" className="pageimg" /> : <div className="picph">Page {n}<br />not inked</div>}
                   </div>
                 </div>
               </article>

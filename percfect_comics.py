@@ -5,7 +5,6 @@ Pictures use the image silo, grok-imagine-image-2.0, 1k.
 """
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
@@ -229,20 +228,7 @@ def _comic_image(prompt: str, refs: List[str], model: str) -> Dict[str, Any]:
         )
         if not image_url:
             return {"ok": False, "error": "No image returned"}
-        if image_url.startswith("data:"):
-            return {"ok": True, "url": image_url}
-        try:
-            fetched = requests.get(image_url, timeout=60)
-        except Exception as e:
-            log.warning("comics ink download failed: %s", e)
-            return {"ok": False, "error": "No image returned"}
-        if not fetched.ok:
-            return {"ok": False, "error": "No image returned"}
-        mime = (fetched.headers.get("Content-Type") or "image/png").split(";")[0].strip()
-        if not mime.startswith("image/") or not fetched.content or len(fetched.content) > 12_000_000:
-            return {"ok": False, "error": "No image returned"}
-        encoded = base64.b64encode(fetched.content).decode("ascii")
-        return {"ok": True, "url": f"data:{mime};base64,{encoded}"}
+        return {"ok": True, "url": image_url}
     return {"ok": False, "error": "Image failed"}
 
 
