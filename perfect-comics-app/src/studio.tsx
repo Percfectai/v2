@@ -804,7 +804,8 @@ export function Studio() {
                 </div>
                 {sheets.map((src, i) => (
                   <figure key={src.slice(0, 48)} className="block">
-                    <div className="label">Reference {i + 1} — one page</div>
+                    <div className="label">{i === 0 ? "Sprite card A — characters 1 and 2" : "Sprite card B — characters 3 and 4"}</div>
+                    <p className="help">Four shots on top, four shots on the bottom. This whole card is one of the three pictures sent with each page.</p>
                     <img src={src} alt="Two characters, four shots each" style={{ width: "100%", maxWidth: 640, borderRadius: 12 }} />
                   </figure>
                 ))}
@@ -871,6 +872,7 @@ export function Studio() {
               <section className={`subpage${tab === 3 ? " on" : ""}`}>
                 <CoverBlock
                   issue={issue}
+                  sheets={sheets}
                   busy={busy}
                   onApprove={() => approvePage(0)}
                   onPrompt={(v) => patchPage(0, (p) => ({ ...p, prompt: v, status: v.trim() ? "ready" : "draft" }))}
@@ -899,6 +901,7 @@ export function Studio() {
                     act={act}
                     pages={pages}
                     issue={issue}
+                    sheets={sheets}
                     busy={busy}
                     onSummary={(v) => patch((i) => ({ ...i, [act]: v }))}
                     onMode={(mode: WriterMode) => patch((i) => ({ ...i, mode }))}
@@ -1117,8 +1120,28 @@ function PromptBox({
   );
 }
 
+function RefLock({ pageN, pages, sheets }: { pageN: number; pages: ComicPage[]; sheets: string[] }) {
+  const prev = pageN > 0 ? pages.find((p) => p.n === pageN - 1) : undefined;
+  const cells = [
+    { title: "Ref 1 · previous page", src: prev?.imageUrl, empty: pageN === 0 ? "Cover uses the cards only" : "Approve the page before this one" },
+    { title: "Ref 2 · card A", src: sheets[0], empty: "Needs characters 1 and 2, four shots each" },
+    { title: "Ref 3 · card B", src: sheets[1], empty: "Only if characters 3 and 4 are both on the sheet" },
+  ];
+  return (
+    <div className="reflock">
+      {cells.map((cell) => (
+        <figure key={cell.title}>
+          {cell.src ? <img src={cell.src} alt="" /> : <div className="reflock__ph">{cell.empty}</div>}
+          <figcaption>{cell.title}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 function CoverBlock({
   issue,
+  sheets,
   busy,
   onPrompt,
   onRewrite,
@@ -1131,6 +1154,7 @@ function CoverBlock({
   freeBook,
 }: {
   issue: Issue;
+  sheets: string[];
   busy: string | null;
   onApprove: () => void;
   onPrompt: (v: string) => void;
@@ -1168,6 +1192,7 @@ function CoverBlock({
         onChange={onPrompt}
         onRewrite={onRewrite}
       />
+      <RefLock pageN={0} pages={issue.pages} sheets={sheets} />
       {page?.imageUrl && <PageArt url={page.imageUrl} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
       <p className="help">The first draft is free and watermarked. That is picture 1 of 3. Unlock it for 2 edits. All three use the 2.0 model.</p>
       {!page?.imageUrl && (
@@ -1201,6 +1226,7 @@ function ActBlock({
   act,
   pages,
   issue,
+  sheets,
   busy,
   onSummary,
   onMode,
@@ -1219,6 +1245,7 @@ function ActBlock({
   act: "beginning" | "middle" | "ending";
   pages: number[];
   issue: Issue;
+  sheets: string[];
   busy: string | null;
   onSummary: (v: string) => void;
   onMode: (m: WriterMode) => void;
@@ -1282,6 +1309,7 @@ function ActBlock({
                       onChange={(v) => onPrompt(n, v)}
                       onRewrite={() => onRewritePage(n)}
                     />
+                    <RefLock pageN={n} pages={issue.pages} sheets={sheets} />
                     <div>
                       <span className="label">Who's on this page</span>
                       <div className="chips">

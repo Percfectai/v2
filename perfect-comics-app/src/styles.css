@@ -271,6 +271,10 @@ h1.head .cr { color: var(--color-gold-hi); }
   text-transform: uppercase;
 }
 .help { font-size: 13px; color: var(--color-muted); line-height: 1.5; }
+.reflock { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.reflock figure { margin: 0; background: #0b0f1c; border: 1px solid #243044; border-radius: 12px; padding: 8px; }
+.reflock img, .reflock .reflock__ph { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: #111827; display: grid; place-items: center; color: #94a3b8; font-size: 12px; }
+.reflock figcaption { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #67e8f9; }
 
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .choice {
