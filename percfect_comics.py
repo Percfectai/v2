@@ -237,6 +237,8 @@ def _comic_image(prompt: str, refs: List[str], model: str) -> Dict[str, Any]:
 
 @bp.route("/comics")
 @bp.route("/comics/")
+@bp.route("/build/comics")
+@bp.route("/build/comics/")
 @bp.route("/studios/comics")
 @bp.route("/studios/comics/")
 def comics_page():
