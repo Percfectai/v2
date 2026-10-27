@@ -557,6 +557,68 @@ export function Studio() {
     else setTab(n + 1 <= 3 ? 3 : n + 1 <= 6 ? 4 : 5);
   }
 
+  async function waitJob(jobId: string) {
+    const deadline = Date.now() + 8 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const res = await fetch(`/studios/generation-job/${encodeURIComponent(jobId)}`, { credentials: "same-origin" });
+      const data = await res.json().catch(() => null);
+      const st = String(data?.status || "").toLowerCase();
+      if (st === "failed" || st === "error") throw new Error(data?.error || data?.result?.error || "The character shots failed.");
+      if (st === "done" || st === "completed" || st === "success") return data?.result || data;
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+    throw new Error("The four shots took too long. Try again.");
+  }
+
+  async function makeFourShots(index: number) {
+    const member = issueRef.current?.characters[index];
+    const photo = member?.refUrl;
+    if (!photo) {
+      setError("Add your photo first. That one picture becomes the four shots.");
+      return;
+    }
+    setBusy("make-four");
+    setError("");
+    try {
+      const one = new FormData();
+      one.append("image_url_0", photo);
+      one.append("description", member.look || member.name || "the person in the photo");
+      const started = await fetch("/studios/percfectcharacter/generate-one", { method: "POST", credentials: "same-origin", body: one });
+      const startedData = await started.json().catch(() => null);
+      if (!started.ok) throw new Error(startedData?.error || "Could not start from your photo.");
+      const frontJob = startedData?.job_id || startedData?.id;
+      const front = frontJob ? await waitJob(frontJob) : startedData;
+      const frontUrl = front?.url || front?.primary_image_url;
+      if (!frontUrl) throw new Error("No front shot came back.");
+      const pack = new FormData();
+      pack.append("primary_image_url", frontUrl);
+      pack.append("prompt", member.look || member.name || "");
+      pack.append("name", member.name || `Character ${index + 1}`);
+      pack.append("source_mode", "comic");
+      const packed = await fetch("/studios/percfectcharacter/pack", { method: "POST", credentials: "same-origin", body: pack });
+      const packedData = await packed.json().catch(() => null);
+      if (!packed.ok) throw new Error(packedData?.error || "Could not make the four shots.");
+      const packJob = packedData?.job_id || packedData?.id;
+      const done = packJob ? await waitJob(packJob) : packedData;
+      const images = (done?.images || done?.character?.images || []).filter((u: unknown) => typeof u === "string").slice(0, 4);
+      if (images.length < 4) throw new Error("The four shots did not finish.");
+      const libId = done?.character?.id;
+      patch((i) => ({
+        ...i,
+        characters: i.characters.map((c, n) => n === index ? {
+          ...c,
+          id: libId ? `lib-${libId}` : c.id,
+          refUrl: images[0],
+          angles: images,
+        } : c),
+      }));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not make the four shots.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveCharacter(member: CastMember) {
     const images = shotsOf(member).slice(0, 4);
     if (images.length < 4) {
@@ -857,30 +919,31 @@ export function Studio() {
                           <article key={c?.id || `slot-${index}`} className="castrow">
                             <div className="label">Character {index + 1}</div>
                             <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
-                            <p className="help">Tap a box to upload that reference shot.</p>
+                            <p className="help">One photo of this person. That picture makes the four shots.</p>
+                            {!saved && (
+                              <label className="refshot">
+                                {c?.refUrl ? <img src={c.refUrl} alt="" /> : <span>Reference photo{"\n"}drop or tap</span>}
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = "";
+                                    void readRefPhoto(file, (dataUrl) => {
+                                      touch((characters) => characters.map((x, n) => n === index ? { ...x, refUrl: dataUrl, angles: [] } : x));
+                                    });
+                                  }}
+                                />
+                              </label>
+                            )}
+                            {c?.refUrl && !saved && (
+                              <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeFourShots(index)}>Make the four shots</button>
+                            )}
                             <div className="shotrow">
                               {POSE_LABELS.map((label, slot) => (
-                                <label key={label}>
-                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : `Upload ${label}`}
-                                  <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      e.target.value = "";
-                                      void readRefPhoto(file, (dataUrl) => {
-                                        touch((characters) => characters.map((x, n) => {
-                                          if (n !== index) return x;
-                                          const next = [...(x.angles || ["", "", "", ""])];
-                                          while (next.length < 4) next.push("");
-                                          next[slot] = dataUrl;
-                                          return { ...x, refUrl: next[0] || dataUrl, angles: next };
-                                        }));
-                                      });
-                                    }}
-                                  />
-                                  <span>{label}</span>
-                                </label>
+                                <div key={label} className="shotshow">
+                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : <span>{label}</span>}
+                                </div>
                               ))}
                             </div>
                             {c && (saved ? <p className="help">Already in the library.</p> : (

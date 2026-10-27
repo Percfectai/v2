@@ -277,6 +277,12 @@ h1.head .cr { color: var(--color-gold-hi); }
 .reflock figcaption { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #67e8f9; }
 .caststack { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
 .castrow { border: 1px solid var(--color-line2); border-radius: 16px; padding: 12px; background: var(--color-inset); }
+.refshot { display: grid; place-items: center; min-height: 180px; margin-top: 10px; border: 2px dashed rgba(196, 76, 255, 0.75); border-radius: 16px; background: rgba(8, 6, 22, 0.92); cursor: pointer; overflow: hidden; position: relative; }
+.refshot span { white-space: pre-line; text-align: center; color: #c4b5fd; font-weight: 700; }
+.refshot img { width: 100%; max-height: 280px; object-fit: contain; background: #0a0a12; }
+.refshot input { display: none; }
+.shotshow { position: relative; min-height: 120px; aspect-ratio: 3/4; border-radius: 12px; overflow: hidden; background: #0b0f1c; display: grid; place-items: center; color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.shotshow img { width: 100%; height: 100%; object-fit: cover; }
 .shotrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
 .shotrow label { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; min-height: 140px; aspect-ratio: 3/4; border: 1px dashed var(--color-line2); border-radius: 12px; overflow: hidden; background: #0b0f1c; cursor: pointer; }
 .shotrow img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
