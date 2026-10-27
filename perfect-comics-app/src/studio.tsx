@@ -157,18 +157,18 @@ function load(): Library {
     const raw = localStorage.getItem(KEY);
     if (!raw) {
       const issue = newIssue();
-      return { currentId: issue.id, issues: [issue], tickets: 24, credits: 320 };
+      return { currentId: issue.id, issues: [issue], tickets: 0, credits: 0 };
     }
     const parsed = JSON.parse(raw) as Library;
     if (!parsed.issues?.length) throw new Error("empty");
     return {
       ...parsed,
-      credits: typeof parsed.credits === "number" ? parsed.credits : 320,
+      credits: 0,
       issues: parsed.issues.map((issue) => normalize(issue)),
     };
   } catch {
     const issue = newIssue();
-    return { currentId: issue.id, issues: [issue], tickets: 24, credits: 320 };
+    return { currentId: issue.id, issues: [issue], tickets: 0, credits: 0 };
   }
 }
 
@@ -223,7 +223,7 @@ function shrinkRef(file: File): Promise<string> {
 
 export function Studio() {
   const [lib, setLib] = useState<Library | null>(null);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(3);
   const [menu, setMenu] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [reader, setReader] = useState(false);
@@ -281,15 +281,8 @@ export function Studio() {
     if (bookIsPaid(issue)) return;
     const free = comicNumber(lib.issues, issue.id) % 5 === 0;
     const have = owned(issue);
-    const next: Purchase = free || part === "all"
-      ? { cover: true, beginning: true, middle: true, ending: true }
-      : { ...have, [part]: true };
-    const cost = free ? 0 : due(have) - due(next);
-    if (!free && cost <= 0) return;
-    if (lib.credits < cost) {
-      setError(`That is ${money(cost)}. You have ${money(lib.credits)} in credits.`);
-      return;
-    }
+    const next: Purchase = { cover: true, beginning: true, middle: true, ending: true };
+    if (!free && due(have) <= 0) return;
     setError("");
     setLib((prev) => {
       if (!prev) return prev;
@@ -304,7 +297,7 @@ export function Studio() {
           updatedAt: new Date().toISOString(),
         };
       });
-      const nextLib = { ...prev, credits: prev.credits - cost, issues };
+      const nextLib = { ...prev, credits: 0, issues };
       localStorage.setItem(KEY, JSON.stringify(forSave(nextLib)));
       return nextLib;
     });
@@ -552,8 +545,7 @@ export function Studio() {
           </div>
         </div>
         <div className="wallet">
-          <span className="chip-w cr"><span className="dot cr" />{lib.credits}</span>
-          <span className="chip-w tk"><span className="dot tk" />{lib.tickets}</span>
+          <span className="chip-w cr"><span className="dot cr" />{money(ISSUE_PRICE)} a comic</span>
         </div>
       </header>
 
@@ -768,7 +760,7 @@ export function Studio() {
                     const page = issue.pages[0];
                     if (page) void ink(page, "rewrite");
                   }}
-                  onBuy={() => buy(freeBook ? "all" : "cover")}
+                  onBuy={() => buy("all")}
                   freeBook={freeBook}
                 />
               </section>
@@ -801,7 +793,7 @@ export function Studio() {
                       const page = issue.pages.find((p) => p.n === n);
                       if (page) void ink({ ...page }, "rewrite");
                     }}
-                    onBuy={() => buy(freeBook ? "all" : act)}
+                    onBuy={() => buy("all")}
                     onGenerate={() => void generateDrafts(pages)}
                     freeBook={freeBook}
                   />
@@ -1041,7 +1033,7 @@ function CoverBlock({
         <button className="btn-genpage" type="button" disabled={!!busy} onClick={onInk}>Generate draft</button>
       )}
       {page?.imageUrl && !owned(issue).cover && (
-        <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock this free cover · 2 edits" : `Unlock cover · ${money(COVER_PRICE)} · 2 edits`}</button>
+        <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock this free comic · 2 edits a page" : `Unlock this comic · ${money(ISSUE_PRICE)}`}</button>
       )}
       {page?.imageUrl && owned(issue).cover && (
         <p className="help">{page.editsLeft ?? 0} edits left.</p>
@@ -1120,7 +1112,7 @@ function ActBlock({
         {pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl) ? "Drafts are in" : "Generate these drafts"}
       </button>
       {pages.some((n) => issue.pages.find((p) => p.n === n)?.imageUrl) && !owned(issue)[act] && (
-        <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock these free pages · 2 edits each" : `Unlock these pages · ${money(ACT_PRICE)} · 2 edits each`}</button>
+        <button className="btn-publish" type="button" onClick={onBuy}>{freeBook ? "Unlock this free comic · 2 edits a page" : `Unlock this comic · ${money(ISSUE_PRICE)}`}</button>
       )}
       {issue.mode === "pageByPage" && (
         <>
