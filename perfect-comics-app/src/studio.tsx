@@ -177,7 +177,7 @@ async function stamp(src: string): Promise<string> {
   }
 }
 
-const TABS = ["Settings", "Character Reference", "Summary", "Cover", "Beginning", "Middle", "Ending", "Final Review"];
+const TABS = ["Cover", "Settings", "Summary", "Beginning", "Middle", "Ending", "Final Review"];
 
 type Library = { currentId: string; issues: Issue[]; tickets: number; credits: number };
 
@@ -260,7 +260,7 @@ function shrinkRef(file: File): Promise<string> {
 
 export function Studio() {
   const [lib, setLib] = useState<Library | null>(null);
-  const [tab, setTab] = useState(3);
+  const [tab, setTab] = useState(0);
   const [menu, setMenu] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [reader, setReader] = useState(false);
@@ -552,9 +552,9 @@ export function Studio() {
     }
     setError("");
     patchPage(n, (p) => ({ ...p, approved: true }));
-    if (n >= 9) setTab(7);
-    else if (n === 0) setTab(4);
-    else setTab(n + 1 <= 3 ? 4 : n + 1 <= 6 ? 5 : 6);
+    if (n >= 9) setTab(6);
+    else if (n === 0) setTab(3);
+    else setTab(n + 1 <= 3 ? 3 : n + 1 <= 6 ? 4 : 5);
   }
 
   async function saveCharacter(member: CastMember) {
@@ -640,7 +640,7 @@ export function Studio() {
   function openPage(n: number) {
     if (n !== 0) patch((i) => ({ ...i, mode: "pageByPage" }));
     setReader(false);
-    setTab(n === 0 ? 3 : n <= 3 ? 4 : n <= 6 ? 5 : 6);
+    setTab(n === 0 ? 0 : n <= 3 ? 3 : n <= 6 ? 4 : 5);
     window.setTimeout(() => {
       document.getElementById(`page-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -655,9 +655,9 @@ export function Studio() {
   const bookNo = comicNumber(lib.issues, issue.id);
   const freeBook = bookNo % 5 === 0;
   const acts: { act: Exclude<Act, "cover">; tab: number; pages: number[] }[] = [
-    { act: "beginning", tab: 4, pages: [1, 2, 3] },
-    { act: "middle", tab: 5, pages: [4, 5, 6] },
-    { act: "ending", tab: 6, pages: [7, 8, 9] },
+    { act: "beginning", tab: 3, pages: [1, 2, 3] },
+    { act: "middle", tab: 4, pages: [4, 5, 6] },
+    { act: "ending", tab: 5, pages: [7, 8, 9] },
   ];
 
   return (
@@ -680,7 +680,7 @@ export function Studio() {
 
       <div className="studiotabs">
         <button className={!reader ? "on" : ""} type="button" onClick={() => setReader(false)}>Studio</button>
-        <button className={reader ? "on" : ""} type="button" onClick={() => { setReader(true); setTab(7); }}>Reader</button>
+        <button className={reader ? "on" : ""} type="button" onClick={() => { setReader(true); setTab(6); }}>Reader</button>
       </div>
 
       {!reader && (
@@ -720,7 +720,7 @@ export function Studio() {
             </section>
           ) : (
             <>
-              <section className={`subpage${tab === 0 ? " on" : ""}`}>
+              <section className={`subpage${tab === 1 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">Settings</div>
                   <h1 className="head">Set the issue. <span className="cr">Then write it.</span></h1>
@@ -804,15 +804,7 @@ export function Studio() {
                 />
               </section>
 
-              <section className={`subpage${tab === 1 ? " on" : ""}`}>
-                <div>
-                  <div className="kicker">Characters</div>
-                  <h1 className="head">Characters sit on the cover page.</h1>
-                  <p className="subhead">The cover prompt is on top. The four characters are underneath it.</p>
-                </div>
-                <button className="btn-publish" type="button" onClick={() => setTab(3)}>Open the cover</button>
-              </section>
-              <section className={`subpage${tab === 3 ? " on" : ""}`}>
+              <section className={`subpage${tab === 0 ? " on" : ""}`}>
                 <CoverBlock
                   issue={issue}
                   sheets={sheets}
@@ -966,7 +958,7 @@ export function Studio() {
                 </section>
               ))}
 
-              <section className={`subpage${tab === 7 ? " on" : ""}`}>
+              <section className={`subpage${tab === 6 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">Final Review</div>
                   <h1 className="head">{issue.title || "My Percfect Hero"}</h1>
@@ -1052,7 +1044,7 @@ export function Studio() {
             </p>
             <div className="nextpage">Rewrites left <b>{issue.rewritesLeft}</b> of {REWRITES} · Small changes left <b>{issue.smallChangesLeft}</b> of {SMALL_CHANGES}</div>
             {error && <div className="errbox">{error}</div>}
-            {tab < 7 && (
+            {tab < 6 && (
               <button className="btn-gen" type="button" onClick={() => setTab(tab + 1)}>
                 Next
               </button>
@@ -1195,7 +1187,7 @@ function CoverBlock({
   return (
     <div id="page-0">
       <div>
-        <div className="kicker">Cover</div>
+        <div className="kicker">1 · Cover</div>
         <h1 className="head">Cover</h1>
         <p className="subhead">Write the cover. Under it, up to four characters. Name any of them in the prompt.</p>
       </div>
