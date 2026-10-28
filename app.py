@@ -89,7 +89,7 @@ def _princess_disabled_response():
 
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "percfect-secret-key")
+app.secret_key = os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY") or "percfect-secret-key"
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
