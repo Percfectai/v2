@@ -1558,8 +1558,14 @@ def _apply_spend(user_id, row: dict, amount: int, extra: dict = None) -> bool:
 def _subscription_bonus_pct(user_id) -> int:
     """Top-up bonus if user has an active subscription (checked via Stripe customer)."""
     try:
-        res = supabase.table("users").select("stripe_customer_id,stripe_subscription_plan").eq("id", user_id).single().execute()
-        plan_key = (res.data or {}).get("stripe_subscription_plan")
+        res = supabase.table("users").select("stripe_customer_id").eq("id", user_id).single().execute()
+        # stripe_subscription_plan is optional on V2 — probe separately
+        plan_key = None
+        try:
+            r2 = supabase.table("users").select("stripe_subscription_plan").eq("id", user_id).single().execute()
+            plan_key = (r2.data or {}).get("stripe_subscription_plan")
+        except Exception:
+            plan_key = None
         if plan_key and plan_key in SUBSCRIPTION_PLANS:
             return int(SUBSCRIPTION_PLANS[plan_key].get("topup_bonus_pct") or 0)
     except Exception:
@@ -5719,9 +5725,10 @@ def percfect_3d_page():
         try:
             reset_daily_if_needed(current_user.id)
             res = supabase.table("users").select(
-                "picture_credits,video_credits,has_purchased"
+                "picture_credits,video_credits,is_admin"
             ).eq("id", current_user.id).single().execute()
-            user_data = res.data
+            user_data = dict(res.data or {})
+            user_data["has_purchased"] = bool(user_data.get("is_admin"))
         except Exception:
             user_data = None
     return render_template("percfect_3d.html", user=user_data)
@@ -8372,7 +8379,8 @@ def _safe_user_update(user_id, updates: dict):
             return True, payload
         except Exception:
             optional = (
-                "display_name", "stripe_customer_id",
+                "display_name", "stripe_customer_id", "stripe_subscription_plan",
+                "has_purchased",
                 "social_twitter", "social_instagram", "social_tiktok",
                 "social_youtube", "social_website",
             )
@@ -8626,17 +8634,35 @@ def account_settings():
 
 # ── PercfectStudios hub + dedicated pages ─────────────────
 def _studio_user_credits():
+    """Studio credit badge row. V2 may lack optional columns like has_purchased."""
     user_data = None
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
-        res = (
-            supabase.table("users")
-            .select("picture_credits,video_credits,images_today,videos_today,has_purchased")
-            .eq("id", current_user.id)
-            .single()
-            .execute()
-        )
-        user_data = res.data
+        try:
+            res = (
+                supabase.table("users")
+                .select("picture_credits,video_credits,images_today,videos_today,is_admin")
+                .eq("id", current_user.id)
+                .single()
+                .execute()
+            )
+            user_data = dict(res.data or {})
+            purchased = bool(user_data.get("is_admin"))
+            try:
+                r2 = (
+                    supabase.table("users")
+                    .select("has_purchased")
+                    .eq("id", current_user.id)
+                    .single()
+                    .execute()
+                )
+                purchased = purchased or bool((r2.data or {}).get("has_purchased"))
+            except Exception:
+                pass
+            user_data["has_purchased"] = purchased
+        except Exception:
+            app.logger.exception("studio user credits load failed")
+            user_data = None
     return user_data
 
 
@@ -10435,11 +10461,11 @@ def stripe_webhook():
                     pass
             if not user_id and inv.get("customer"):
                 try:
-                    ures = supabase.table("users").select("id,stripe_subscription_plan")\
+                    ures = supabase.table("users").select("id")\
                         .eq("stripe_customer_id", inv.get("customer")).limit(1).execute()
                     if ures.data:
                         user_id = ures.data[0]["id"]
-                        plan_key = plan_key or ures.data[0].get("stripe_subscription_plan")
+                        plan_key = plan_key  # stripe_subscription_plan column optional on V2
                 except Exception:
                     pass
             plan = SUBSCRIPTION_PLANS.get(plan_key or "")
@@ -10913,10 +10939,17 @@ def _load_bytes(url: str) -> bytes:
 
 
 def _user_has_purchased(user_id) -> bool:
+    """Admins always pass. has_purchased is optional on V2 schemas."""
     try:
-        res = supabase.table("users").select("has_purchased,is_admin").eq("id", user_id).single().execute()
+        res = supabase.table("users").select("is_admin").eq("id", user_id).single().execute()
         d = res.data or {}
-        return bool(d.get("is_admin")) or bool(d.get("has_purchased"))
+        if bool(d.get("is_admin")):
+            return True
+    except Exception:
+        return False
+    try:
+        res = supabase.table("users").select("has_purchased").eq("id", user_id).single().execute()
+        return bool((res.data or {}).get("has_purchased"))
     except Exception:
         return False
 
@@ -11227,12 +11260,12 @@ def percfect_character_legacy():
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select(
-            "picture_credits,video_credits,images_today,videos_today,has_purchased,is_admin"
+            "picture_credits,video_credits,images_today,videos_today,is_admin"
         ).eq("id", current_user.id).single().execute()
-        user_data = res.data or {}
+        user_data = dict(res.data or {})
+        user_data["has_purchased"] = bool(user_data.get("is_admin"))
         # Template badges: show unified wallet (one number for all studio spends)
         bal = _user_credits(user_data)
-        user_data = dict(user_data)
         user_data["picture_credits"] = bal
         user_data["video_credits"] = bal
         try:
@@ -11970,9 +12003,10 @@ def character_shop_page():
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select(
-            "picture_credits,video_credits,has_purchased,is_admin"
+            "picture_credits,video_credits,is_admin"
         ).eq("id", current_user.id).single().execute()
-        user_data = res.data
+        user_data = dict(res.data or {})
+        user_data["has_purchased"] = bool(user_data.get("is_admin"))
         bal = _user_credits(user_data)
     catalog = _shop_catalog()
     listings = [char_shop.public_listing_view(x) for x in char_shop.active_listings(catalog)]
@@ -12183,9 +12217,10 @@ def _arena_page_context():
         reset_daily_if_needed(current_user.id)
         try:
             res = supabase.table("users").select(
-                "picture_credits,video_credits,has_purchased"
+                "picture_credits,video_credits,is_admin"
             ).eq("id", current_user.id).single().execute()
-            user_data = res.data
+            user_data = dict(res.data or {})
+            user_data["has_purchased"] = bool(user_data.get("is_admin"))
         except Exception:
             user_data = None
     backgrounds = []
@@ -12654,9 +12689,10 @@ def percfect_motion():
     if current_user.is_authenticated:
         reset_daily_if_needed(current_user.id)
         res = supabase.table("users").select(
-            "picture_credits,video_credits,has_purchased"
+            "picture_credits,video_credits,is_admin"
         ).eq("id", current_user.id).single().execute()
-        user_data = res.data
+        user_data = dict(res.data or {})
+        user_data["has_purchased"] = bool(user_data.get("is_admin"))
     return render_template(
         "percfectmotion.html",
         user=user_data,

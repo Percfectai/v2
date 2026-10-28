@@ -35,6 +35,10 @@ alter table users add column if not exists social_youtube text;
 alter table users add column if not exists social_website text;
 alter table users add column if not exists tickets int default 0;
 alter table users add column if not exists tickets_daily_at date;
+-- V2 studio unlocks / billing (required by app.py studio pages + Stripe)
+alter table users add column if not exists has_purchased boolean default false;
+alter table users add column if not exists stripe_subscription_plan text;
+
 
 -- Trading / Battle card progression (level 1–4 · unlock abilities)
 alter table characters add column if not exists card_level int default 1;
