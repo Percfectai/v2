@@ -1,18 +1,4424 @@
 {% extends "base.html" %}
-{% block title %}{{ "Percfect Videos" if studio_mode == "videos" else "Percfect Pictures" }} — Percfect Studios{% endblock %}
+{% set mode = studio_mode|default('photos') %}
+{% block title %}{% if mode == 'videos' %}PERCFECT VIDEOS{% else %}PERCFECT PHOTOS{% endif %}{% endblock %}
+{% block body_class %}{% if mode == 'videos' %}theme-videos{% else %}theme-photos{% endif %}{% endblock %}
+
 {% block content %}
-<div id="studio-app" data-mode="{{ studio_mode }}">
-    <!-- STUB: The real percfectstudios.html had the full photos/videos studio UI.
-         This includes: prompt input, reference photo upload, aspect ratio picker,
-         batch controls, AI-assist, saved/recent strip, results grid.
-         Restore from the live site or rebuild per HANDOFFS/01_PHOTOS.md -->
-    <h1>{{ "Percfect Videos" if studio_mode == "videos" else "Percfect Pictures" }}</h1>
-    <p style="color:#aaa;">Studio template stub — needs full UI restoration.</p>
+
+<!-- ── Hero: title only (big + colorful). Credits live in the top nav. ── -->
+<div class="studio-hero">
+  <div class="container">
+    {% if mode == 'videos' %}
+    <h1 class="hero-grad" style="letter-spacing:-.03em;">PERCFECT VIDEOS</h1>
+    {% else %}
+    <h1 class="hero-grad" style="letter-spacing:-.03em;">PERCFECT PHOTOS</h1>
+    {% endif %}
+    {# Hidden balance hooks for gen cost math (not shown on page) #}
+    <span id="img-credits" class="visually-hidden" aria-hidden="true">{% if user %}{{ user.picture_credits }}{% else %}0{% endif %}</span>
+    <span id="vid-credits" class="visually-hidden" aria-hidden="true">{% if user %}{{ user.video_credits }}{% else %}0{% endif %}</span>
+  </div>
 </div>
-{% endblock %}
-{% block scripts %}
-<script src="/static/js/studio_jobs.js"></script>
-{% if studio_mode == "videos" %}
-<script src="/static/js/video_extend.js"></script>
+
+<!-- ── Generator panels ──────────────────────────────────── -->
+<div class="container mb-5">
+  <div class="row g-4">
+
+    {% if mode == 'photos' %}
+    {# 3 columns: LEFT prompt · CENTER refs 1/2/3 stack · RIGHT advanced · results bare underneath #}
+    <div class="col-12">
+      <div class="photos-board" id="img-panel">
+
+        <div class="photos-col photos-col-prompt" id="photo-prompt-wrap">
+          <textarea class="form-control photos-prompt" id="img-prompt" rows="4"
+            placeholder="Describe / paste…"
+            aria-label="Prompt"></textarea>
+          <button class="generate-btn photos-gen-btn" id="img-btn" onclick="generateImage()">
+            <span id="img-btn-text">Generate <span id="img-cost-label">(1)</span></span>
+            <span id="img-btn-spinner" style="display:none">Generating…</span>
+          </button>
+          <div id="img-toast" class="batch-toast" style="display:none" role="status" aria-live="polite"></div>
+          <div id="batch-toast" class="batch-toast" style="display:none" role="status" aria-live="polite"></div>
+          <div id="batch-error" class="gen-error" style="display:none"></div>
+          <div id="img-error" class="gen-error" style="display:none"></div>
+        </div>
+
+        {# Middle: refs stacked vertically 1 / 2 / 3 #}
+        <div class="photos-col photos-col-refs" id="photo-refs-block">
+          <div class="ref-box ref-box-stack" id="img-ref-slots" data-lib-drop="image" aria-label="References">
+            <div class="ref-cell" data-slot="0" id="img-ref-0" tabindex="0" role="button" aria-label="Photo 1" onclick="photoPickSlot(0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();photoPickSlot(0);}"></div>
+            <div class="ref-cell" data-slot="1" id="img-ref-1" tabindex="0" role="button" aria-label="Photo 2" onclick="photoPickSlot(1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();photoPickSlot(1);}"></div>
+            <div class="ref-cell" data-slot="2" id="img-ref-2" tabindex="0" role="button" aria-label="Photo 3" onclick="photoPickSlot(2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();photoPickSlot(2);}"></div>
+          </div>
+          <input type="file" id="img-file-input" accept="image/*" style="display:none" onchange="photoHandleFile(this)" />
+        </div>
+
+        <div class="photos-col photos-col-adv" id="photo-advanced">
+          <div class="photos-adv-label">PERCFECT styleS</div>
+          <div class="style-chips" id="img-style-chips">
+            <span class="style-chip active" onclick="toggleStyle(this,'img')">None</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">GTA 5</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Concept Art</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">3D Animation</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">3D Pixar</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">2D Animation</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Realistic</span>
+            <span class="style-chip" onclick="toggleStyle(this,'img')">Anime</span>
+          </div>
+          <div class="photos-adv-label">aspect ratio</div>
+          <div class="style-chips" id="img-size-chips" role="group" aria-label="aspect ratio">
+            {# Default Auto — click any fixed ratio, then Auto again to go back #}
+            <span class="style-chip active" data-aspect="auto" id="img-size-auto" onclick="togglePhotoSize(this)" title="Default. With a reference photo, output matches the photo shape (no stretch). Fixed sizes only force the frame on text-only gens.">Auto</span>
+            <span class="style-chip" data-aspect="1:1" onclick="togglePhotoSize(this)">1:1</span>
+            <span class="style-chip" data-aspect="9:16" onclick="togglePhotoSize(this)">9:16</span>
+            <span class="style-chip" data-aspect="3:4" onclick="togglePhotoSize(this)">3:4</span>
+            <span class="style-chip" data-aspect="16:9" onclick="togglePhotoSize(this)">16:9</span>
+            <span class="style-chip" data-aspect="4:3" onclick="togglePhotoSize(this)">4:3</span>
+          </div>
+          <div class="photos-adv-label">Split screen</div>
+          <div class="style-chips photos-split-chips" id="img-split-chips" role="group" aria-label="Split screen">
+            <button type="button" class="style-chip" data-split="4" onclick="togglePhotoSplit(this)" title="four-way split screen">four-way</button>
+            <button type="button" class="style-chip" data-split="6" onclick="togglePhotoSplit(this)" title="six-way split screen">six-way</button>
+            <button type="button" class="style-chip" data-split="8" onclick="togglePhotoSplit(this)" title="eight-way split screen">eight-way</button>
+          </div>
+          <div class="photos-adv-label">Batch</div>
+          <div class="photos-batch-row">
+            <button type="button" class="photos-batch-sm" data-batch="5" onclick="runPhotoBatch(5)">×5</button>
+            <button type="button" class="photos-batch-sm" data-batch="10" onclick="runPhotoBatch(10)">×10</button>
+          </div>
+          <button type="button" id="batch-btn" style="display:none" aria-hidden="true">
+            <span id="batch-btn-text">Batch</span>
+            <span id="batch-btn-spinner" style="display:none">Batch…</span>
+          </button>
+        </div>
+
+        <div id="img-drop-zone" style="display:none" aria-hidden="true"></div>
+        <input type="hidden" id="img-image-url" value="" />
+
+        {# Results: no frame box — images just appear underneath #}
+        <div class="photos-results" id="img-output-area">
+          <div class="output-placeholder" id="img-placeholder" style="display:none"></div>
+          <div class="loading-overlay" id="img-loading">
+            <div class="spinner"></div>
+            <p id="img-progress-label">Generating…</p>
+            <small id="img-progress-sub"></small>
+          </div>
+          <img id="img-result" class="photos-result-one" src="" alt="" />
+          <div id="batch-result-grid" class="photos-result-stack" style="display:none" aria-label="Batch results"></div>
+        </div>
+
+        <div id="img-actions" style="display:none" class="output-actions photos-actions">
+          <a id="img-download" href="#" onclick="downloadFile(this.dataset.url,'percfect-image.jpg');return false;" class="btn-outline-accent btn-sm">↓ Download</a>
+          <button type="button" class="btn-outline-accent btn-sm" onclick="editImageFromResult()">✎ Edit</button>
+          <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('img-result').src,'image',document.getElementById('img-prompt').value)">𝕏 Post to X</button>
+          <button onclick="sendToVideoFromResult()" class="btn-accent btn-sm">▶ Animate</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}{# photos image panel #}
+
+    {% if mode == 'videos' %}
+    {# PORTION 1 Generate · July-15 chrome · left prompt+6/10/15 · mid video · right 4 square refs #}
+    <div class="col-12">
+      <div class="photos-board videos-board videos-board-gen" id="vid-panel">
+
+        <div class="photos-col photos-col-prompt" id="vid-prompt-col">
+          <div class="vid-prompt-wrap">
+            <textarea class="form-control photos-prompt" id="vid-prompt" rows="5"
+              placeholder="Describe / paste…"
+              aria-label="Video prompt"></textarea>
+            <button type="button" class="vid-clear-btn" id="vid-clear-prompt" onclick="clearVidPrompt()" title="Clear prompt">Clear</button>
+          </div>
+          <div class="style-chips photos-split-chips duration-chips" id="vid-duration-chips" role="group" aria-label="Generate seconds">
+            <span class="style-chip active" onclick="setDuration(this,6)">6s</span>
+            <span class="style-chip" onclick="setDuration(this,10)">10s</span>
+            <span class="style-chip" onclick="setDuration(this,15)">15s</span>
+          </div>
+          <p class="credit-note" id="duration-note" style="text-align:center;margin:0;">6s · <span id="vid-rate-note">3</span> credits/sec · 480p</p>
+          <button class="generate-btn photos-gen-btn generate-btn-video" id="vid-btn" onclick="generateVideo()">
+            <span id="vid-btn-text">Generate (<span id="vid-cost">18</span>)</span>
+            <span id="vid-btn-spinner" style="display:none">Generating…</span>
+          </button>
+          {# Progress lives under Generate so it is always visible (not buried in mid frame) #}
+          <div id="vid-progress-wrap" class="vid-progress-card" style="display:none;margin-top:0.65rem;" aria-live="polite">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.45rem;gap:.5rem;">
+              <span style="font-size:0.85rem;font-weight:600;" id="vid-progress-label">Starting…</span>
+              <span style="font-size:0.95rem;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent-2,#a78bfa);" id="vid-progress-pct">0%</span>
+            </div>
+            <div style="background:var(--bg-2);border-radius:99px;height:14px;overflow:hidden;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="vid-progress-track">
+              <div id="vid-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;transition:width 0.45s linear;"></div>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.4rem;text-align:center;" id="vid-progress-sub">Working…</div>
+          </div>
+          <label class="vid-save-toggle" style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.55rem;font-size:0.75rem;line-height:1.35;cursor:pointer;color:var(--text-muted);">
+            <input type="checkbox" id="vid-save-library" checked style="margin-top:0.2rem;accent-color:var(--accent);" />
+            <span><strong style="color:var(--text);">Save to library</strong> · off = download only</span>
+          </label>
+          <div id="vid-error" class="gen-error" style="display:none"></div>
+        </div>
+
+        <div class="photos-col photos-col-mid" id="vid-mid-col">
+          <div class="vid-mid-frame" id="vid-output-area">
+            <div class="vid-mid-placeholder" id="vid-placeholder">
+              <span>Your video</span>
+              <small>480p · appears here</small>
+            </div>
+            {# Spinner kept for CSS/id hooks but video gen uses progress card (never covers the bar) #}
+            <div class="loading-overlay" id="vid-loading" style="display:none !important" aria-hidden="true"><div class="spinner"></div><p id="vid-loading-text">Generating…</p></div>
+            <video id="vid-result" class="videos-result-one" controls loop playsinline></video>
+          </div>
+          <div id="vid-actions" style="display:none" class="output-actions photos-actions vid-next-actions">
+            <a id="vid-download" href="#" onclick="downloadFile(this.dataset.url,'percfect-video.mp4');return false;" class="btn-outline-accent btn-sm">↓ Download</a>
+            <button type="button" class="btn-outline-accent btn-sm" onclick="redoVideo()">↻ Generate again</button>
+            <button type="button" class="btn-accent btn-sm" onclick="goExtendFromResult()">⤢ Extend this video</button>
+            <button type="button" class="btn-share-x btn-sm" onclick="shareToX(document.getElementById('vid-result').src,'video',document.getElementById('vid-prompt').value)">𝕏 Post</button>
+          </div>
+          <div class="vid-frame-tools" id="vid-frame-tools" style="display:none">
+            <button type="button" class="btn-outline-accent btn-sm" onclick="vidStep('vid-result',-1)">⟨ frame</button>
+            <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('vid-result',0.25)">¼×</button>
+            <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('vid-result',0.5)">½×</button>
+            <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('vid-result',1)">1×</button>
+            <button type="button" class="btn-outline-accent btn-sm" onclick="vidStep('vid-result',1)">frame ⟩</button>
+            <button type="button" class="btn-accent btn-sm" onclick="vidCaptureStill('vid-result')">📷 Still</button>
+            <span class="credit-note" id="vid-frame-time" style="margin:0">shot-for-shot</span>
+          </div>
+        </div>
+
+        <div class="photos-col photos-col-refs" id="vid-refs-col">
+          <div class="vid-refs-head">
+            <span class="photos-adv-label" style="margin:0;">References</span>
+            <div class="vid-refs-actions" title="P = your Percfect library · + = photo from your computer">
+              {# Same crown as corner FAB — smaller twin, same open action #}
+              <button type="button" class="user-lib-fab user-lib-fab--inline user-lib-fab--sm" id="vid-lib-open-btn" onclick="openStudioVideoImagePicker()" title="Your Percfect library (same as corner)" aria-label="Open your library">
+                <img src="/static/assets/brand/percfect_p_crown.jpg" alt="Library" />
+              </button>
+              {# Local computer file → next empty ref slot #}
+              <button type="button" class="vid-ref-plus" id="vid-ref-plus-btn" onclick="openLocalVideoRefFile()" title="Photo from your computer" aria-label="Add photo from computer">+</button>
+            </div>
+          </div>
+          <div class="vid-ref-grid" id="vid-ref-slots" data-lib-drop="image" aria-label="Video references">
+            <div class="vid-ref-cell" data-slot="0" id="vid-ref-0" tabindex="0" role="button" aria-label="Ref 1" onclick="vidPickSlot(0)"></div>
+            <div class="vid-ref-cell" data-slot="1" id="vid-ref-1" tabindex="0" role="button" aria-label="Ref 2" onclick="vidPickSlot(1)"></div>
+            <div class="vid-ref-cell" data-slot="2" id="vid-ref-2" tabindex="0" role="button" aria-label="Ref 3" onclick="vidPickSlot(2)"></div>
+            <div class="vid-ref-cell" data-slot="3" id="vid-ref-3" tabindex="0" role="button" aria-label="Ref 4" onclick="vidPickSlot(3)"></div>
+          </div>
+          <button type="button" class="vid-clear-btn vid-clear-refs" id="vid-clear-refs" onclick="clearVidRefs()" title="Clear all references">Clear refs</button>
+          <p class="form-hint" style="margin:.4rem 0 0;text-align:center;">
+            <strong>P</strong> = your library on Percfect · <strong>+</strong> = file from your computer<br />
+            Empty box: pick P or + · drag / paste · filled pic inserts 📸1–4
+          </p>
+          <input type="file" id="vid-file-input" accept="image/*" style="display:none" onchange="vidHandleFile(this)" />
+          {# legacy hooks for library/paste helpers #}
+          <div id="drop-zone" style="display:none" aria-hidden="true"></div>
+          <input type="hidden" id="vid-image-url" value="" />
+          <img id="drop-preview" src="" alt="" style="display:none" />
+          <span id="drop-label" style="display:none"></span>
+        </div>
+      </div>
+
+      {# PORTION 2 Extend · same July-15 chrome · 6/8/10 · trim if too long #}
+      <div class="videos-extend-break" aria-hidden="true"><span>⤢ Extend</span></div>
+      <div class="photos-board videos-board videos-board-extend" id="vid-extend">
+        <div class="photos-col photos-col-prompt">
+          <div class="extend-prompt-wrap">
+            <div class="extend-prefix">extend this video</div>
+            <textarea id="extend-prompt" class="form-control extend-prompt-extra" rows="4" maxlength="2000" placeholder="(optional — e.g. camera pulls back slowly)"></textarea>
+          </div>
+          <button type="button" class="generate-btn photos-gen-btn generate-btn-video" id="extend-btn" onclick="extendVideo()">
+            ⤢ Extend (+<span id="extend-cost">36</span>)
+          </button>
+          <div id="extend-error" class="gen-error" style="display:none"></div>
+        </div>
+
+        <div class="photos-col photos-col-mid">
+          {# No zone onclick — file picker only via buttons below (loaded video must control playback) #}
+          <div id="extend-drop-zone" class="vid-start-frame extend-src-box" data-lib-drop="video" aria-label="Source video drop zone">
+            <span id="extend-drop-label" class="vid-start-hint">Source clip<br /><span style="font-size:.78rem;opacity:.85">result above · drop MP4 · or use buttons</span></span>
+            <video id="extend-drop-preview" controls playsinline muted loop></video>
+          </div>
+          <div class="extend-source-btns" id="extend-source-btns">
+            <button type="button" class="btn-outline-accent btn-sm" id="extend-upload-btn" onclick="document.getElementById('extend-file-input').click()">Upload from computer</button>
+            <button type="button" class="btn-outline-accent btn-sm" id="extend-library-btn" onclick="openStudioExtendPicker()">Choose from Library</button>
+          </div>
+          <input type="file" id="extend-file-input" accept="video/mp4,video/*,.mp4" style="display:none" />
+          <input type="hidden" id="extend-video-url" value="" />
+          {# QT-style: yellow range = keep · two handles · scrub · Trim saves NEW source · then Extend #}
+          <div id="extend-trim-wrap" class="extend-trim-wrap">
+            <p class="credit-note" style="margin:0 0 .4rem;text-align:left;">
+              <strong style="color:#fbbf24">Yellow</strong> = keep · drag handles · free Trim saves a new clip · then Extend
+            </p>
+            <div class="clip-hl-track" id="clip-hl-track" title="Drag yellow ends to set in/out">
+              <div class="clip-hl-rail"></div>
+              <div class="clip-hl-window" id="clip-hl-window" role="group" aria-label="Keep range">
+                <span class="clip-hl-handle clip-hl-handle-l" id="clip-hl-h-l" aria-label="In"></span>
+                <span class="clip-hl-handle clip-hl-handle-r" id="clip-hl-h-r" aria-label="Out"></span>
+              </div>
+              <div class="clip-hl-playhead" id="clip-hl-playhead" aria-hidden="true"></div>
+            </div>
+            <p class="credit-note" id="extend-trim-label" style="margin:.35rem 0 0;text-align:center;">Load a source, set yellow range, hit Trim (free) or skip and Extend</p>
+            <button type="button" class="btn-outline-accent btn-sm" id="trim-apply-btn" style="width:100%;margin-top:.5rem;" onclick="applyTrimToSource()">✂ Trim · save as new clip (free)</button>
+            <div class="vid-frame-tools" style="margin-top:.5rem">
+              <button type="button" class="btn-outline-accent btn-sm" onclick="vidStep('extend-drop-preview',-1)">⟨ frame</button>
+              <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('extend-drop-preview',0.25)">¼×</button>
+              <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('extend-drop-preview',0.5)">½×</button>
+              <button type="button" class="btn-outline-accent btn-sm" onclick="vidSetRate('extend-drop-preview',1)">1×</button>
+              <button type="button" class="btn-outline-accent btn-sm" onclick="vidStep('extend-drop-preview',1)">frame ⟩</button>
+              <button type="button" class="btn-accent btn-sm" onclick="vidCaptureStill('extend-drop-preview')">📷 Still</button>
+            </div>
+          </div>
+          <div id="extend-progress-wrap" class="vid-progress-card" style="display:none;margin-top:.65rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <span style="font-size:0.85rem;font-weight:600;" id="extend-progress-label">Extending…</span>
+            </div>
+            <div style="background:var(--bg-2);border-radius:99px;height:10px;overflow:hidden;">
+              <div id="extend-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;transition:width 0.35s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="photos-col photos-col-adv">
+          <div class="photos-adv-label">Extend by</div>
+          <div class="style-chips photos-split-chips duration-chips" id="extend-chips" role="group" aria-label="Extend seconds">
+            <span class="style-chip active" onclick="setExtend(this,6)">+6s</span>
+            <span class="style-chip" onclick="setExtend(this,8)">+8s</span>
+            <span class="style-chip" onclick="setExtend(this,10)">+10s</span>
+          </div>
+          <p class="credit-note" style="text-align:center;margin:0 0 .5rem;"><span id="extend-rate-note">6</span> credits/sec · 480p</p>
+          <p class="credit-note" style="text-align:center;margin:0;font-size:.72rem;opacity:.85;">No trim needed if clip is already short enough</p>
+        </div>
+      </div>
+
+      <div class="videos-extend-break" aria-hidden="true"><span>🎞 Movie</span></div>
+      <div class="photos-board videos-board" id="vid-movie">
+        <div class="photos-col photos-col-prompt">
+          <p class="photos-adv-label">Stitch clips</p>
+          <p class="credit-note" style="margin:0 0 .6rem">Trim or extend small pieces, add them here, merge into one longer video. Free.</p>
+          <button type="button" class="btn-outline-accent" style="width:100%;margin-bottom:.4rem" onclick="movieAddCurrent()">+ Add current clip</button>
+          <button type="button" class="generate-btn photos-gen-btn generate-btn-video" onclick="movieMerge()">Merge movie (free)</button>
+          <div id="movie-error" class="gen-error" style="display:none"></div>
+        </div>
+        <div class="photos-col photos-col-mid">
+          <ol class="movie-clip-list" id="movie-clips"></ol>
+          <video id="movie-result" class="videos-result-one" controls playsinline style="display:none;margin-top:.6rem"></video>
+        </div>
+        <div class="photos-col photos-col-adv">
+          <p class="photos-adv-label">Order</p>
+          <p class="credit-note">Top = first. Merge in that order.</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}{# videos panel #}
+
+  </div>
+</div>
+
+<!-- ── Bottom strip: last gens (videos = last 6 only, under Extend) ───── -->
+<div class="container mb-6" id="gallery-section" style="display:none">
+  {% if mode == 'videos' %}
+  <div class="last6-head">
+    <div>
+      <p class="section-label" style="margin:0">Your last 6 videos</p>
+      <p class="library-hint" style="margin:0.25rem 0 0">Newest first · click to play</p>
+    </div>
+  </div>
+  <div id="gallery-videos-empty" class="library-empty" style="display:none">No saved videos yet — generate one above and keep “Save to library” on.</div>
+  <div class="last6-row">
+    <div class="library-grid library-grid-last6" id="gallery-videos"></div>
+    <a class="all-videos-tile" href="/studios/library?tab=videos" title="Open full video library">
+      <span class="all-videos-tile-icon">▶</span>
+      <strong>All videos</strong>
+      <small>Full library</small>
+    </a>
+  </div>
+  <div id="gallery-images-empty" class="library-empty" style="display:none" aria-hidden="true"></div>
+  <div class="library-grid" id="gallery-images" style="display:none"></div>
+  {% else %}
+  <p class="section-label">Your PERCFECT PHOTOS</p>
+  <p class="library-hint">Click any item to enlarge · check boxes to download or delete in bulk</p>
+  <div id="gallery-images-empty" class="library-empty" style="display:none" aria-hidden="true"></div>
+  <div class="library-grid" id="gallery-images"></div>
+  <div id="gallery-videos-empty" class="library-empty" style="display:none" aria-hidden="true"></div>
+  <div class="library-grid" id="gallery-videos" style="display:none"></div>
+  {% endif %}
+
+  <div id="library-toolbar" class="batch-toolbar" style="display:none">
+    <button type="button" class="btn-accent btn-sm" id="lib-download-btn" onclick="downloadSelectedLibrary()" disabled>↓ Download <span id="lib-sel-count">0</span> selected</button>
+    <button type="button" class="btn-outline-accent btn-sm" onclick="librarySelectAll()">Select all</button>
+    <button type="button" class="btn-outline-accent btn-sm" onclick="libraryClearSelection()">Clear</button>
+    <button type="button" class="btn-outline-accent btn-sm" id="lib-delete-btn" onclick="deleteSelectedLibrary()" disabled>Delete selected</button>
+  </div>
+</div>
+
+
+{% if mode == 'photos' %}
+<!-- ── Bottom crop tool (Photos only — keep above untouched) ─────────── -->
+<div class="container mb-6" id="photo-crop-section">
+  <p class="section-label">Crop tool</p>
+  <p class="library-hint">Load a photo, drag a box, save as a new image</p>
+  <div class="photo-crop-row">
+    <div class="photo-crop-controls">
+      <input type="file" id="photo-crop-file" accept="image/*" style="display:none" />
+      <button type="button" class="btn-outline-accent btn-sm" onclick="document.getElementById('photo-crop-file').click()">↑ Load image</button>
+      <button type="button" class="btn-outline-accent btn-sm" id="photo-crop-from-result" onclick="photoCropFromResult()">Use last result</button>
+      <button type="button" class="btn-accent btn-sm" id="photo-crop-save" onclick="photoCropSave()" disabled>↓ Save crop</button>
+      <button type="button" class="btn-outline-accent btn-sm" id="photo-crop-clear" onclick="photoCropClear()" disabled>Clear</button>
+      <span id="photo-crop-toast" class="batch-toast" style="display:none" role="status"></span>
+    </div>
+    <div class="photo-crop-stage" id="photo-crop-stage">
+      <canvas id="photo-crop-canvas" width="640" height="400" aria-label="Crop canvas"></canvas>
+      <p class="photo-crop-empty" id="photo-crop-empty">Load an image to crop</p>
+    </div>
+  </div>
+</div>
 {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Studios-specific overrides ─────────────────────── */
+/* Title only — big colorful + glow, board sits tight under it */
+.studio-hero {
+  text-align: center;
+  padding: 2.25rem 1rem 0.85rem;
+  position: relative;
+}
+.studio-hero::before {
+  content:'';
+  position:absolute;top:-10%;left:50%;transform:translateX(-50%);
+  width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,252,.14) 0%,transparent 65%);
+  pointer-events:none;
+}
+.studio-hero h1 {
+  font-size:clamp(2.2rem,6vw,4rem);font-weight:900;
+  letter-spacing:-.05em;line-height:1.05;margin:0;
+  position: relative;
+}
+.hero-grad {
+  background:linear-gradient(135deg,#fff 0%,var(--accent-3) 40%,var(--accent) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.visually-hidden {
+  position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+.section-label {
+  font-family:var(--font-mono);font-size:.7rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);
+  margin-bottom:.9rem;
+}
+
+/* Photos / Videos board tight under title */
+body.theme-photos .container.mb-5,
+body.theme-videos .container.mb-5 {
+  margin-bottom: 1rem !important;
+  margin-top: 0;
+}
+body.theme-photos .row.g-4,
+body.theme-videos .row.g-4 {
+  --bs-gutter-y: 0.5rem;
+}
+
+/* ── Three equal columns: prompt | refs 1/2/3 stack | advanced ── */
+.photos-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    "prompt refs adv"
+    "results results results"
+    "actions actions actions";
+  gap: 1rem;
+  align-items: stretch;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+/* Videos: left prompt · middle video · right 4 square refs */
+body.theme-videos .videos-board-gen {
+  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-areas:
+    "prompt mid refs";
+  max-width: 1180px;
+}
+body.theme-videos .videos-board-extend {
+  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-areas:
+    "prompt mid adv";
+  max-width: 1180px;
+}
+body.theme-videos .videos-board-gen .photos-col-mid,
+body.theme-videos .videos-board-extend .photos-col-mid {
+  grid-area: mid;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+body.theme-videos .videos-board-gen .photos-col-refs { grid-area: refs; }
+.vid-prompt-wrap { position: relative; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.vid-prompt-wrap .photos-prompt { min-height: 12rem !important; padding-bottom: 2.2rem !important; }
+.vid-clear-btn {
+  position: absolute; right: 0.55rem; bottom: 0.55rem; z-index: 2;
+  border: 1px solid var(--border-2); background: rgba(0,0,0,.55); color: var(--text-muted);
+  border-radius: 8px; padding: 0.2rem 0.55rem; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+}
+.vid-clear-btn:hover { color: #fff; border-color: var(--accent); }
+.vid-clear-refs { position: relative; align-self: flex-end; margin-top: 0.45rem; }
+.vid-refs-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.45rem; gap:0.5rem; }
+.vid-refs-actions { display:flex; align-items:center; gap:0.4rem; }
+/* Inline library button reuses .user-lib-fab from user_library_sidebar partial */
+/* + from computer — matches round crown footprint */
+/* Small twins of the corner P (same look, smaller) + matching + */
+.user-lib-fab.user-lib-fab--inline.user-lib-fab--sm {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,.45));
+}
+.vid-ref-plus {
+  flex: 0 0 auto;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px dashed var(--border-2);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  transition: border-color .15s, color .15s, transform .15s, background .15s;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,.35));
+}
+.vid-ref-plus:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(244,63,94,.1);
+  transform: scale(1.06);
+}
+.vid-ref-grid {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  gap: 0.45rem; flex: 1 1 auto; min-height: 16rem;
+}
+.vid-ref-cell {
+  position: relative; aspect-ratio: 1; border: 2px dashed var(--border-2); border-radius: 12px;
+  background: var(--bg-3); cursor: pointer; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, background .15s;
+}
+.vid-ref-cell:hover, .vid-ref-cell:focus-visible { border-color: var(--accent); background: rgba(244,63,94,.08); outline: none; }
+.vid-ref-cell.drag-over { border-color: #34d399; box-shadow: inset 0 0 0 2px rgba(52,211,153,.4); }
+.vid-ref-cell.filled { border-style: solid; border-color: var(--accent); }
+.vid-ref-cell.paste-flash {
+  box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 0.7);
+  background: rgba(52, 211, 153, 0.12);
+}
+.vid-ref-cell .vid-ref-mark {
+  font-size: 1.1rem; font-weight: 800; color: var(--text-muted); user-select: none; z-index: 1;
+}
+.vid-ref-cell.filled .vid-ref-mark { position:absolute; top:6px; left:8px; font-size:.85rem; color:#fff; text-shadow:0 1px 3px #000; }
+.vid-ref-cell img {
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
+}
+.vid-ref-cell .vid-ref-x {
+  position:absolute; top:4px; right:4px; z-index:2; width:22px; height:22px; border:none;
+  border-radius:50%; background:rgba(0,0,0,.65); color:#fff; font-size:14px; line-height:1;
+  display:none; align-items:center; justify-content:center; cursor:pointer; padding:0;
+}
+.vid-ref-cell.filled .vid-ref-x { display:flex; }
+/* Empty cell: choose library vs computer */
+.vid-ref-choose {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.45rem; padding: 0.4rem; width: 100%; height: 100%;
+  z-index: 2;
+}
+.vid-ref-choose-label {
+  font-size: 0.62rem; font-weight: 700; color: var(--text-muted);
+  text-align: center; line-height: 1.25; max-width: 90%;
+}
+.vid-ref-choose-row {
+  display: flex; align-items: center; justify-content: center; gap: 0.45rem;
+}
+.vid-ref-choose .user-lib-fab--sm { width: 40px; height: 40px; }
+.vid-ref-choose .vid-ref-plus { width: 40px; height: 40px; font-size: 1.4rem; }
+.vid-ref-choose-cap {
+  font-size: 0.55rem; font-weight: 700; color: var(--text-muted);
+  text-align: center; letter-spacing: 0.02em;
+}
+.vid-mid-frame {
+  position: relative; flex: 1 1 auto; min-height: 16rem; width: 100%;
+  border: 1px solid var(--border-2); border-radius: 14px; background: #0a0a12;
+  overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.vid-mid-placeholder { text-align:center; color:var(--text-muted); padding:1.5rem; }
+.vid-mid-placeholder span { display:block; font-weight:700; font-size:1rem; margin-bottom:.35rem; color:var(--text); }
+.vid-mid-placeholder small { font-size:.78rem; }
+body.theme-videos .videos-result-one {
+  display: none; width: 100%; max-height: min(48vh, 420px); object-fit: contain; background: #000; margin: 0;
+}
+#vid-result[src]:not([src=""]) { display: block; }
+.vid-next-actions { flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.15rem; }
+.extend-trim-wrap {
+  margin-top: 0.55rem; padding: 0.65rem 0.75rem; border: 1px solid var(--border-2);
+  border-radius: 12px; background: var(--bg-3);
+}
+.vid-frame-tools {
+  display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center;
+  align-items: center; margin-top: 0.4rem;
+}
+.movie-clip-list {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.movie-clip-list li {
+  display: flex; align-items: center; gap: 0.5rem;
+  border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.55rem;
+  background: var(--bg-3); font-size: 0.8rem;
+}
+.movie-clip-list video { width: 88px; height: 50px; object-fit: cover; border-radius: 6px; background: #000; }
+/* Clip highlighter timeline under source video */
+.clip-hl-track {
+  position: relative;
+  width: 100%;
+  height: 28px;
+  border-radius: 8px;
+  background: #1a1520;
+  border: 1px solid var(--border-2);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  overflow: hidden;
+}
+.clip-hl-track:active { cursor: grabbing; }
+.clip-hl-rail {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.08), rgba(255,255,255,.04));
+}
+.clip-hl-window {
+  position: absolute;
+  top: 3px; bottom: 3px; left: 0;
+  min-width: 16px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.45);
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.35);
+  z-index: 2;
+  pointer-events: none;
+}
+.clip-hl-handle {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 12px;
+  background: #fbbf24;
+  border-radius: 3px;
+  cursor: ew-resize;
+  pointer-events: auto;
+  z-index: 3;
+  box-shadow: 0 0 6px rgba(0,0,0,.4);
+}
+.clip-hl-handle-l { left: -2px; }
+.clip-hl-handle-r { right: -2px; }
+.clip-hl-playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: #fff;
+  z-index: 4;
+  pointer-events: none;
+  left: 0;
+  opacity: 0.9;
+}
+.photos-col-prompt {
+  grid-area: prompt;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100%;
+}
+.photos-col-refs {
+  grid-area: refs;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.photos-col-adv {
+  grid-area: adv;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  height: 100%;
+  padding: 0.85rem;
+  border: 1px solid var(--border-2);
+  border-radius: 14px;
+  background: var(--bg-3);
+  box-sizing: border-box;
+}
+.photos-results { grid-area: results; }
+.photos-actions { grid-area: actions; }
+
+/* Tall prompt — same column width as refs & advanced */
+.photos-prompt,
+textarea.photos-prompt.form-control {
+  flex: 1 1 auto;
+  min-height: 16rem !important;
+  width: 100%;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  border-radius: 14px !important;
+  padding: 1rem 1.1rem !important;
+  background: var(--bg-3) !important;
+  border: 1px solid var(--border-2) !important;
+  color: var(--text) !important;
+}
+.photos-prompt:focus,
+textarea.photos-prompt.form-control:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2) !important;
+}
+.photos-gen-btn {
+  width: 100%;
+  margin-top: 0.65rem;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+/* Advanced column header — library is the corner / FAB popup only */
+.photos-adv-label {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+.photos-col-adv .style-chips { margin: 0; }
+/* Split ×4 / ×6 / ×8 — equal small chips in one row */
+.photos-split-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+.photos-split-chips .style-chip {
+  flex: 1 1 0;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.42rem 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  color: var(--text-muted);
+  border-radius: 99px;
+  line-height: 1.2;
+}
+.photos-split-chips .style-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+/* Batch ×5 · ×10 — smaller equal buttons */
+.photos-batch-row {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: auto;
+}
+.photos-batch-sm {
+  flex: 1 1 0;
+  border: none;
+  border-radius: 10px;
+  padding: 0.48rem 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-main);
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  box-shadow: 0 3px 14px rgba(124, 58, 237, 0.28);
+}
+.photos-batch-sm:hover { filter: brightness(1.06); }
+.photos-batch-sm:disabled { opacity: 0.55; cursor: wait; }
+
+/* Middle: full column width, 1 / 2 / 3 stacked */
+.ref-box {
+  display: grid; gap: 0; border: 2px dashed var(--border-2); border-radius: 14px;
+  background: var(--bg-3); overflow: hidden;
+}
+.ref-box-3 { grid-template-columns: repeat(3, 1fr); }
+.ref-box-stack {
+  grid-template-columns: 1fr;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 16rem;
+}
+.ref-box-stack .ref-cell {
+  border-right: none !important;
+  border-bottom: 1px solid var(--border);
+  aspect-ratio: auto;
+  min-height: 5.25rem;
+  flex: 1;
+}
+.ref-box-stack .ref-cell:last-child { border-bottom: none; }
+.ref-cell {
+  position: relative; aspect-ratio: 1; min-height: 0; cursor: pointer;
+  border-right: 1px solid var(--border); outline: none; transition: background .15s;
+  background: var(--bg-2, #0d0d18);
+}
+.ref-box-3 .ref-cell:nth-child(3n) { border-right: none; }
+.ref-cell:hover, .ref-cell:focus-visible { background: rgba(124,92,252,.08); }
+.ref-cell.drag-over, .ref-cell.paste-flash {
+  background: rgba(0,255,136,.1); box-shadow: inset 0 0 0 2px rgba(0,255,136,.55);
+}
+.ref-cell.filled { background: #0a0a12; }
+.ref-cell-inner {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; padding: .35rem; gap: .1rem;
+}
+/* contain = full photo visible, natural proportions (cover was cropping/looking stretched) */
+.ref-cell-inner img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: #0a0a12;
+}
+.ref-cell-mark { font-size: clamp(.85rem, 2.8vw, 1.2rem); line-height: 1.1; user-select: none; z-index: 1; }
+.ref-cell-cr { font-size: .52rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-muted); z-index: 1; }
+.ref-cell-x {
+  position: absolute; top: 4px; right: 4px; z-index: 3; width: 22px; height: 22px; border: none;
+  border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 14px; line-height: 1;
+  cursor: pointer; display: none; align-items: center; justify-content: center;
+}
+.ref-cell.filled .ref-cell-x { display: flex; }
+
+/* Videos: start-frame center column + bare result video */
+.vid-start-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 16rem;
+  width: 100%;
+  border: 2px dashed var(--border-2);
+  border-radius: 14px;
+  background: var(--bg-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: border-color .15s, background .15s;
+}
+.vid-start-frame:hover { border-color: var(--accent); background: rgba(244, 63, 94, 0.06); }
+.vid-start-frame.has-image,
+.vid-start-frame.has-video {
+  border-style: solid;
+  border-color: var(--accent);
+  padding: 0;
+}
+.vid-start-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.vid-start-frame img#drop-preview,
+.vid-start-frame #drop-preview {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none !important;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 0 !important;
+}
+.vid-start-frame.has-image #drop-preview { display: block !important; }
+.vid-start-frame.has-image .vid-start-hint { display: none; }
+.vid-start-frame #extend-drop-preview {
+  display: none;
+  width: 100%;
+  height: 100%;
+  min-height: 16rem;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #000;
+  margin: 0 !important;
+  max-height: none !important;
+}
+.vid-start-frame.has-video #extend-drop-preview { display: block !important; }
+.vid-start-frame.has-video .vid-start-hint { display: none; }
+/* Loaded extend clip: zone is not a click target; video controls playback */
+#extend-drop-zone.has-video {
+  cursor: default;
+  pointer-events: none;
+}
+#extend-drop-zone.has-video #extend-drop-preview {
+  pointer-events: auto;
+}
+.extend-source-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: center;
+  margin: 0.55rem 0 0.35rem;
+}
+.extend-source-btns .btn-sm { min-width: 9.5rem; }
+.videos-result-one {
+  display: none;
+  width: 100%;
+  max-width: 960px;
+  margin: 0.5rem auto 0;
+  border-radius: 10px;
+  background: #000;
+  min-height: min(40vh, 320px);
+  max-height: 70vh;
+}
+#vid-result[src]:not([src=""]) { display: block; }
+.vid-progress-card {
+  margin: 0 auto 0.75rem;
+  max-width: 900px;
+  padding: 1rem 1.25rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  text-align: left;
+}
+.videos-extend-break {
+  margin: 2.5rem auto 1.1rem;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.videos-extend-break::before,
+.videos-extend-break::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-2), transparent);
+}
+.videos-extend-break span {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+.extend-prompt-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 16rem;
+  border: 1px solid var(--border-2);
+  border-radius: 14px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.extend-prefix {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  padding: 0.7rem 1rem 0.35rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(244, 63, 94, 0.06);
+}
+.extend-prompt-wrap textarea,
+.extend-prompt-wrap .extend-prompt-extra {
+  flex: 1 1 auto;
+  min-height: 10rem !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  resize: vertical;
+  margin: 0 !important;
+}
+body.theme-videos .generate-btn-video {
+  background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
+  box-shadow: 0 4px 24px rgba(244, 63, 94, 0.35) !important;
+}
+
+/* Bare results under the 3 columns — no card frame */
+.photos-results {
+  position: relative;
+  min-height: 0;
+  width: 100%;
+  text-align: center;
+}
+.photos-results .loading-overlay {
+  position: relative;
+  inset: auto;
+  min-height: 120px;
+  border-radius: 12px;
+  background: rgba(13, 13, 24, 0.55);
+}
+.photos-result-one {
+  display: none;
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  margin: 0.5rem auto 0;
+  border-radius: 8px;
+  /* Never CSS-stretch generated photos */
+  object-fit: contain;
+  object-position: center;
+}
+.photos-result-stack {
+  display: none;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 900px;
+  margin: 0.5rem auto 0;
+}
+.photos-result-stack.is-on { display: flex !important; }
+.photos-result-stack .batch-tile {
+  position: relative;
+  aspect-ratio: auto;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+}
+.photos-result-stack .batch-tile img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+.photos-result-stack .batch-tile-anim {
+  position: absolute; right: 10px; bottom: 10px;
+}
+
+/*
+ * iPhone / narrow: must stack VERTICALLY (wide 3-col only works in a browser).
+ * prompt → refs 1·2·3 horizontal → advanced → results (scroll the page)
+ */
+@media (max-width: 800px) {
+  .photos-board {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "prompt"
+      "refs"
+      "adv"
+      "results"
+      "actions";
+    gap: 0.75rem;
+  }
+  body.theme-videos .videos-board-gen {
+    grid-template-areas:
+      "prompt"
+      "refs"
+      "mid";
+  }
+  body.theme-videos .videos-board-extend {
+    grid-template-areas:
+      "prompt"
+      "mid"
+      "adv";
+  }
+  .photos-col-refs,
+  .photos-col-adv,
+  .photos-col-prompt,
+  .photos-col-mid {
+    width: 100%;
+  }
+  .ref-box-stack {
+    width: 100%;
+    min-height: 12rem;
+  }
+  .photos-result-one,
+  .photos-result-stack {
+    max-width: 100%;
+  }
+  .photos-prompt,
+  textarea.photos-prompt.form-control {
+    min-height: 10rem !important;
+  }
+}
+
+/* Drop zone (extend still uses single zone) */
+#drop-zone,#img-drop-zone {
+  border:2px dashed var(--border-2);border-radius:12px;
+  padding:1.25rem;text-align:center;cursor:pointer;
+  transition:all .2s;color:var(--text-muted);font-size:.85rem;
+  background:var(--bg-3);
+}
+#drop-zone:hover,#img-drop-zone:hover,#drop-zone.drag-over,#img-drop-zone.drag-over {
+  border-color:var(--accent);background:rgba(124,92,252,.06);color:var(--accent-2);
+}
+#drop-zone.has-image,#img-drop-zone.has-image,#extend-drop-zone.has-video { border-style:solid;border-color:var(--accent); }
+#extend-drop-zone {
+  border:2px dashed var(--border-2);border-radius:12px;
+  padding:1.25rem;text-align:center;cursor:default;
+  transition:all .2s;color:var(--text-muted);font-size:.85rem;
+  background:var(--bg-3);
+}
+#extend-drop-zone:not(.has-video) { cursor: default; }
+#extend-drop-zone.drag-over {
+  border-color:var(--accent);background:rgba(124,92,252,.06);color:var(--accent-2);
+}
+/* Videos page only: Library FAB bottom-LEFT (panel from left), music bottom-RIGHT */
+body.theme-videos .user-lib-fab:not(.user-lib-fab--inline) {
+  left: 22px;
+  right: auto;
+}
+body.theme-videos:has(#vanessa-fab) .user-lib-fab:not(.user-lib-fab--inline),
+body.theme-videos:has(.vanessa-fab) .user-lib-fab:not(.user-lib-fab--inline) {
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+body.theme-videos .percfect-site-music {
+  left: auto !important;
+  right: 1rem !important;
+  bottom: 1.25rem !important;
+}
+body.theme-videos:has(#vanessa-fab) .percfect-site-music,
+body.theme-videos:has(.vanessa-fab) .percfect-site-music {
+  bottom: 1.25rem !important;
+}
+body.theme-videos .user-lib-panel {
+  left: 0;
+  right: auto;
+  border-left: none;
+  border-right: 1px solid var(--border);
+  box-shadow: 16px 0 48px rgba(0,0,0,.45);
+  transform: translateX(-105%);
+}
+body.theme-videos .user-lib-panel.open { transform: translateX(0); }
+.extend-prompt-row { display:flex; flex-wrap:wrap; align-items:flex-start; gap:.5rem; margin-bottom:.35rem; }
+.extend-prompt-prefix { font-family:var(--font-mono); font-size:.82rem; color:var(--accent-2); background:var(--bg-3); border:1px solid var(--border); border-radius:10px; padding:.55rem .75rem; white-space:nowrap; margin-top:.15rem; }
+.extend-prompt-extra { flex:1; min-width:200px; margin:0; }
+.extend-prompt-note { font-size:.75rem; color:var(--text-muted); margin:0 0 .25rem; text-align:left; }
+.extend-byo-details summary { list-style:none; }
+.extend-byo-details summary::-webkit-details-marker { display:none; }
+.extend-byo-details summary::before { content:'▸ '; color:var(--accent-2); }
+.extend-byo-details[open] summary::before { content:'▾ '; }
+#img-result.has-preview { cursor:pointer; }
+
+/* Prompt pills */
+.prompt-pills { display:flex;flex-wrap:wrap;gap:.5rem; }
+.prompt-pill {
+  background:var(--bg-3);border:1px solid var(--border-2);
+  border-radius:99px;padding:.35rem 1rem;font-size:.8rem;
+  color:var(--text-muted);cursor:pointer;transition:all .15s;
+  font-family:var(--font-main);white-space:nowrap;
+}
+.prompt-pill:hover { border-color:var(--accent);color:var(--text);background:rgba(124,92,252,.06); }
+.vid-pill:hover { border-color:var(--accent-3);color:var(--accent-3); }
+
+/* Generate button */
+.generate-btn {
+  width:100%;padding:.75rem;border-radius:14px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),#5a3fcf);
+  color:#fff;font-size:1rem;font-weight:700;font-family:var(--font-main);
+  transition:all .2s;margin-bottom:.5rem;
+  box-shadow:0 4px 24px rgba(124,92,252,.3);
+}
+.generate-btn:hover { transform:translateY(-2px);box-shadow:0 8px 32px rgba(124,92,252,.45); }
+.generate-btn:disabled { opacity:.6;transform:none;cursor:not-allowed; }
+.generate-btn-video { background:linear-gradient(135deg,#3d6ee8,#2a4fcf); box-shadow:0 4px 24px rgba(61,110,232,.3); }
+.generate-btn-video:hover { box-shadow:0 8px 32px rgba(61,110,232,.45); }
+.generate-btn-batch { background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 4px 24px rgba(124,58,237,.3); margin-top:.4rem; }
+.generate-btn-batch:hover { box-shadow:0 8px 32px rgba(124,58,237,.45); }
+.six-toggle { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.2rem 0 .6rem; font-size:.9rem; font-weight:600; cursor:pointer; }
+.six-toggle input { width:16px; height:16px; accent-color:var(--accent,#7c5cfc); cursor:pointer; }
+.six-hint { color:var(--text-muted); font-weight:400; font-size:.75rem; }
+.batch-hint { font-size:.75rem; color:var(--text-muted); margin:0 0 .5rem; text-align:left; }
+.batch-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:.5rem; }
+.batch-tile { position:relative; display:block; border-radius:10px; overflow:hidden; border:2px solid var(--border-2,#333); aspect-ratio:1; cursor:pointer; transition:border-color .15s,box-shadow .15s; background:var(--bg-3); }
+.batch-tile:hover { border-color:var(--accent-2); }
+.batch-tile.selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.batch-tile img { width:100%; height:100%; object-fit:contain; object-position:center; display:block; pointer-events:none; background:#0a0a12; }
+.batch-pick { position:absolute; top:.35rem; left:.35rem; z-index:3; width:22px; height:22px; accent-color:var(--accent); cursor:pointer; }
+.batch-tile.selected .batch-pick { outline:2px solid var(--accent); outline-offset:1px; border-radius:4px; }
+.batch-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem; }
+.batch-lightbox img { max-width:92vw; max-height:72vh; border-radius:10px; box-shadow:0 0 50px rgba(0,0,0,.7); object-fit:contain; }
+.batch-lightbox-actions { display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap; justify-content:center; max-width:92vw; }
+.batch-lightbox-hint { font-size:.75rem; color:rgba(255,255,255,.55); margin-top:.65rem; text-align:center; }
+.batch-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--border); }
+
+.credit-note { font-size:.75rem;color:var(--text-muted);text-align:center;margin-bottom:1rem; }
+.credit-note a { color:var(--accent-2); }
+.form-hint { font-size:.72rem;color:var(--text-muted);font-weight:400; }
+
+/* Output */
+.output-area {
+  background:var(--bg-3);border:1px solid var(--border);
+  border-radius:var(--radius-lg);min-height:300px;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;position:relative;
+}
+.output-area img,.output-area video {
+  max-width:100%;max-height:480px;width:100%;
+  border-radius:var(--radius);display:none;object-fit:contain;
+}
+.output-area .batch-grid {
+  width:100%;
+  max-height:480px;
+  overflow:auto;
+  padding:.65rem;
+  align-self:stretch;
+}
+.output-placeholder { text-align:center;width:100%;padding:1rem; }
+.placeholder-grid {
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  width:160px;height:120px;margin:0 auto 1rem;border-radius:10px;overflow:hidden;opacity:.35;
+}
+.ph-tile { border-radius:3px; }
+.ph-text { font-size:.82rem;color:var(--text-muted);opacity:.6;margin:0; }
+
+/* Shimmer loading */
+.shimmer-overlay {
+  display:none;position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(124,92,252,.08) 50%,transparent 100%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Spinner loading overlay */
+.loading-overlay{ display:none;position:absolute;inset:0;background:rgba(13,13,24,.92);
+  flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  gap:.85rem;z-index:5;border-radius:inherit;backdrop-filter:blur(4px);color:var(--accent-3,#a78bfa); }
+.loading-overlay.show{ display:flex; }
+/* Progress under Generate — always on screen, never hidden by mid frame */
+#vid-progress-wrap {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.65rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  box-shadow: 0 4px 18px rgba(0,0,0,.25);
+  display: none;
+}
+#vid-progress-wrap[style*="display: block"],
+#vid-progress-wrap.is-on {
+  display: block !important;
+}
+.loading-overlay p{ margin:0;font-weight:700;font-size:1.02rem; }
+.loading-overlay small{ color:var(--text-muted);font-weight:500;font-size:.78rem; }
+.spinner{ width:48px;height:48px;border:4px solid var(--border,#333);border-top-color:var(--accent,#7c5cfc);
+  border-radius:50%;animation:spin .8s linear infinite; }
+@keyframes spin{ to{transform:rotate(360deg);} }
+
+.output-actions { display:flex;gap:.5rem;margin-top:.75rem; }
+.gen-error {
+  background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);
+  color:var(--danger);border-radius:10px;padding:.75rem 1rem;
+  font-size:.85rem;margin-top:.75rem;
+}
+
+/* Saved library */
+.studio-panel { max-width:920px; margin-left:auto; margin-right:auto; }
+.library-hint { font-size:.78rem; color:var(--text-muted); margin:-.25rem 0 1rem; }
+.library-sub { font-size:.65rem; margin-bottom:.5rem; }
+.library-empty { font-size:.85rem; color:var(--text-muted); padding:1rem; border:1px dashed var(--border-2); border-radius:12px; margin-bottom:.75rem; }
+.library-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.55rem; margin-bottom:.5rem; }
+.library-tile-chain { box-shadow: 0 0 0 2px rgba(224,169,78,.45); }
+.library-tile-chain .library-type-badge { min-width: 2.4rem; text-align: center; }
+/* Videos page: last 6 + “All videos” tile → full library videos tab */
+.last6-head { margin-bottom: 0.55rem; }
+.last6-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(7.5rem, 9.5rem);
+  gap: 0.65rem;
+  align-items: stretch;
+  margin-bottom: 1.5rem;
+}
+.library-grid-last6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+.all-videos-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 12px;
+  border: 2px dashed var(--border-2);
+  background: var(--bg-3);
+  color: var(--text);
+  padding: 0.75rem 0.5rem;
+  min-height: 100%;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.all-videos-tile:hover {
+  border-color: var(--accent);
+  background: rgba(124, 92, 252, 0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.all-videos-tile-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+.all-videos-tile strong {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.all-videos-tile small {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+@media (max-width: 900px) {
+  .last6-row { grid-template-columns: 1fr; }
+  .library-grid-last6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .all-videos-tile { min-height: 5.5rem; flex-direction: row; gap: 0.55rem; }
+}
+@media (max-width: 520px) {
+  .library-grid-last6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.library-grid-last6 .library-tile { aspect-ratio: 16 / 10; }
+.library-tile { position:relative; border-radius:10px; overflow:hidden; border:2px solid var(--border-2); aspect-ratio:1; cursor:pointer; transition:border-color .15s,box-shadow .15s; background:var(--bg-3); }
+.library-tile:hover { border-color:var(--accent-2); }
+.library-tile.selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.library-tile img, .library-tile video { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.library-pick { position:absolute; top:.35rem; left:.35rem; z-index:3; width:22px; height:22px; accent-color:var(--accent); cursor:pointer; }
+.library-type-badge { position:absolute; top:.35rem; right:.35rem; z-index:2; font-size:.62rem; font-family:var(--font-mono); background:rgba(0,0,0,.55); color:#fff; padding:2px 6px; border-radius:6px; pointer-events:none; }
+.library-tile-edit {
+  position:absolute; right:.35rem; bottom:.35rem; z-index:3;
+  border:1px solid rgba(255,255,255,.25); border-radius:8px;
+  background:rgba(8,8,16,.78); color:#fff;
+  font-size:.68rem; font-weight:700; padding:.28rem .5rem; cursor:pointer;
+}
+.library-tile-edit:hover { border-color:var(--accent-2); background:rgba(124,92,252,.55); }
+.photo-crop-row { display:flex; flex-direction:column; gap:.75rem; }
+.photo-crop-controls { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; }
+.photo-crop-stage {
+  position:relative; width:100%; max-width:720px;
+  border:1px solid var(--border-2); border-radius:14px; background:#0a0a12;
+  overflow:hidden; min-height:220px;
+}
+.photo-crop-stage canvas { display:block; width:100%; height:auto; max-height:70vh; cursor:crosshair; touch-action:none; }
+.photo-crop-empty {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  margin:0; color:var(--text-muted); font-size:.9rem; pointer-events:none;
+}
+.photo-crop-stage.has-image .photo-crop-empty { display:none; }
+.batch-toast { background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.28); color:var(--success); border-radius:10px; padding:.65rem 1rem; font-size:.85rem; margin-top:.5rem; }
+.mb-6 { margin-bottom: 4rem; }
+.duration-chips { display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem; }
+</style>
+
+<script src="/static/js/paste_drop.js"></script>
+<script src="/static/js/studio_jobs.js?v=vid-progress-live-2"></script>
+<script src="/static/js/video_extend.js"></script>
+<script src="/static/js/extend_byo.js"></script>
+
+
+<script>const STUDIO_MODE = {{ mode|tojson }};</script>
+<script>
+const LOGGED_IN = {{ 'true' if user else 'false' }};
+const ANIMATE_DEFAULT_PROMPT = 'animate this';
+/* Credits only on page — never $ / margin. Nick lock: base 3 · multi 6 · extend 6. */
+const VIDEO_RATE = {{ video_rate|default(3)|int }};
+const VIDEO_REF_RATE = {{ video_ref_rate|default(6)|int }};
+const VIDEO_EXTEND_RATE = {{ video_extend_rate|default(6)|int }};
+const VIDEO_DURATIONS = [6, 10, 15];
+// MUST be before vidPaintSlots / initVidRefs — those call updateVidCostUI on load.
+// TDZ on `let _duration` was killing the whole script so Generate did nothing.
+let _duration = 6;
+let _extendSec = 6;
+function videoCreditCost(secs) {
+  const s = VIDEO_DURATIONS.includes(parseInt(secs, 10)) ? parseInt(secs, 10) : 6;
+  const n = (typeof videoRefCount === 'function') ? videoRefCount() : 0;
+  const rate = n >= 2 ? VIDEO_REF_RATE : VIDEO_RATE;
+  return s * rate;
+}
+function videoGenRate() {
+  const n = (typeof videoRefCount === 'function') ? videoRefCount() : 0;
+  return n >= 2 ? VIDEO_REF_RATE : VIDEO_RATE;
+}
+function updateVidCostUI() {
+  const rate = videoGenRate();
+  const cost = videoCreditCost(_duration || 6);
+  const vc = document.getElementById('vid-cost');
+  if (vc) vc.textContent = String(cost);
+  const rateNote = document.getElementById('vid-rate-note');
+  if (rateNote) rateNote.textContent = String(rate);
+  const note = document.getElementById('duration-note');
+  if (note) {
+    note.innerHTML = (_duration || 6) + ' seconds · <span id="vid-rate-note">' + rate + '</span> credits/sec'
+      + (videoRefCount() >= 2 ? ' · multi-ref' : '');
+  }
+}
+
+function hasVideoReference() {
+  if (typeof videoRefCount === 'function' && videoRefCount() > 0) return true;
+  if (window._droppedImageFile) return true;
+  const url = document.getElementById('vid-image-url')?.value?.trim();
+  if (url) return true;
+  const prev = document.getElementById('drop-preview');
+  return !!(prev && prev.style.display !== 'none' && prev.src);
+}
+
+/* ── Videos: 4 square refs (generate portion only) ── */
+const VIDEO_MAX_REFS = 4;
+// Same as Photos: click filled ref → drop 📸1️⃣…📸4️⃣ into prompt at cursor
+const VIDEO_REF_EMOJIS = [
+  ['📸', '1️⃣'],
+  ['📸', '2️⃣'],
+  ['📸', '3️⃣'],
+  ['📸', '4️⃣'],
+];
+const VIDEO_MARKERS = ['📸1️⃣', '📸2️⃣', '📸3️⃣', '📸4️⃣'];
+const videoRefs = [null, null, null, null];
+let vidPendingSlot = 0;
+function videoRefCount() { return videoRefs.filter(Boolean).length; }
+function vidFirstEmpty() {
+  for (let i = 0; i < VIDEO_MAX_REFS; i++) if (!videoRefs[i]) return i;
+  return -1;
+}
+/** Click a filled ref photo → insert 📸N at the prompt cursor (e.g. "the man " + 📸2️⃣). */
+function vidInsertRefEmojisAtCursor(slotIndex) {
+  const ta = document.getElementById('vid-prompt');
+  if (!ta) return;
+  const pair = VIDEO_REF_EMOJIS[slotIndex];
+  if (!pair) return;
+  const insert = pair[0] + pair[1];
+  const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+  const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+  const before = ta.value.slice(0, start);
+  const after = ta.value.slice(end);
+  const needLead = before.length && !/\s$/.test(before);
+  const needTrail = after.length && !/^\s/.test(after);
+  const chunk = (needLead ? ' ' : '') + insert + (needTrail ? ' ' : '');
+  ta.value = before + chunk + after;
+  const pos = (before + chunk).length;
+  try {
+    ta.focus();
+    ta.setSelectionRange(pos, pos);
+  } catch (_e) {
+    ta.focus();
+  }
+  const cell = document.getElementById('vid-ref-' + slotIndex);
+  if (cell) {
+    cell.classList.add('paste-flash');
+    setTimeout(function () { cell.classList.remove('paste-flash'); }, 350);
+  }
+}
+function vidPaintSlots() {
+  for (let i = 0; i < VIDEO_MAX_REFS; i++) {
+    const cell = document.getElementById('vid-ref-' + i);
+    if (!cell) continue;
+    const r = videoRefs[i];
+    const mark = VIDEO_MARKERS[i];
+    if (!r) {
+      cell.classList.remove('filled');
+      cell.title = 'Ref ' + (i + 1) + ' — P library · + computer';
+      // Clean empty slot: only P + plus (no labels / no 📸 clutter)
+      cell.innerHTML =
+        '<div class="vid-ref-choose" onclick="event.stopPropagation()">' +
+          '<div class="vid-ref-choose-row">' +
+            '<button type="button" class="user-lib-fab user-lib-fab--inline user-lib-fab--sm" title="Library (Photos)" aria-label="Library" ' +
+              'onclick="event.stopPropagation();vidPickFromLibrary(' + i + ')">' +
+              '<img src="/static/assets/brand/percfect_p_crown.jpg" alt="Library" />' +
+            '</button>' +
+            '<button type="button" class="vid-ref-plus" title="From your computer" aria-label="From computer" ' +
+              'onclick="event.stopPropagation();vidPickFromComputer(' + i + ')">+</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      cell.classList.add('filled');
+      cell.title = 'Click to insert ' + mark + ' into your prompt at the cursor';
+      cell.innerHTML =
+        '<img src="' + String(r.preview).replace(/"/g, '&quot;') + '" alt="Ref ' + (i + 1) + '">' +
+        '<span class="vid-ref-mark">' + mark + '</span>' +
+        '<button type="button" class="vid-ref-x" aria-label="Remove" onclick="event.stopPropagation();vidRemoveRef(' + i + ')">×</button>';
+    }
+  }
+  // First filled ref → legacy single-image hooks; all slots sent via appendVideoRefs
+  const first = videoRefs.find(Boolean);
+  window._droppedImageFile = (first && first.kind === 'file' && first.file) ? first.file : null;
+  const urlEl = document.getElementById('vid-image-url');
+  if (urlEl) {
+    urlEl.value = (first && (first.url || (first.preview && String(first.preview).startsWith('http') ? first.preview : ''))) || '';
+  }
+  if (typeof updateVidCostUI === 'function') updateVidCostUI();
+}
+function vidRemoveRef(i) { videoRefs[i] = null; vidPaintSlots(); }
+function clearVidRefs() {
+  for (let i = 0; i < VIDEO_MAX_REFS; i++) videoRefs[i] = null;
+  vidPaintSlots();
+}
+function clearVidPrompt() {
+  const ta = document.getElementById('vid-prompt');
+  if (ta) { ta.value = ''; ta.focus(); }
+}
+function vidPlaceRef(ref, preferred) {
+  let slot = preferred;
+  if (slot == null || slot < 0) slot = vidFirstEmpty();
+  if (slot < 0) { showError('vid', 'Max 4 reference photos.'); return -1; }
+  videoRefs[slot] = ref;
+  vidPaintSlots();
+  return slot;
+}
+/** Empty slot: open site library on Photos tab for this slot */
+function vidPickFromLibrary(i) {
+  vidPendingSlot = i;
+  if (typeof openStudioVideoImagePicker === 'function') openStudioVideoImagePicker();
+}
+/** Empty slot: local file for this slot only */
+function vidPickFromComputer(i) {
+  vidPendingSlot = i;
+  const inp = document.getElementById('vid-file-input');
+  if (!inp) return;
+  try { inp.removeAttribute('multiple'); } catch (_e) {}
+  inp.value = '';
+  inp.click();
+}
+window.vidPickFromLibrary = vidPickFromLibrary;
+window.vidPickFromComputer = vidPickFromComputer;
+function vidPickSlot(i) {
+  const r = videoRefs[i];
+  // Filled → insert 📸N into prompt at cursor (same as Photos)
+  if (r && r.preview) {
+    vidInsertRefEmojisAtCursor(i);
+    return;
+  }
+  // Empty: chooser is already painted (P + plus); click on cell does nothing extra
+}
+function vidHandleFile(input) {
+  const files = input.files ? Array.from(input.files) : [];
+  input.value = '';
+  if (!files.length) return;
+  let slot = (typeof vidPendingSlot === 'number') ? vidPendingSlot : null;
+  files.forEach((f) => {
+    if (!f || !(f.type || '').startsWith('image/')) return;
+    const prefer = (slot != null && slot >= 0) ? slot : null;
+    const r = new FileReader();
+    r.onload = (e) => vidPlaceRef({ kind: 'file', file: f, preview: e.target.result }, prefer);
+    r.readAsDataURL(f);
+    slot = null; // next file → first empty
+  });
+}
+/** One pending slot from P-button / chooser; consumed on next library drop. */
+function consumeVidPendingSlot() {
+  const s = (typeof vidPendingSlot === 'number' && vidPendingSlot >= 0 && vidPendingSlot < VIDEO_MAX_REFS)
+    ? vidPendingSlot
+    : null;
+  vidPendingSlot = null;
+  return s;
+}
+window.consumeVidPendingSlot = consumeVidPendingSlot;
+
+function vidAddUrl(url, preferred) {
+  if (!url) return -1;
+  // Only ONE slot per call — never fan-out to all four.
+  let slot = preferred;
+  if (slot == null || slot < 0) slot = consumeVidPendingSlot();
+  return vidPlaceRef({ kind: 'url', url, preview: url }, slot != null ? slot : null);
+}
+function appendVideoRefs(fd) {
+  // All filled slots → server multi-ref when 2+
+  let primary = false;
+  videoRefs.forEach((r, i) => {
+    if (!r) return;
+    if (r.kind === 'file' && r.file) {
+      fd.append('image_file_' + i, r.file);
+      if (!primary) { fd.append('image_file', r.file); primary = true; }
+    } else if (r.url || (r.preview && String(r.preview).startsWith('http'))) {
+      const u = r.url || r.preview;
+      fd.append('image_url_' + i, u);
+      if (!primary) { fd.append('image_url', u); primary = true; }
+    }
+  });
+}
+function vidIngestImageFile(f, preferredSlot) {
+  if (!f || !(f.type || '').startsWith('image/')) return false;
+  const r = new FileReader();
+  r.onload = (ev) => vidPlaceRef({ kind: 'file', file: f, preview: ev.target.result }, preferredSlot);
+  r.readAsDataURL(f);
+  return true;
+}
+function vidIngestDropEvent(e, preferredSlot) {
+  e.preventDefault();
+  e.stopPropagation();
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length) {
+    let slot = preferredSlot;
+    for (let i = 0; i < files.length; i++) {
+      if (vidIngestImageFile(files[i], slot != null ? slot : null)) slot = null;
+    }
+    return true;
+  }
+  try {
+    const raw = e.dataTransfer.getData('application/x-percfect-library');
+    if (raw) {
+      const p = JSON.parse(raw);
+      const url = (p && (p.url || p.thumb || p.primary_image_url)) || '';
+      if (url) { vidAddUrl(url, preferredSlot != null ? preferredSlot : null); return true; }
+    }
+  } catch (_e) { /* ignore */ }
+  const uri = ((e.dataTransfer && (e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain'))) || '')
+    .trim().split('\n')[0].trim();
+  if (uri && /^https?:\/\//i.test(uri)) {
+    vidAddUrl(uri, preferredSlot != null ? preferredSlot : null);
+    return true;
+  }
+  return false;
+}
+(function initVidRefs() {
+  if (!document.getElementById('vid-ref-slots')) return;
+  vidPaintSlots();
+  const grid = document.getElementById('vid-ref-slots');
+  if (grid) {
+    grid.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (_e) {}
+      grid.classList.add('drag-over');
+    });
+    grid.addEventListener('dragleave', (e) => {
+      if (!grid.contains(e.relatedTarget)) grid.classList.remove('drag-over');
+    });
+    grid.addEventListener('drop', (e) => {
+      grid.classList.remove('drag-over');
+      vidIngestDropEvent(e, null);
+    });
+  }
+  for (let i = 0; i < VIDEO_MAX_REFS; i++) {
+    const cell = document.getElementById('vid-ref-' + i);
+    if (!cell) continue;
+    cell.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (_e) {}
+      cell.classList.add('drag-over');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    cell.addEventListener('drop', (e) => {
+      cell.classList.remove('drag-over');
+      vidIngestDropEvent(e, i);
+    });
+  }
+  // Paste image while focused on prompt or refs → real ref slots (not hidden legacy zone)
+  function vidPasteImageHandler(e) {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    if (cd.items) {
+      for (let j = 0; j < cd.items.length; j++) {
+        if (cd.items[j].kind !== 'file') continue;
+        const f = cd.items[j].getAsFile();
+        if (f && (f.type || '').startsWith('image/')) {
+          e.preventDefault();
+          e.stopPropagation();
+          vidIngestImageFile(f, null);
+          return;
+        }
+      }
+    }
+    if (cd.files && cd.files.length) {
+      for (let j = 0; j < cd.files.length; j++) {
+        if (vidIngestImageFile(cd.files[j], null)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+  }
+  const ta = document.getElementById('vid-prompt');
+  if (ta) ta.addEventListener('paste', vidPasteImageHandler, true);
+  if (grid) grid.addEventListener('paste', vidPasteImageHandler, true);
+})();
+
+/* ── Percfect Pictures: 3 refs — click filled pic to drop 2 emojis into prompt ── */
+const PHOTO_MAX_REFS = 3;
+// Two emojis per slot (camera + keycap number) — inserted at cursor when user clicks that pic
+const PHOTO_REF_EMOJIS = [
+  ['📸', '1️⃣'],
+  ['📸', '2️⃣'],
+  ['📸', '3️⃣'],
+];
+const PHOTO_MARKERS = ['📸1️⃣', '📸2️⃣', '📸3️⃣'];
+const photoRefs = [null, null, null]; // {kind:'file'|'url', file?, url?, preview}
+let photoPendingSlot = 0;
+
+function photoRefCount() { return photoRefs.filter(Boolean).length; }
+function photoCost() {
+  const n = photoRefCount();
+  return n <= 0 ? 1 : 1 + n;
+}
+function photoFirstEmpty() {
+  for (let i = 0; i < PHOTO_MAX_REFS; i++) if (!photoRefs[i]) return i;
+  return -1;
+}
+function photoUpdateCostUI() {
+  const c = photoCost();
+  const el = document.getElementById('img-cost-label');
+  if (el) el.textContent = '(' + c + ' credit' + (c === 1 ? '' : 's') + ')';
+}
+/** Insert the two ref emojis at the prompt cursor (when they click that pic to reference it). */
+function photoInsertRefEmojisAtCursor(slotIndex) {
+  const ta = document.getElementById('img-prompt');
+  if (!ta) return;
+  const pair = PHOTO_REF_EMOJIS[slotIndex];
+  if (!pair) return;
+  const insert = pair[0] + pair[1]; // exactly 2 emojis
+  const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+  const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start;
+  const before = ta.value.slice(0, start);
+  const after = ta.value.slice(end);
+  // Space padding so it doesn't glue to words
+  const needLead = before.length && !/\s$/.test(before);
+  const needTrail = after.length && !/^\s/.test(after);
+  const chunk = (needLead ? ' ' : '') + insert + (needTrail ? ' ' : '');
+  ta.value = before + chunk + after;
+  const pos = (before + chunk).length;
+  try {
+    ta.focus();
+    ta.setSelectionRange(pos, pos);
+  } catch (_e) {
+    ta.focus();
+  }
+  // Brief flash on the cell so they know it dropped
+  const cell = document.getElementById('img-ref-' + slotIndex);
+  if (cell) {
+    cell.classList.add('paste-flash');
+    setTimeout(function () { cell.classList.remove('paste-flash'); }, 350);
+  }
+}
+function photoPaintSlots() {
+  for (let i = 0; i < PHOTO_MAX_REFS; i++) {
+    const cell = document.getElementById('img-ref-' + i);
+    if (!cell) continue;
+    const r = photoRefs[i];
+    const mark = PHOTO_MARKERS[i];
+    if (!r) {
+      cell.classList.remove('filled');
+      cell.title = 'Add photo ' + (i + 1);
+      cell.innerHTML = '<div class="ref-cell-inner"><div class="ref-cell-mark">' + mark + '</div><div class="ref-cell-cr">+1 CR</div></div>';
+    } else {
+      cell.classList.add('filled');
+      cell.title = 'Click to drop ' + mark + ' into your prompt at the cursor';
+      cell.innerHTML =
+        '<div class="ref-cell-inner">' +
+        '<img src="' + String(r.preview).replace(/"/g, '&quot;') + '" alt="Ref ' + (i + 1) + '">' +
+        '<div class="ref-cell-mark">' + mark + '</div>' +
+        '<button type="button" class="ref-cell-x" aria-label="Remove" onclick="event.stopPropagation();photoRemoveRef(' + i + ')">×</button>' +
+        '</div>';
+    }
+  }
+  photoUpdateCostUI();
+}
+function photoRemoveRef(i) {
+  photoRefs[i] = null;
+  photoPaintSlots();
+}
+function photoPlaceRef(ref, preferred) {
+  let slot = preferred;
+  if (slot == null || slot < 0) slot = photoFirstEmpty();
+  else if (!photoRefs[slot]) {
+    const fe = photoFirstEmpty();
+    if (fe >= 0 && fe < slot) slot = fe;
+  }
+  if (slot < 0) { showError('img', 'Max 3 reference photos.'); return -1; }
+  photoRefs[slot] = ref;
+  photoPaintSlots();
+  return slot;
+}
+function photoPickSlot(i) {
+  const r = photoRefs[i];
+  // Filled pic → drop 2 emojis into prompt at cursor (reference at the moment they click)
+  if (r && r.preview) {
+    photoInsertRefEmojisAtCursor(i);
+    return;
+  }
+  // Empty → pick a file for this slot
+  photoPendingSlot = i;
+  const inp = document.getElementById('img-file-input');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+function photoHandleFile(input) {
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f || !f.type.startsWith('image/')) return;
+  const r = new FileReader();
+  r.onload = (e) => {
+    photoPlaceRef({ kind: 'file', file: f, preview: e.target.result }, photoPendingSlot);
+  };
+  r.readAsDataURL(f);
+}
+function consumePhotoPendingSlot() {
+  const s = (typeof photoPendingSlot === 'number' && photoPendingSlot >= 0 && photoPendingSlot < PHOTO_MAX_REFS)
+    ? photoPendingSlot
+    : null;
+  photoPendingSlot = null;
+  return s;
+}
+window.consumePhotoPendingSlot = consumePhotoPendingSlot;
+
+function photoAddUrl(url, preferred) {
+  if (!url) return -1;
+  let slot = preferred;
+  if (slot == null || slot < 0) slot = consumePhotoPendingSlot();
+  return photoPlaceRef({ kind: 'url', url, preview: url }, slot != null ? slot : null);
+}
+function appendStudioRefs(fd, refs) {
+  // Slot-stable: index 0 = 📸1️⃣, index 1 = 📸2️⃣, index 2 = 📸3️⃣
+  // Do NOT compact empty middle slots (that remapped 📸3️⃣ onto IMAGE_1).
+  (refs || []).forEach((r, i) => {
+    if (!r) return;
+    if (r.kind === 'file' && r.file) {
+      fd.append('image_file_' + i, r.file);
+    } else if (r.url) {
+      fd.append('image_url_' + i, r.url);
+    } else if (r.preview && String(r.preview).startsWith('http')) {
+      fd.append('image_url_' + i, r.preview);
+    }
+  });
+}
+function photoAspectRatio() {
+  const a = document.querySelector('#img-size-chips .style-chip.active');
+  return (a && a.getAttribute('data-aspect')) || 'auto';
+}
+/** Select Auto (default) — used when switching back from a fixed ratio. */
+function photoSelectAutoSize() {
+  const autoChip = document.getElementById('img-size-auto')
+    || document.querySelector('#img-size-chips .style-chip[data-aspect="auto"]');
+  if (autoChip) togglePhotoSize(autoChip);
+}
+// NOTE: resize / upscale / style / no-stretch wording is SECRET SAUCE on the server only.
+// Never write engine prompts into #img-prompt — box stays the user's words (or empty).
+function togglePhotoSize(el) {
+  if (!el) return;
+  const ar = (el.getAttribute('data-aspect') || 'auto').trim().toLowerCase();
+  // Clicking the active fixed ratio again → return to default Auto
+  if (el.classList.contains('active') && ar !== 'auto') {
+    const autoChip = document.getElementById('img-size-auto')
+      || document.querySelector('#img-size-chips .style-chip[data-aspect="auto"]');
+    if (autoChip && autoChip !== el) {
+      document.querySelectorAll('#img-size-chips .style-chip').forEach((c) => c.classList.remove('active'));
+      autoChip.classList.add('active');
+      return;
+    }
+  }
+  document.querySelectorAll('#img-size-chips .style-chip').forEach((c) => c.classList.remove('active'));
+  el.classList.add('active');
+}
+function appendPhotoAspect(fd) {
+  if (fd) fd.append('aspect_ratio', photoAspectRatio());
+}
+
+// Wire photo ref drop/paste on slots + prompt
+(function initPhotoRefs() {
+  if (!document.getElementById('img-ref-slots')) return;
+  photoPaintSlots();
+  for (let i = 0; i < PHOTO_MAX_REFS; i++) {
+    const cell = document.getElementById('img-ref-' + i);
+    if (!cell) continue;
+    cell.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (_e) {}
+      cell.classList.add('drag-over');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cell.classList.remove('drag-over');
+      // Library popup drag (images / character stills / backgrounds)
+      try {
+        const raw = e.dataTransfer.getData('application/x-percfect-library');
+        if (raw) {
+          const p = JSON.parse(raw);
+          const kind = String((p && (p.kind || p.type)) || '').toLowerCase();
+          const url = (p && (p.url || p.thumb || p.primary_image_url)) || '';
+          if (url && kind !== 'video' && kind !== '3d') {
+            photoAddUrl(url, i);
+            e.stopPropagation();
+            return;
+          }
+        }
+      } catch (_e) { /* ignore */ }
+      const uri = ((e.dataTransfer && (e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain'))) || '')
+        .trim().split('\n')[0].trim();
+      if (uri && /^https?:\/\//i.test(uri) && !/\.(mp4|webm|mov)($|\?)/i.test(uri)) {
+        photoAddUrl(uri, i);
+        e.stopPropagation();
+        return;
+      }
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) {
+        photoPendingSlot = i;
+        const r = new FileReader();
+        r.onload = (ev) => photoPlaceRef({ kind: 'file', file: f, preview: ev.target.result }, i);
+        r.readAsDataURL(f);
+        e.stopPropagation();
+      }
+    });
+  }
+  const ta = document.getElementById('img-prompt');
+  if (ta) {
+    ta.addEventListener('paste', (e) => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+      if (cd.items) {
+        for (let j = 0; j < cd.items.length; j++) {
+          if (cd.items[j].kind !== 'file') continue;
+          const f = cd.items[j].getAsFile();
+          if (f && f.type.startsWith('image/')) {
+            e.preventDefault();
+            const r = new FileReader();
+            r.onload = (ev) => photoPlaceRef({ kind: 'file', file: f, preview: ev.target.result }, null);
+            r.readAsDataURL(f);
+            return;
+          }
+        }
+      }
+      const text = (cd.getData && cd.getData('text')) || '';
+      const t = text.trim();
+      if (/^https?:\/\//i.test(t) && !/\s/.test(t) && (
+        /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(t) ||
+        /cdn\.|imgur|supabase|twimg|media\./i.test(t) || t.length < 500
+      )) {
+        e.preventDefault();
+        photoAddUrl(t, null);
+      }
+    }, true);
+  }
+})();
+
+function ensureAnimatePrompt() {
+  const ta = document.getElementById('vid-prompt');
+  if (ta && !ta.value.trim() && hasVideoReference()) ta.value = ANIMATE_DEFAULT_PROMPT;
+}
+
+/* ── Auth callback ─────────────────────────────── */
+function onAuthSuccess(data) {
+  window.LOGGED_IN = true;
+  // Wallet is in the site nav — only sync hidden hooks for cost math
+  const imgC = document.getElementById('img-credits');
+  const vidC = document.getElementById('vid-credits');
+  if (imgC && data && data.picture_credits != null) imgC.textContent = data.picture_credits;
+  if (vidC && data && data.video_credits != null) vidC.textContent = data.video_credits;
+  document.querySelectorAll('.credit-note a').forEach(a => a.style.display='none');
+  if (window._pendingGenerate) { window._pendingGenerate(); window._pendingGenerate = null; }
+  loadGallery();
+}
+
+function requireAuth(fn) {
+  if (LOGGED_IN || window.LOGGED_IN) { fn(); return; }
+  window._pendingGenerate = fn;
+  openAuthModal('signup');
+}
+
+/* ── Style chips ───────────────────────────────── */
+function toggleStyle(chip, panel) {
+  document.querySelectorAll(`#${panel}-style-chips .style-chip`).forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+}
+
+/* Force a real download (the <a download> attr is ignored on cross-origin xAI URLs,
+   so browsers just open the image in a tab). Pull it through our same-origin proxy
+   and save it as a blob. */
+async function downloadFile(url, filename) {
+  if (!url || url === '#') return;
+  try {
+    const res = await fetch('/share/fetch?url=' + encodeURIComponent(url));
+    if (!res.ok) throw new Error('proxy failed');
+    const blob = await res.blob();
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj; a.download = filename || 'percfect-image.jpg';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(obj), 8000);
+  } catch (e) { window.open(url, '_blank'); }  // last-resort fallback
+}
+
+/* ── Prompt pills ──────────────────────────────── */
+function usePill(btn, panel) {
+  const text = btn.textContent.trim();
+  document.getElementById(`${panel}-prompt`).value = text;
+  document.getElementById(`${panel}-prompt`).focus();
+  document.getElementById(`${panel}-panel`).scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ── Keyboard shortcut ─────────────────────────── */
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    const active = document.activeElement;
+    if (active?.id === 'img-prompt') generateImage();
+    else if (active?.id === 'vid-prompt') generateVideo();
+  }
+});
+
+/* ── Generate image ────────────────────────────── */
+function generateImage() { requireAuth(_generateImage); }
+function generateVideo() {
+  try {
+    requireAuth(_generateVideo);
+  } catch (e) {
+    console.error('generateVideo', e);
+    const el = document.getElementById('vid-error');
+    if (el) {
+      el.style.display = 'block';
+      el.textContent = (e && e.message) || 'Generate failed to start — hard refresh and try again.';
+    } else {
+      alert((e && e.message) || 'Generate failed to start — hard refresh.');
+    }
+  }
+}
+window.generateVideo = generateVideo;
+function generateBatch() { requireAuth(() => _generateBatch(10)); }
+function runPhotoBatch(n) {
+  // Coerce string "5" from data-batch attrs; only 5 or 10 are valid
+  const num = parseInt(n, 10);
+  const count = (num === 5 || num === 10) ? num : 10;
+  requireAuth(() => _generateBatch(count));
+}
+
+/** Split ×4 / ×6 / ×8 — click appends phrase into the prompt box. */
+const PHOTO_SPLIT_WAY = { 4: 'four-way', 6: 'six-way', 8: 'eight-way' };
+function photoSplitPhrase(n) {
+  const way = PHOTO_SPLIT_WAY[n];
+  return way ? (way + ' split screen') : '';
+}
+function stripPhotoSplitPhrases(text) {
+  return String(text || '')
+    .replace(/,?\s*\(?\s*(four|six|eight)-way(?:\s+multi\s+panel)?\s+split\s+screen\s*\)?/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^,\s*|,\s*$/g, '')
+    .trim();
+}
+function photoSplitN() {
+  const a = document.querySelector('#img-split-chips .style-chip.active');
+  if (!a) return 0;
+  const n = parseInt(a.getAttribute('data-split'), 10);
+  return (n === 4 || n === 6 || n === 8) ? n : 0;
+}
+function togglePhotoSplit(el) {
+  if (!el) return;
+  const n = parseInt(el.getAttribute('data-split'), 10);
+  const ta = document.getElementById('img-prompt');
+  const turningOff = el.classList.contains('active');
+  document.querySelectorAll('#img-split-chips .style-chip').forEach((c) => c.classList.remove('active'));
+  let base = stripPhotoSplitPhrases(ta ? ta.value : '');
+  if (!turningOff && (n === 4 || n === 6 || n === 8)) {
+    el.classList.add('active');
+    const phrase = photoSplitPhrase(n);
+    if (ta) {
+      ta.value = base ? (base + ', ' + phrase) : phrase;
+      try { ta.focus(); } catch (_e) {}
+    }
+  } else if (ta) {
+    ta.value = base;
+  }
+}
+window.togglePhotoSplit = togglePhotoSplit;
+window.photoSplitN = photoSplitN;
+// Prompt box already gets the split phrase on chip click; keep a send-time backup too.
+function rawPhotoPrompt() {
+  let p = (document.getElementById('img-prompt')?.value || '').trim();
+  const sn = photoSplitN();
+  if (sn) {
+    const way = PHOTO_SPLIT_WAY[sn];
+    const low = p.toLowerCase();
+    if (!low.includes('split screen') && !low.includes(way + ' split')) {
+      const phrase = photoSplitPhrase(sn);
+      p = p ? (p + ', ' + phrase) : phrase;
+    }
+  }
+  return p;
+}
+
+function showImgResult(url) {
+  if (!url) return;
+  const img = document.getElementById('img-result');
+  const ph = document.getElementById('img-placeholder');
+  const grid = document.getElementById('batch-result-grid');
+  if (grid) {
+    grid.style.display = 'none';
+    grid.classList.remove('is-on');
+    grid.innerHTML = '';
+  }
+  if (ph) ph.style.display = 'none';
+  if (!img) return;
+  // Big single image — no frame, just on the page
+  img.onload = null;
+  img.onerror = null;
+  img.src = url;
+  img.style.display = 'block';
+  wireImagePreview(img, url, 'percfect-image.jpg');
+  const dl = document.getElementById('img-download');
+  if (dl) dl.dataset.url = url;
+  const actions = document.getElementById('img-actions');
+  if (actions) actions.style.display = 'flex';
+}
+
+function showBatchResults(urls) {
+  const list = (urls || []).filter(Boolean);
+  const grid = document.getElementById('batch-result-grid');
+  const img = document.getElementById('img-result');
+  const ph = document.getElementById('img-placeholder');
+  if (ph) ph.style.display = 'none';
+  if (img) {
+    img.style.display = 'none';
+    img.removeAttribute('src');
+  }
+  if (!grid) return;
+  grid.innerHTML = '';
+  // Stack full-width images down the page (scroll if many)
+  if (list.length) {
+    grid.classList.add('is-on');
+    grid.style.display = 'flex';
+  } else {
+    grid.classList.remove('is-on');
+    grid.style.display = 'none';
+  }
+  list.forEach((url, i) => {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'batch-tile';
+    tile.title = 'Open image ' + (i + 1);
+    const im = document.createElement('img');
+    im.src = url;
+    im.alt = 'Batch ' + (i + 1);
+    im.loading = 'lazy';
+    tile.appendChild(im);
+    tile.onclick = () => {
+      openImagePreview(url, 'percfect-batch-' + (i + 1) + '.jpg');
+    };
+    grid.appendChild(tile);
+  });
+  if (list[0]) {
+    const dl = document.getElementById('img-download');
+    if (dl) dl.dataset.url = list[0];
+    const actions = document.getElementById('img-actions');
+    if (actions) actions.style.display = 'flex';
+  }
+}
+
+function setImgProgress(label, sub) {
+  const el = document.getElementById('img-progress-label');
+  const s = document.getElementById('img-progress-sub');
+  if (el && label) el.textContent = label;
+  if (s && sub != null) s.textContent = sub;
+}
+
+function photoActiveStyle() {
+  const style = document.querySelector('#img-style-chips .style-chip.active');
+  return style ? (style.textContent || '').trim() : 'None';
+}
+function photoStyleIsSet() {
+  const s = photoActiveStyle();
+  return s && s.toLowerCase() !== 'none';
+}
+async function _generateImage() {
+  // Prompt box = user words only (may be empty). Server adds resize/style/boost secret sauce.
+  const prompt = rawPhotoPrompt();
+  setLoading('img', true);
+  const sn = photoSplitN();
+  setImgProgress(sn ? ({4:'four-way',6:'six-way',8:'eight-way'}[sn] + ' split…') : 'Generating…', '');
+  hideToast('img-toast');
+  hideToast('batch-toast');
+  const fd = new FormData();
+  fd.append('prompt', prompt || '');
+  fd.append('split_n', String(sn || 0));
+  // Style + size: form fields only — never written into the prompt box
+  const styleName = photoActiveStyle();
+  if (styleName) fd.append('style', styleName);
+  appendStudioRefs(fd, photoRefs);
+  appendPhotoAspect(fd);
+  try {
+    const res = await fetch('/percfectstudios/generate-image', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    let data;
+    try {
+      data = await PercfectStudioJobs.resolveGenerationResponse(res, {
+        kind: 'image',
+        onProgress: (_d, label) => {
+          setImgProgress(label || 'Rendering…', 'Still working — results will show here');
+        },
+      });
+    } catch (e) {
+      showError('img', e.message || 'Generation failed. You were not charged.');
+      // Job may still finish in the background — refresh gallery after a beat
+      setTimeout(() => loadGallery(), 2500);
+      return;
+    }
+    const url = data.url || data.output_url || (data.result && data.result.url);
+    if (!url) {
+      showError('img', 'Generation finished but no image URL returned. Check Your PERCFECT PHOTOS below.');
+      await loadGallery();
+      return;
+    }
+    showImgResult(url);
+    const el = document.getElementById('img-credits');
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent) - (data.charged || photoCost()));
+    showToast('img-toast', '✓ Finished — 1 image ready below');
+    await loadGallery();
+    document.getElementById('img-output-area')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (e) {
+    showError('img', 'Network error — please try again.');
+  } finally {
+    setLoading('img', false);
+  }
+}
+
+function showBatchError(m){
+  const e = document.getElementById('batch-error');
+  if (!e) return;
+  e.textContent = m;
+  e.style.display = 'block';
+}
+function hideToast(id) {
+  const t = document.getElementById(id);
+  if (t) t.style.display = 'none';
+}
+function showToast(id, m, ms) {
+  const t = document.getElementById(id || 'batch-toast');
+  if (!t) return;
+  t.textContent = m;
+  t.style.display = 'block';
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => { t.style.display = 'none'; }, ms || 14000);
+}
+function showBatchToast(m){ showToast('batch-toast', m, 14000); }
+
+let _library = { images: [], videos: [] };
+let _libSelected = new Set();
+
+function libraryItemName(item, idx) {
+  const ext = item.type === 'video' ? 'mp4' : 'jpg';
+  return 'percfect-' + (item.type || 'file') + '-' + (idx + 1) + '.' + ext;
+}
+
+function allLibraryItems() { return [..._library.images, ..._library.videos]; }
+
+function updateLibraryToolbar() {
+  const n = _libSelected.size;
+  const countEl = document.getElementById('lib-sel-count');
+  const dlBtn = document.getElementById('lib-download-btn');
+  const delBtn = document.getElementById('lib-delete-btn');
+  const bar = document.getElementById('library-toolbar');
+  if (countEl) countEl.textContent = n;
+  if (dlBtn) dlBtn.disabled = n === 0;
+  if (delBtn) delBtn.disabled = n === 0;
+  if (bar) bar.style.display = allLibraryItems().length ? 'flex' : 'none';
+  document.querySelectorAll('.library-tile').forEach((tile) => {
+    const id = tile.dataset.id;
+    const on = id && _libSelected.has(id);
+    tile.classList.toggle('selected', !!on);
+    const pick = tile.querySelector('.library-pick');
+    if (pick) pick.checked = !!on;
+  });
+}
+
+function toggleLibrarySelect(id, on) {
+  if (!id) return;
+  if (on) _libSelected.add(id);
+  else _libSelected.delete(id);
+  updateLibraryToolbar();
+}
+
+function librarySelectAll() {
+  allLibraryItems().forEach((item) => _libSelected.add(String(item.id)));
+  updateLibraryToolbar();
+}
+
+function libraryClearSelection() {
+  _libSelected.clear();
+  updateLibraryToolbar();
+}
+
+async function deleteLibraryItem(id, closeFn) {
+  if (!id) return;
+  try {
+    const fd = new FormData();
+    fd.append('id', id);
+    const res = await fetch('/percfectstudios/delete-generation', { method: 'POST', body: fd });
+    if (!res.ok) return;
+    if (closeFn) closeFn();
+    _libSelected.delete(String(id));
+    await loadGallery();
+  } catch (_e) {}
+}
+
+async function deleteSelectedLibrary() {
+  if (!_libSelected.size) return;
+  const ids = [..._libSelected];
+  for (const id of ids) {
+    const fd = new FormData();
+    fd.append('id', id);
+    await fetch('/percfectstudios/delete-generation', { method: 'POST', body: fd });
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  _libSelected.clear();
+  await loadGallery();
+}
+
+async function downloadSelectedLibrary() {
+  const items = allLibraryItems().filter((item) => _libSelected.has(String(item.id)));
+  if (!items.length) return;
+  for (let i = 0; i < items.length; i++) {
+    await downloadFile(items[i].output_url, libraryItemName(items[i], i));
+    await new Promise((r) => setTimeout(r, 350));
+  }
+}
+
+function loadImageAsReference(url) {
+  if (!url) return;
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE === 'videos') {
+    // On videos page, load as animate start frame (one only)
+    sendToVideo(url);
+    return;
+  }
+  if (!document.getElementById('img-ref-slots')) {
+    try { sessionStorage.setItem('percfect_photo_ref', url); } catch (_e) {}
+    window.location.href = '/percfectstudios/photos';
+    return;
+  }
+  // Edit = this photo becomes the primary reference (slot 0)
+  photoPlaceRef({ kind: 'url', url: url, preview: url }, 0);
+  document.getElementById('img-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('img-prompt')?.focus();
+}
+window.loadImageAsReference = loadImageAsReference;
+
+function sendToVideo(url) {
+  const src = url || document.getElementById('img-result')?.src
+    || document.getElementById('img-download')?.dataset?.url || '';
+  if (!src) return;
+  // Photos page → hand off URL to Videos (ref + animate this)
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE === 'photos') {
+    try {
+      sessionStorage.setItem('percfect_animate_url', src);
+      sessionStorage.setItem('percfect_animate_prompt', ANIMATE_DEFAULT_PROMPT || 'animate this');
+    } catch (_e) {}
+    window.location.href = '/percfectstudios/videos?animate=1';
+    return;
+  }
+  // Already on Videos — put still into real 4-slot refs (not legacy hidden drop only)
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE === 'videos' && typeof vidAddUrl === 'function') {
+    if (!videoRefCount()) {
+      vidAddUrl(src, 0);
+    } else {
+      // Don't wipe existing refs; fill first empty or slot 0 if empty
+      const slot = (typeof vidFirstEmpty === 'function' && vidFirstEmpty() >= 0) ? vidFirstEmpty() : 0;
+      if (!videoRefs[0]) vidAddUrl(src, 0);
+      else if (slot >= 0) vidAddUrl(src, slot);
+    }
+    if (typeof ensureAnimatePrompt === 'function') ensureAnimatePrompt();
+    const ta = document.getElementById('vid-prompt');
+    if (ta && !ta.value.trim()) ta.value = ANIMATE_DEFAULT_PROMPT || 'animate this';
+    document.getElementById('vid-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ta?.focus();
+    if (typeof updateVidCostUI === 'function') updateVidCostUI();
+    return;
+  }
+  // Fallback: navigate to Videos with handoff
+  try {
+    sessionStorage.setItem('percfect_animate_url', src);
+    sessionStorage.setItem('percfect_animate_prompt', ANIMATE_DEFAULT_PROMPT || 'animate this');
+  } catch (_e) {}
+  window.location.href = '/percfectstudios/videos?animate=1';
+}
+
+function applyAnimateHandoff() {
+  if (typeof STUDIO_MODE === 'undefined' || STUDIO_MODE !== 'videos') return;
+  let src = null;
+  let wantPrompt = null;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('animate') || q.get('image_url')) {
+      src = sessionStorage.getItem('percfect_animate_url') || q.get('image_url');
+      wantPrompt = sessionStorage.getItem('percfect_animate_prompt');
+    }
+  } catch (_e) {}
+  if (!src) return;
+  try {
+    sessionStorage.removeItem('percfect_animate_url');
+    sessionStorage.removeItem('percfect_animate_prompt');
+  } catch (_e) {}
+  // Real ref slot so Generate sends the image
+  if (typeof vidAddUrl === 'function') {
+    vidAddUrl(src, 0);
+  } else {
+    const urlEl = document.getElementById('vid-image-url');
+    if (urlEl) urlEl.value = src;
+  }
+  const ta = document.getElementById('vid-prompt');
+  if (ta) {
+    if (!ta.value.trim()) ta.value = wantPrompt || ANIMATE_DEFAULT_PROMPT || 'animate this';
+  } else if (typeof ensureAnimatePrompt === 'function') {
+    ensureAnimatePrompt();
+  }
+  document.getElementById('vid-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (typeof updateVidCostUI === 'function') updateVidCostUI();
+  // Clean ?animate= from URL without reload
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.has('animate') || u.searchParams.has('image_url')) {
+      u.searchParams.delete('animate');
+      u.searchParams.delete('image_url');
+      history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
+    }
+  } catch (_e) {}
+}
+
+function sendToVideoFromUrl(url) {
+  sendToVideo(url);
+  setExtendInput({ url });
+  const preview = document.getElementById('extend-drop-preview');
+  const zone = document.getElementById('extend-drop-zone');
+  const label = document.getElementById('extend-drop-label');
+  if (preview) { preview.src = url; preview.style.display = 'block'; }
+  if (label) label.textContent = 'Saved video';
+  if (zone) zone.classList.add('has-video');
+  const vid = document.getElementById('vid-result');
+  if (vid) {
+    vid.src = url;
+    vid.style.display = 'block';
+    document.getElementById('vid-placeholder').style.display = 'none';
+    document.getElementById('vid-actions').style.display = 'flex';
+    document.getElementById('vid-download').dataset.url = url;
+  }
+  document.getElementById('vid-extend')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function openLibraryPreview(item, idx) {
+  if (!item || !item.output_url) return;
+  setActiveVideoChain(item);
+  const name = libraryItemName(item, idx || 0);
+  const overlay = document.createElement('div');
+  overlay.className = 'batch-lightbox';
+  const media = item.type === 'video'
+    ? Object.assign(document.createElement('video'), { src: item.output_url, controls: true, playsInline: true, loop: true })
+    : Object.assign(document.createElement('img'), { src: item.output_url, alt: '' });
+  if (item.type === 'video') media.style.maxHeight = '72vh';
+  const actions = document.createElement('div');
+  actions.className = 'batch-lightbox-actions';
+  const mkBtn = (label, cls, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = label;
+    b.onclick = (e) => { e.stopPropagation(); fn(); };
+    return b;
+  };
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onEsc);
+  };
+  const btns = [
+    mkBtn('↓ Download', 'btn-accent btn-sm', () => downloadFile(item.output_url, name)),
+  ];
+  if (item.type === 'image') {
+    btns.push(
+      mkBtn('✎ Edit', 'btn-outline-accent btn-sm', () => { close(); loadImageAsReference(item.output_url); }),
+      mkBtn('▶ Animate', 'btn-outline-accent btn-sm', () => { close(); sendToVideo(item.output_url); }),
+    );
+  } else {
+    btns.push(mkBtn('⤢ Extend', 'btn-outline-accent btn-sm', () => {
+      close();
+      setActiveVideoChain(item);
+      sendToVideoFromUrl(item.output_url);
+    }));
+  }
+  if (item.id) btns.push(mkBtn('Delete', 'btn-outline-accent btn-sm', () => deleteLibraryItem(String(item.id), close)));
+  btns.push(mkBtn('Close', 'btn-outline-accent btn-sm', close));
+  actions.append(...btns);
+  const hint = document.createElement('p');
+  hint.className = 'batch-lightbox-hint';
+  hint.textContent = item.type === 'video'
+    ? (item.is_chain
+      ? ('Chain · ' + item.chain_count + ' clips — Extend continues this group')
+      : 'Extend loads this clip into the video panel')
+    : 'Edit = use as reference · Animate = send to video panel';
+  overlay.append(media, actions, hint);
+  if (item.type === 'video' && item.is_chain && Array.isArray(item.chain_clips)) {
+    const chainBox = document.createElement('div');
+    chainBox.className = 'batch-lightbox-hint';
+    chainBox.style.maxWidth = '42rem';
+    chainBox.style.textAlign = 'left';
+    chainBox.style.whiteSpace = 'pre-wrap';
+    const lines = (item.chain_prompts || []).map((p, i) => (i + 1) + '. ' + p);
+    chainBox.textContent = 'Prompts in order:\n' + (lines.join('\n') || '(no prompts)');
+    const clipRow = document.createElement('div');
+    clipRow.style.display = 'flex';
+    clipRow.style.flexWrap = 'wrap';
+    clipRow.style.gap = '0.4rem';
+    clipRow.style.justifyContent = 'center';
+    clipRow.style.marginTop = '0.55rem';
+    (item.chain_clips || []).forEach((clip, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn-outline-accent btn-sm';
+      b.textContent = 'Clip ' + (i + 1);
+      b.onclick = (e) => {
+        e.stopPropagation();
+        media.src = clip.output_url || clip.url;
+        media.play().catch(() => {});
+        setActiveVideoChain(clip);
+      };
+      clipRow.appendChild(b);
+    });
+    overlay.append(chainBox, clipRow);
+  }
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  media.onclick = (e) => e.stopPropagation();
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(overlay);
+  if (item.type === 'video') media.play().catch(() => {});
+}
+
+function openImagePreview(url, name, opts) {
+  openLibraryPreview({ id: opts?.id, type: 'image', output_url: url }, 0);
+}
+
+function wireImagePreview(imgEl, url, name) {
+  if (!imgEl || !url) return;
+  imgEl.classList.add('has-preview');
+  imgEl.title = 'Click to preview full screen';
+  imgEl.onclick = () => openImagePreview(url, name || 'percfect-image.jpg', { removable: false });
+}
+
+function editImageFromResult() {
+  const url = document.getElementById('img-download')?.dataset?.url || document.getElementById('img-result')?.src;
+  if (url) loadImageAsReference(url);
+}
+
+function _isVideoMediaUrl(u) {
+  return /\.(mp4|webm|mov)($|\?)/i.test(String(u || ''));
+}
+function _hydrateGalleryVideoThumb(vid) {
+  if (!vid || vid.dataset.posterReady === '1') return;
+  const seek = () => {
+    try {
+      const d = Number(vid.duration);
+      const t = (Number.isFinite(d) && d > 0) ? Math.min(0.1, d * 0.02) : 0.1;
+      if (vid.currentTime < 0.05) vid.currentTime = t;
+    } catch (_e) { /* ignore */ }
+  };
+  const mark = () => {
+    try { vid.pause(); } catch (_e) {}
+    vid.dataset.posterReady = '1';
+  };
+  vid.addEventListener('loadedmetadata', seek, { once: true });
+  vid.addEventListener('seeked', mark, { once: true });
+  if (vid.readyState >= 1) seek();
+}
+function paintLibraryGrid(gridId, items, emptyId, isVideo) {
+  const grid = document.getElementById(gridId);
+  const empty = document.getElementById(emptyId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (empty) empty.style.display = items.length ? 'none' : 'block';
+  items.forEach((item, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'library-tile' + (item.is_chain ? ' library-tile-chain' : '');
+    tile.dataset.id = String(item.id);
+    tile.dataset.chainId = String(item.chain_id || item.id || '');
+    tile.title = item.is_chain
+      ? ('Chain · ' + item.chain_count + ' clips — click to preview')
+      : 'Click to preview';
+    const pick = document.createElement('input');
+    pick.type = 'checkbox';
+    pick.className = 'library-pick';
+    pick.checked = _libSelected.has(String(item.id));
+    pick.onclick = (ev) => {
+      ev.stopPropagation();
+      toggleLibrarySelect(String(item.id), pick.checked);
+    };
+    if (isVideo) {
+      const poster = item.preview_url || item.thumb || '';
+      const badge = document.createElement('span');
+      badge.className = 'library-type-badge';
+      badge.textContent = item.is_chain ? ('▶ ×' + item.chain_count) : '▶';
+      if (poster && !_isVideoMediaUrl(poster)) {
+        const im = document.createElement('img');
+        im.src = poster;
+        im.alt = '';
+        im.loading = 'lazy';
+        tile.append(pick, badge, im);
+      } else {
+        const vid = document.createElement('video');
+        vid.className = 'lib-vid-thumb';
+        vid.src = item.output_url;
+        vid.muted = true;
+        vid.playsInline = true;
+        vid.preload = 'metadata';
+        tile.append(pick, badge, vid);
+        _hydrateGalleryVideoThumb(vid);
+      }
+    } else {
+      const im = document.createElement('img');
+      im.src = item.output_url;
+      im.alt = '';
+      im.loading = 'lazy';
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'library-tile-edit';
+      editBtn.textContent = '✎ Edit';
+      editBtn.title = 'Load as reference on Photos';
+      editBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        loadImageAsReference(item.output_url);
+      };
+      tile.append(pick, im, editBtn);
+    }
+    tile.onclick = () => openLibraryPreview(item, idx);
+    grid.appendChild(tile);
+  });
+}
+
+/** Newest first, then cap (Videos page = last 6 only). */
+function sortLibraryNewest(items) {
+  return (items || []).slice().sort((a, b) => {
+    const ta = Date.parse(a.created_at || a.createdAt || a.updated_at || a.ts || 0) || 0;
+    const tb = Date.parse(b.created_at || b.createdAt || b.updated_at || b.ts || 0) || 0;
+    if (tb !== ta) return tb - ta;
+    // Higher id usually newer
+    const ia = Number(a.id) || 0;
+    const ib = Number(b.id) || 0;
+    if (ib !== ia) return ib - ia;
+    return 0;
+  });
+}
+
+/** Collapse related clips (extend/trim/re-roll) into one tile per chain_id. */
+function groupVideosByChain(items) {
+  const sorted = sortLibraryNewest(items || []);
+  const map = new Map();
+  const order = [];
+  sorted.forEach((it) => {
+    const cid = String(it.chain_id || it.id || it.output_url || '');
+    if (!cid) return;
+    if (!map.has(cid)) {
+      map.set(cid, []);
+      order.push(cid);
+    }
+    map.get(cid).push(it);
+  });
+  return order.map((cid) => {
+    const clips = map.get(cid) || [];
+    const newest = clips[0] || {};
+    const oldestFirst = clips.slice().reverse();
+    return {
+      ...newest,
+      chain_id: cid,
+      chain_count: clips.length,
+      chain_clips: oldestFirst,
+      chain_prompts: oldestFirst.map((c) => c.prompt || '').filter(Boolean),
+      is_chain: clips.length > 1,
+    };
+  });
+}
+
+function setActiveVideoChain(meta) {
+  if (!meta) return;
+  if (meta.chain_id) window._videoChainId = String(meta.chain_id);
+  if (meta.id != null) window._videoSourceId = String(meta.id);
+  if (meta.output_url || meta.url) {
+    window._videoSourceUrl = meta.output_url || meta.url;
+  }
+}
+window.setActiveVideoChain = setActiveVideoChain;
+
+function paintLibrary() {
+  const section = document.getElementById('gallery-section');
+  if (!(LOGGED_IN || window.LOGGED_IN)) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  const mode = (typeof STUDIO_MODE !== 'undefined') ? STUDIO_MODE : 'photos';
+  if (mode === 'videos') {
+    // Always show the bottom strip on Videos (under Extend) — last 6 chains
+    const all = sortLibraryNewest(_library.videos || []);
+    const session = (window._sessionRecentVideos || []).filter((v) => v && v.output_url);
+    const seen = new Set(all.map((v) => String(v.output_url || '')));
+    const merged = all.slice();
+    session.forEach((v) => {
+      if (!seen.has(String(v.output_url))) {
+        seen.add(String(v.output_url));
+        merged.unshift(v);
+      }
+    });
+    const items = groupVideosByChain(merged).slice(0, 6);
+    if (section) section.style.display = 'block';
+    paintLibraryGrid('gallery-videos', items, 'gallery-videos-empty', true);
+    updateLibraryToolbar();
+    return;
+  }
+  const items = _library.images || [];
+  /* Photos: hide empty shell */
+  if (!items.length) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = 'block';
+  paintLibraryGrid('gallery-images', items, 'gallery-images-empty', false);
+  updateLibraryToolbar();
+}
+
+/** Remember a just-finished video at the bottom (even before library refresh). */
+function rememberSessionVideo(url, meta) {
+  if (!url) return;
+  const chainId = (meta && meta.chain_id) || window._videoChainId || null;
+  const genId = (meta && (meta.generation_id || meta.id)) || null;
+  window._sessionRecentVideos = window._sessionRecentVideos || [];
+  window._sessionRecentVideos = [
+    {
+      id: genId || ('session-' + Date.now()),
+      type: 'video',
+      output_url: url,
+      chain_id: chainId,
+      prompt: (meta && meta.prompt) || '',
+      created_at: new Date().toISOString(),
+    },
+  ].concat(window._sessionRecentVideos.filter((v) => v.output_url !== url)).slice(0, 12);
+  setActiveVideoChain({ chain_id: chainId, id: genId, output_url: url });
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE === 'videos') paintLibrary();
+}
+window.rememberSessionVideo = rememberSessionVideo;
+
+async function _generateBatch(batchN) {
+  const nWanted = (Number(batchN) === 5 || Number(batchN) === 10) ? Number(batchN) : 10;
+  // Separate images — do not apply split-screen wrap
+  // User box only — empty OK; server builds resize/style secret sauce
+  const prompt = (document.getElementById('img-prompt')?.value || '').trim();
+  const imgBtn = document.getElementById('img-btn');
+  const batchBtns = document.querySelectorAll('.photos-batch-sm');
+  if (imgBtn) imgBtn.disabled = true;
+  batchBtns.forEach((b) => { b.disabled = true; });
+  const errEl = document.getElementById('batch-error');
+  if (errEl) errEl.style.display = 'none';
+  const imgErr = document.getElementById('img-error');
+  if (imgErr) imgErr.style.display = 'none';
+  hideToast('batch-toast');
+  hideToast('img-toast');
+  setLoading('img', true);
+  setImgProgress('Batch ×' + nWanted + '…', nWanted + ' separate images');
+  const fd = new FormData();
+  fd.append('prompt', prompt || '');
+  fd.append('batch_n', String(nWanted));
+  const styleName = photoActiveStyle();
+  if (styleName) fd.append('style', styleName);
+  appendStudioRefs(fd, photoRefs);
+  appendPhotoAspect(fd);
+  try {
+    if (typeof PercfectStudioJobs === 'undefined' || !PercfectStudioJobs.resolveGenerationResponse) {
+      showBatchError('Page scripts not loaded — hard refresh and try again.');
+      showError('img', 'Page scripts not loaded — hard refresh and try again.');
+      return;
+    }
+    const res = await fetch('/percfectstudios/generate-batch', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    let data;
+    try {
+      data = await PercfectStudioJobs.resolveGenerationResponse(res, {
+        kind: 'batch',
+        deadlineMs: 360000,
+        onProgress: (_d, label) => {
+          setImgProgress(label || 'Batch…', '×' + nWanted);
+        },
+      });
+    } catch (e) {
+      const msg = e.message || 'Batch failed. You were not charged.';
+      showBatchError(msg);
+      showError('img', msg);
+      setTimeout(() => loadGallery(), 2500);
+      return;
+    }
+    const urls = data.urls || data.images || (data.result && data.result.urls) || [];
+    const made = data.made != null ? data.made : urls.length;
+    const failed = data.failed != null ? data.failed : Math.max(0, nWanted - made);
+    const charged = data.charged != null ? data.charged : made;
+    if (!urls.length) {
+      const msg = 'Batch finished with 0 images. You were not charged for empties. Try again.';
+      showBatchError(msg);
+      showError('img', msg);
+      await loadGallery();
+      return;
+    }
+    showBatchResults(urls);
+    const el = document.getElementById('img-credits');
+    if (el) {
+      const bal = parseInt(el.textContent, 10);
+      if (!isNaN(bal)) el.textContent = Math.max(0, bal - charged);
+    }
+    await loadGallery();
+    const msg =
+      '✓ ' + made + '/' + nWanted +
+      (failed ? ' · ' + failed + ' skipped' : '') +
+      ' · ' + charged + ' cr';
+    showBatchToast(msg);
+    showToast('img-toast', msg, 12000);
+  } catch (e) {
+    showBatchError('Network error — please try again.');
+    showError('img', 'Network error — please try again.');
+  } finally {
+    setLoading('img', false);
+    if (imgBtn) imgBtn.disabled = false;
+    batchBtns.forEach((b) => { b.disabled = false; });
+  }
+}
+
+// Once rendering starts, xAI can take several minutes. Hard stop only after that.
+const VID_JOB_DEADLINE_MS = 480000;
+// Fail-fast ONLY if the server never accepts the job (no job_id / still <12%).
+// Multi-ref often sits in Queued longer than 45s — aborting then shows a fake
+// Error 69069 while the clip still finishes in the library.
+const VID_START_STUCK_MS = 45000;
+const VID_ERR_OUR_SIDE = '69069';
+let _vidJobStartedAt = 0;
+let _vidStatusTimer = null; // seconds ticker only — NEVER moves the bar
+let _vidHardTimer = null;
+let _vidStartStuckTimer = null;
+let _vidAbortAll = null; // cancel timers (poll is not aborted)
+let _vidLastPct = 0;
+let _vidGenActive = false;
+let _vidReachedProcessing = false;
+let _vidJobAccepted = false; // true once POST returns job_id
+let _vidStageProg = null;
+let _vidStatusLabel = 'Starting…';
+
+function showVidResult(url) {
+  if (!url) return;
+  const vid = document.getElementById('vid-result');
+  const ph = document.getElementById('vid-placeholder');
+  if (ph) ph.style.display = 'none';
+  if (vid) {
+    vid.src = url;
+    vid.style.display = 'block';
+    try { vid.load(); } catch (_e) {}
+  }
+  const dl = document.getElementById('vid-download');
+  if (dl) dl.dataset.url = url;
+  const actions = document.getElementById('vid-actions');
+  if (actions) actions.style.display = 'flex';
+  const ft = document.getElementById('vid-frame-tools');
+  if (ft) ft.style.display = 'flex';
+  // Always arm extend source when generate finishes (scroll-down ready)
+  setExtendInput({ url });
+  const extUrl = document.getElementById('extend-video-url');
+  if (extUrl) extUrl.value = url;
+  const prev = document.getElementById('extend-drop-preview');
+  const zone = document.getElementById('extend-drop-zone');
+  const lab = document.getElementById('extend-drop-label');
+  if (prev) { prev.src = url; prev.style.display = 'block'; }
+  if (zone) zone.classList.add('has-video');
+  if (lab) lab.style.display = 'none';
+  wireExtendTrimFromPreview();
+}
+
+/**
+ * Error 69069 = OUR hang only: nothing finished after the long client wait.
+ * Other failures (xAI moderation, credits, etc.) get plain messages — not 69069.
+ */
+function formatVideoGenError(raw) {
+  const code = raw && raw.code;
+  const msg = String((raw && raw.message) || raw || 'Generation failed.').trim();
+  const low = msg.toLowerCase();
+  // Explicit our-side timeout flag
+  const isOurHang =
+    code === VID_ERR_OUR_SIDE ||
+    /error\s*69069|\b69069\b/.test(msg) ||
+    (raw && raw.reason === 'timeout') ||
+    /no finish for ~?2 min|over 2 minutes with no finish|no finish after long wait|did not finish in time|stuck with no finish/i.test(msg);
+
+  if (isOurHang) {
+    const neverStarted = /never started rendering|stuck before xAI|never accepted the job/i.test(msg);
+    return {
+      code: VID_ERR_OUR_SIDE,
+      text: neverStarted
+        ? 'Job never started rendering — that is on us (queue/workers), not xAI. You were not charged if it never completed. Want to retry?'
+        : 'Nothing finished after a long wait — that is on us. You were not charged if it never completed. Check Your last 6 videos — it may still land. Want to retry?',
+      retry: true,
+    };
+  }
+  // Real generation failures from the job (poll 400 body, xAI error, etc.) — show ASAP, no 69069
+  if (/generation failed|poll HTTP|timed out after|xAI |moderat|rejected|blocked|disallowed|safety|policy/i.test(msg)) {
+    return {
+      code: null,
+      text: msg.replace(/^Error\s*\d+\s*—\s*/i, '').trim() || msg,
+      retry: true,
+    };
+  }
+  if (/session expired|log in/i.test(low)) {
+    return { code: null, text: msg, retry: false };
+  }
+  if (/not enough credits|402/i.test(low)) {
+    return { code: null, text: msg, retry: false };
+  }
+  // Other real errors — show message, offer retry, no fake 69069
+  return {
+    code: null,
+    text: msg || 'Generation failed.',
+    retry: true,
+  };
+}
+
+function showVidError(raw, opts) {
+  opts = opts || {};
+  const info = formatVideoGenError(raw);
+  // Always close progress UI on error
+  stopVidStageProgress(false);
+  const el = document.getElementById('vid-error');
+  if (!el) {
+    alert(info.text);
+    setLoading('vid', false);
+    return;
+  }
+  el.style.display = 'block';
+  el.style.color = '';
+  const codeLine = info.code
+    ? '<div style="font-family:var(--font-mono);font-size:0.78rem;opacity:0.95;margin-bottom:0.35rem;">Error <strong>' +
+      info.code +
+      '</strong> (our side)</div>'
+    : '';
+  const retryHtml =
+    info.retry || opts.forceRetry
+      ? '<div style="margin-top:0.7rem;display:flex;gap:0.5rem;flex-wrap:wrap;">' +
+        '<button type="button" class="btn-accent btn-sm" id="vid-retry-btn" onclick="retryVideoGenerate()">↻ Yes, retry</button>' +
+        '<button type="button" class="btn-outline-accent btn-sm" onclick="document.getElementById(\'vid-error\').style.display=\'none\'">No thanks</button>' +
+        '</div>'
+      : '';
+  el.innerHTML = codeLine + '<div>' + String(info.text).replace(/</g, '&lt;') + '</div>' + retryHtml;
+  setLoading('vid', false);
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_e) {}
+}
+
+function retryVideoGenerate() {
+  const err = document.getElementById('vid-error');
+  if (err) {
+    err.style.display = 'none';
+    err.innerHTML = '';
+  }
+  document.getElementById('vid-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  generateVideo();
+}
+window.retryVideoGenerate = retryVideoGenerate;
+
+function paintVidPct(pct, label) {
+  // Monotone only — bar never goes backwards
+  const p = Math.max(_vidLastPct, Math.min(100, Math.round(Number(pct) || 0)));
+  _vidLastPct = p;
+  if (label) _vidStatusLabel = label;
+  const bar = document.getElementById('vid-progress-bar');
+  if (bar) bar.style.width = p + '%';
+  const track = document.getElementById('vid-progress-track');
+  if (track) track.setAttribute('aria-valuenow', String(p));
+  const pctEl = document.getElementById('vid-progress-pct');
+  if (pctEl) pctEl.textContent = p + '%';
+  if (label) {
+    const lab = document.getElementById('vid-progress-label');
+    if (lab) lab.textContent = label;
+  }
+  refreshVidStatusSub();
+}
+
+function refreshVidStatusSub() {
+  const sub = document.getElementById('vid-progress-sub');
+  if (!sub || !_vidJobStartedAt) return;
+  const sec = Math.floor((Date.now() - _vidJobStartedAt) / 1000);
+  let hint = '';
+  if (_vidLastPct < 12) {
+    hint = 'Sending request…';
+  } else if (_vidLastPct < 20) {
+    hint = 'Accepted by us — waiting for render to start';
+  } else if (_vidLastPct < 100) {
+    hint = 'Rendering — % moves with xAI progress (not a timer)';
+  } else {
+    hint = 'Done';
+  }
+  sub.textContent = _vidLastPct + '% · ' + sec + 's · ' + hint;
+}
+
+function startVidStageProgress() {
+  _vidJobStartedAt = Date.now();
+  _vidLastPct = 0;
+  _vidGenActive = true;
+  _vidReachedProcessing = false;
+  _vidJobAccepted = false;
+  _vidStatusLabel = 'Starting…';
+  if (_vidStatusTimer) { clearInterval(_vidStatusTimer); _vidStatusTimer = null; }
+  if (_vidHardTimer) { clearTimeout(_vidHardTimer); _vidHardTimer = null; }
+  if (_vidStartStuckTimer) { clearTimeout(_vidStartStuckTimer); _vidStartStuckTimer = null; }
+  const wrap = document.getElementById('vid-progress-wrap');
+  if (wrap) {
+    wrap.style.display = 'block';
+    wrap.classList.add('is-on');
+    try { wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_e) {}
+  }
+  const ld = document.getElementById('vid-loading');
+  if (ld) {
+    ld.classList.remove('show');
+    ld.style.setProperty('display', 'none', 'important');
+  }
+  const ph = document.getElementById('vid-placeholder');
+  if (ph) ph.style.display = 'none';
+  const bar = document.getElementById('vid-progress-bar');
+  if (bar) bar.style.width = '0%';
+  const pctEl = document.getElementById('vid-progress-pct');
+  if (pctEl) pctEl.textContent = '0%';
+
+  // HONEST stage bar only — no soft timer creep. % jumps on real status changes:
+  //   12% queued  ·  55% rendering (xAI accepted)  ·  90% saving  ·  100% done
+  _vidStageProg = (window.PercfectStudioJobs && PercfectStudioJobs.makeStageProgress)
+    ? PercfectStudioJobs.makeStageProgress({ bar: 'vid-progress-bar', label: 'vid-progress-label' })
+    : null;
+  if (_vidStageProg && _vidStageProg.reset) _vidStageProg.reset();
+  paintVidPct(5, 'Starting…');
+  if (_vidStageProg) _vidStageProg({ status: 'pending' }, 'Starting…');
+
+  // Seconds ticker only — proves the page is alive; does NOT move the bar
+  _vidStatusTimer = setInterval(() => {
+    if (!_vidGenActive) return;
+    refreshVidStatusSub();
+  }, 1000);
+
+  // Fail FAST only if POST never returns a job_id (still on Starting <12%).
+  // Once Queued (12%+), wait the full render deadline — multi-ref often queues >45s.
+  _vidStartStuckTimer = setTimeout(() => {
+    if (!_vidGenActive || _vidJobAccepted || _vidReachedProcessing || _vidLastPct >= 12) return;
+    if (_vidAbortAll) {
+      try { _vidAbortAll('never_started'); } catch (_e) {}
+    }
+  }, VID_START_STUCK_MS);
+
+  // Hard stop only for long renders (after processing). Reset when processing hits.
+  _vidHardTimer = setTimeout(() => {
+    if (_vidAbortAll) {
+      try { _vidAbortAll('timeout'); } catch (_e) {}
+    }
+  }, VID_JOB_DEADLINE_MS);
+}
+
+function onVidJobProgress(data, label) {
+  if (!_vidGenActive) return;
+  if (Date.now() - _vidJobStartedAt > VID_JOB_DEADLINE_MS) {
+    const err = new Error('Error ' + VID_ERR_OUR_SIDE + ' — no finish after long wait.');
+    err.code = VID_ERR_OUR_SIDE;
+    throw err;
+  }
+  const st = String((data && data.status) || '').toLowerCase();
+  if (st === 'processing' || st === 'running' || st === 'saving') {
+    if (!_vidReachedProcessing) {
+      _vidReachedProcessing = true;
+      // Cancel fail-fast; arm full render deadline from NOW
+      if (_vidStartStuckTimer) { clearTimeout(_vidStartStuckTimer); _vidStartStuckTimer = null; }
+      if (_vidHardTimer) { clearTimeout(_vidHardTimer); _vidHardTimer = null; }
+      _vidHardTimer = setTimeout(() => {
+        if (_vidAbortAll) {
+          try { _vidAbortAll('timeout'); } catch (_e) {}
+        }
+      }, VID_JOB_DEADLINE_MS);
+    }
+  }
+  // Prefer live server progress (xAI via job marker). Fall back to stages only if missing.
+  const serverPct = (data && (data.progress != null || data.percent != null || data.pct != null))
+    ? Number(data.progress != null ? data.progress : (data.percent != null ? data.percent : data.pct))
+    : null;
+  let lab = label || (data && data.message) || null;
+  if (!lab) {
+    if (st === 'queued' || st === 'pending') lab = 'In queue…';
+    else if (st === 'processing' || st === 'running') lab = 'Rendering video…';
+    else if (st === 'saving') lab = 'Saving…';
+  }
+  if (serverPct != null && isFinite(serverPct)) {
+    let p = serverPct;
+    if (p > 0 && p <= 1) p = p * 100;
+    if (lab && p < 100) lab = 'Rendering video… ' + Math.round(p) + '%';
+    paintVidPct(p, lab);
+    return;
+  }
+  if (_vidStageProg) {
+    _vidStageProg(data, lab);
+    const bar = document.getElementById('vid-progress-bar');
+    const w = bar ? parseFloat(bar.style.width) || 0 : 0;
+    _vidLastPct = Math.max(_vidLastPct, Math.round(w));
+    if (lab) _vidStatusLabel = lab;
+    const labEl = document.getElementById('vid-progress-label');
+    if (labEl && _vidStatusLabel) labEl.textContent = _vidStatusLabel;
+    const pctEl = document.getElementById('vid-progress-pct');
+    if (pctEl) pctEl.textContent = _vidLastPct + '%';
+    refreshVidStatusSub();
+    return;
+  }
+  if (st === 'queued' || st === 'pending') paintVidPct(12, lab || 'In queue…');
+  else if (st === 'processing' || st === 'running') paintVidPct(Math.max(_vidLastPct, 20), lab || 'Rendering video…');
+  else if (st === 'saving') paintVidPct(90, lab || 'Saving…');
+  else if (lab) paintVidPct(_vidLastPct, lab);
+}
+
+function stopVidStageProgress(ok) {
+  _vidGenActive = false;
+  if (_vidStatusTimer) { clearInterval(_vidStatusTimer); _vidStatusTimer = null; }
+  if (_vidHardTimer) { clearTimeout(_vidHardTimer); _vidHardTimer = null; }
+  if (_vidStartStuckTimer) { clearTimeout(_vidStartStuckTimer); _vidStartStuckTimer = null; }
+  _vidAbortAll = null;
+  if (ok) {
+    if (_vidStageProg && _vidStageProg.done) _vidStageProg.done('Done');
+    paintVidPct(100, 'Done');
+  }
+  _vidStageProg = null;
+  setTimeout(() => {
+    const wrap = document.getElementById('vid-progress-wrap');
+    if (wrap) {
+      wrap.style.display = 'none';
+      wrap.classList.remove('is-on');
+    }
+  }, ok ? 500 : 0);
+}
+
+async function _generateVideo() {
+  if (typeof PercfectStudioJobs === 'undefined' || !PercfectStudioJobs.resolveGenerationResponse) {
+    showError('vid', 'Page scripts not loaded — hard refresh (Cmd+Shift+R) and try again.');
+    return;
+  }
+  let prompt = (document.getElementById('vid-prompt') && document.getElementById('vid-prompt').value || '').trim();
+  if (!prompt && hasVideoReference()) {
+    prompt = ANIMATE_DEFAULT_PROMPT;
+    const ta = document.getElementById('vid-prompt');
+    if (ta) ta.value = prompt;
+  }
+  if (!prompt) { showError('vid','Please describe what you want to generate.'); return; }
+  // Kill any prior run
+  if (_vidAbortAll) {
+    try { _vidAbortAll('superseded'); } catch (_e) {}
+  }
+  setLoading('vid', true);
+  const ld = document.getElementById('vid-loading');
+  if (ld) {
+    ld.classList.remove('show');
+    ld.style.setProperty('display', 'none', 'important');
+  }
+  const errBox = document.getElementById('vid-error');
+  if (errBox) {
+    errBox.style.display = 'none';
+    errBox.innerHTML = '';
+  }
+  startVidStageProgress();
+  const fd = new FormData();
+  fd.append('prompt', prompt);
+  fd.append('duration', String(_duration || 6));
+  appendVideoRefs(fd);
+  const saveLib = document.getElementById('vid-save-library');
+  fd.append('save_to_library', (saveLib && saveLib.checked) ? '1' : '0');
+  // Re-roll / continue: keep the same chain_id so library collapses related clips
+  if (window._continueVideoChain && window._videoChainId) {
+    fd.append('continue_chain', '1');
+    fd.append('chain_id', String(window._videoChainId));
+    if (window._videoSourceId) fd.append('source_id', String(window._videoSourceId));
+    if (window._videoSourceUrl) fd.append('source_video_url', String(window._videoSourceUrl));
+  }
+  window._continueVideoChain = false;
+
+  const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  let settled = false;
+  let hardReject = null;
+  const hardStop = new Promise((_, reject) => {
+    hardReject = (reason) => {
+      if (settled) return;
+      settled = true;
+      if (ac) {
+        try { ac.abort(); } catch (_e) {}
+      }
+      let msg;
+      if (reason === 'never_started') {
+        msg =
+          'Error ' + VID_ERR_OUR_SIDE + ' — job never started rendering (stuck before xAI). ' +
+          'Not charged if it never completed. Try again — if this keeps happening workers are down.';
+      } else {
+        msg =
+          'Error ' + VID_ERR_OUR_SIDE + ' — video did not finish in time (our side). ' +
+          'You were not charged if it never completed. Check Your last 6 videos — it may still land.';
+      }
+      const err = new Error(msg);
+      err.code = VID_ERR_OUR_SIDE;
+      err.reason = reason || 'timeout';
+      reject(err);
+    };
+  });
+  _vidAbortAll = (reason) => {
+    if (hardReject) hardReject(reason || 'timeout');
+  };
+
+  try {
+    const work = (async () => {
+      // Only abort the initial POST if it hangs forever — do NOT abort after job_id is in
+      const postAc = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      // 25s max for ack — fail fast if server never returns job_id
+      const postTimer = postAc ? setTimeout(() => { try { postAc.abort(); } catch (_e) {} }, 25000) : null;
+      let res;
+      try {
+        res = await fetch('/percfectstudios/generate-video', {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+          signal: postAc ? postAc.signal : (ac ? ac.signal : undefined),
+        });
+      } finally {
+        if (postTimer) clearTimeout(postTimer);
+      }
+      if (!_vidGenActive || settled) {
+        const err = new Error('Error ' + VID_ERR_OUR_SIDE + ' — generation cancelled.');
+        err.code = VID_ERR_OUR_SIDE;
+        throw err;
+      }
+      if (!res.ok) {
+        let errBody = {};
+        try { errBody = await res.json(); } catch (_e) {}
+        throw new Error(errBody.error || ('Generate failed (' + res.status + ').'));
+      }
+      // Job accepted by us → 12% stage (queued). Clear fail-fast — queue can sit >45s.
+      _vidJobAccepted = true;
+      if (_vidStartStuckTimer) { clearTimeout(_vidStartStuckTimer); _vidStartStuckTimer = null; }
+      paintVidPct(12, 'Queued…');
+      if (_vidStageProg) _vidStageProg({ status: 'queued' }, 'Queued…');
+      return PercfectStudioJobs.resolveGenerationResponse(res, {
+        kind: 'video',
+        deadlineMs: VID_JOB_DEADLINE_MS,
+        onProgress: (d, label) => onVidJobProgress(d, label),
+      });
+    })();
+
+    const data = await Promise.race([work, hardStop]);
+    settled = true;
+    const url = data.url || data.output_url || (data.result && data.result.url);
+    if (!url) {
+      stopVidStageProgress(false);
+      showVidError(data.error || data.message || 'No video URL returned.');
+      return;
+    }
+    stopVidStageProgress(true);
+    showVidResult(url);
+    rememberSessionVideo(url, {
+      chain_id: data.chain_id,
+      generation_id: data.generation_id || data.id,
+      prompt: prompt,
+    });
+    if (data.download_only || data.ephemeral || data.saved_to_library === false) {
+      const note = document.getElementById('vid-error');
+      if (note) {
+        note.style.display = 'block';
+        note.style.color = 'var(--accent-2, #a78bfa)';
+        note.textContent = 'Private run — not saved to library. Download now; the link may expire.';
+      }
+    }
+    const el = document.getElementById('vid-credits');
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent) - (data.charged || videoCreditCost(_duration)));
+    loadGallery();
+  } catch (e) {
+    settled = true;
+    stopVidStageProgress(false);
+    if (e && e.reason === 'superseded') return;
+    if (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message || '')))) {
+      showVidError({
+        message:
+          'Error ' + VID_ERR_OUR_SIDE + ' — server never accepted the job in time (our side). ' +
+          'Try again; if every run does this, workers/queue are down.',
+      });
+      loadGallery();
+      return;
+    }
+    showVidError(e);
+    // Job may still finish server-side — refresh strip
+    try { loadGallery(); } catch (_e) {}
+  } finally {
+    setLoading('vid', false);
+    _vidAbortAll = null;
+  }
+}
+window._generateVideo = _generateVideo;
+
+function redoVideo() {
+  window._continueVideoChain = true;
+  document.getElementById('vid-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  generateVideo();
+}
+function goExtendFromResult() {
+  const vid = document.getElementById('vid-result');
+  const url = (vid && vid.src) || document.getElementById('vid-download')?.dataset?.url || '';
+  if (url) {
+    setExtendInput({ url });
+    setActiveVideoChain({
+      chain_id: window._videoChainId,
+      id: window._videoSourceId,
+      output_url: url,
+    });
+  }
+  document.getElementById('vid-extend')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function sendToVideoFromResult() { sendToVideo(); }
+
+function setLoading(panel, on) {
+  const btn = document.getElementById(`${panel}-btn`);
+  if (btn) btn.disabled = on;
+  const btnText = document.getElementById(`${panel}-btn-text`);
+  if (btnText) btnText.style.display = on ? 'none' : '';
+  const btnSpin = document.getElementById(`${panel}-btn-spinner`);
+  if (btnSpin) btnSpin.style.display = on ? '' : 'none';
+  const ld = document.getElementById(`${panel}-loading`);
+  // Videos: progress card only — never full-screen spinner covering the % bar
+  if (ld) {
+    if (panel === 'vid') {
+      ld.classList.remove('show');
+      ld.style.setProperty('display', 'none', 'important');
+    } else {
+      ld.classList.toggle('show', on);
+    }
+  }
+  const err = document.getElementById(`${panel}-error`);
+  if (err && on) {
+    err.style.display = 'none';
+    if (panel === 'vid') err.innerHTML = '';
+  }
+  if (on) {
+    const ph = document.getElementById(`${panel}-placeholder`);
+    // Videos: hide placeholder so progress card is visible in the frame
+    if (ph) ph.style.display = panel === 'vid' ? 'none' : '';
+    const r = document.getElementById(`${panel}-result`);
+    if (r) {
+      r.style.display = 'none';
+      if (panel === 'img') {
+        r.classList.remove('has-preview');
+        r.onclick = null;
+      }
+    }
+    if (panel === 'img') {
+      const bg = document.getElementById('batch-result-grid');
+      if (bg) {
+        bg.style.display = 'none';
+        bg.innerHTML = '';
+      }
+    }
+    const a = document.getElementById(`${panel}-actions`);
+    if (a) a.style.display = 'none';
+  }
+}
+
+function showError(panel, msg) {
+  if (panel === 'vid') {
+    showVidError(msg);
+    return;
+  }
+  const el = document.getElementById(`${panel}-error`);
+  el.textContent = msg; el.style.display = 'block';
+  setLoading(panel, false);
+}
+
+/* ── Duration (6 / 10 / 15 only · never 5) ──────── */
+// _duration declared near VIDEO_RATE (must be before initVidRefs)
+function setDuration(chip, secs) {
+  secs = parseInt(secs, 10);
+  if (!VIDEO_DURATIONS.includes(secs)) secs = 6;
+  const root = chip?.closest?.('.duration-chips') || document.getElementById('vid-duration-chips') || document;
+  root.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'));
+  if (chip) chip.classList.add('active');
+  _duration = secs;
+  updateVidCostUI();
+}
+
+/* ── Extend (one input: { file } or { url }) ───────────── */
+window._extendInput = null;
+
+function setExtendInput(src) {
+  window._extendInput = src;
+  if (src && src.url) {
+    const extUrl = document.getElementById('extend-video-url');
+    if (extUrl) extUrl.value = src.url;
+    const prev = document.getElementById('extend-drop-preview');
+    const zone = document.getElementById('extend-drop-zone');
+    const lab = document.getElementById('extend-drop-label');
+    if (prev) { prev.src = src.url; prev.style.display = 'block'; }
+    if (zone) zone.classList.add('has-video');
+    if (lab) lab.style.display = 'none';
+    wireExtendTrimFromPreview();
+  } else if (src && src.file) {
+    const zone = document.getElementById('extend-drop-zone');
+    if (zone) zone.classList.add('has-video');
+  }
+}
+
+/** Extend output → bottom player only. Never touches #vid-result (top). */
+function showExtendResult(url) {
+  if (!url) return;
+  setExtendInput({ url });
+  const extUrl = document.getElementById('extend-video-url');
+  if (extUrl) extUrl.value = url;
+  const prev = document.getElementById('extend-drop-preview');
+  const zone = document.getElementById('extend-drop-zone');
+  const lab = document.getElementById('extend-drop-label');
+  if (prev) {
+    prev.src = url;
+    prev.style.display = 'block';
+    try { prev.load(); } catch (_e) {}
+  }
+  if (zone) zone.classList.add('has-video');
+  if (lab) lab.style.display = 'none';
+  wireExtendTrimFromPreview();
+}
+
+function getExtendSource() {
+  return window.PercfectExtendByo
+    ? PercfectExtendByo.getSource({ videoId: 'extend-drop-preview', urlInputId: 'extend-video-url', downloadId: 'vid-download' })
+    : (window._extendInput || null);
+}
+
+/** Detect xAI / backend "video too long for extend" style errors. */
+function isVideoTooLongError(msg) {
+  const m = String(msg || '').toLowerCase();
+  if (!m) return false;
+  // Direct phrases
+  if (
+    m.includes('too long') ||
+    m.includes('too_long') ||
+    m.includes('video is longer') ||
+    m.includes('longer than') ||
+    m.includes('exceeds the maximum') ||
+    m.includes('exceed maximum') ||
+    m.includes('maximum duration') ||
+    m.includes('max duration') ||
+    m.includes('duration too') ||
+    m.includes('clip too long') ||
+    m.includes('input too long') ||
+    m.includes('must be shorter') ||
+    m.includes('shorter than or equal') ||
+    m.includes('at most 15') ||
+    m.includes('max 15') ||
+    m.includes('<= 15') ||
+    m.includes('≤ 15') ||
+    (m.includes('15 second') && (m.includes('max') || m.includes('limit') || m.includes('exceed') || m.includes('long')))
+  ) {
+    return true;
+  }
+  // duration/length + long/exceed/limit
+  if ((m.includes('duration') || m.includes('length')) &&
+      (m.includes('long') || m.includes('exceed') || m.includes('limit') || m.includes('invalid'))) {
+    return true;
+  }
+  return false;
+}
+
+/** xAI said too long → tell user to Trim first (save new clip), then Extend. */
+function suggestTrimForTooLong(rawMsg) {
+  const lab = document.getElementById('extend-trim-label');
+  if (lab) lab.textContent = 'Clip too long for xAI — set yellow range, hit Trim (free), then Extend';
+  const tb = document.getElementById('trim-apply-btn');
+  if (tb) {
+    tb.style.boxShadow = '0 0 0 2px #fbbf24';
+    setTimeout(() => { tb.style.boxShadow = ''; }, 2800);
+  }
+  document.getElementById('vid-extend')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  return (
+    'Clip is too long to extend. ' +
+    'Set the yellow keep range, hit Trim (saves a new free clip), then hit Extend.'
+  );
+}
+
+function showExtendError(msg) {
+  let text = msg || 'Extend failed.';
+  if (isVideoTooLongError(text)) {
+    text = suggestTrimForTooLong(text);
+  }
+  const el = document.getElementById('extend-error');
+  if (el) { el.textContent = text; el.style.display = 'block'; }
+}
+function hideExtendError() {
+  const el = document.getElementById('extend-error');
+  if (el) el.style.display = 'none';
+}
+
+const EXTEND_DURATIONS = [6, 8, 10];
+// _extendSec declared near VIDEO_RATE (must be before initVidRefs)
+/** QT-style keep range: inSec / outSec. Trim button saves NEW source. Extend never auto-trims. */
+let _clipHl = { inSec: 0, outSec: 0, sourceDur: 0, playhead: 0 };
+
+function extendCreditCost(secs) {
+  const s = EXTEND_DURATIONS.includes(parseInt(secs, 10)) ? parseInt(secs, 10) : 6;
+  return s * VIDEO_EXTEND_RATE;
+}
+
+function getSourceDuration() {
+  const prev = document.getElementById('extend-drop-preview');
+  if (prev && isFinite(prev.duration) && prev.duration > 0) return prev.duration;
+  return _clipHl.sourceDur || 0;
+}
+
+function paintClipHighlighter() {
+  const track = document.getElementById('clip-hl-track');
+  const win = document.getElementById('clip-hl-window');
+  const lab = document.getElementById('extend-trim-label');
+  const ph = document.getElementById('clip-hl-playhead');
+  if (!track || !win) return;
+
+  const dur = getSourceDuration();
+  _clipHl.sourceDur = dur;
+  if (dur <= 0) {
+    win.style.left = '0%';
+    win.style.width = '100%';
+    if (lab) lab.textContent = 'Load a source video first';
+    return;
+  }
+  if (!_clipHl.outSec || _clipHl.outSec > dur) _clipHl.outSec = dur;
+  if (_clipHl.inSec < 0) _clipHl.inSec = 0;
+  if (_clipHl.inSec >= _clipHl.outSec) _clipHl.inSec = Math.max(0, _clipHl.outSec - 0.5);
+  const leftPct = (_clipHl.inSec / dur) * 100;
+  const widthPct = ((_clipHl.outSec - _clipHl.inSec) / dur) * 100;
+  win.style.left = leftPct + '%';
+  win.style.width = Math.max(widthPct, 1) + '%';
+  if (ph) ph.style.left = ((_clipHl.playhead || _clipHl.inSec) / dur) * 100 + '%';
+  if (lab) {
+    const span = _clipHl.outSec - _clipHl.inSec;
+    lab.textContent =
+      'Keep ' + span.toFixed(1) + 's · ' +
+      _clipHl.inSec.toFixed(1) + 's → ' + _clipHl.outSec.toFixed(1) + 's of ' + dur.toFixed(1) + 's · ' +
+      'Trim saves new clip · or Extend as-is if short enough';
+  }
+}
+
+function wireExtendTrimFromPreview() {
+  const prev = document.getElementById('extend-drop-preview');
+  if (!prev) return;
+  const onMeta = () => {
+    const d = prev.duration || 0;
+    _clipHl.sourceDur = d;
+    _clipHl.inSec = 0;
+    _clipHl.outSec = d;
+    _clipHl.playhead = 0;
+    paintClipHighlighter();
+  };
+  prev.removeEventListener('loadedmetadata', onMeta);
+  prev.addEventListener('loadedmetadata', onMeta);
+  prev.ontimeupdate = () => {
+    if (isFinite(prev.currentTime)) {
+      _clipHl.playhead = prev.currentTime;
+      const ph = document.getElementById('clip-hl-playhead');
+      const dur = getSourceDuration();
+      if (ph && dur > 0) ph.style.left = (prev.currentTime / dur) * 100 + '%';
+    }
+  };
+  if (prev.readyState >= 1) onMeta();
+}
+
+(function initClipHighlighterDrag() {
+  const track = document.getElementById('clip-hl-track');
+  const hL = document.getElementById('clip-hl-h-l');
+  const hR = document.getElementById('clip-hl-h-r');
+  if (!track) return;
+  let mode = null; // 'in' | 'out' | 'seek'
+
+  function xToSec(clientX) {
+    const rect = track.getBoundingClientRect();
+    const dur = getSourceDuration();
+    if (!dur || rect.width <= 0) return 0;
+    let frac = (clientX - rect.left) / rect.width;
+    frac = Math.max(0, Math.min(1, frac));
+    return frac * dur;
+  }
+  function onDown(e, which) {
+    mode = which;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const sec = xToSec(x);
+    const prev = document.getElementById('extend-drop-preview');
+    if (mode === 'in') {
+      _clipHl.inSec = Math.min(sec, _clipHl.outSec - 0.5);
+      if (prev) try { prev.currentTime = _clipHl.inSec; } catch (_e) {}
+    } else if (mode === 'out') {
+      _clipHl.outSec = Math.max(sec, _clipHl.inSec + 0.5);
+      if (prev) try { prev.currentTime = _clipHl.outSec; } catch (_e) {}
+    } else {
+      _clipHl.playhead = sec;
+      if (prev) try { prev.currentTime = sec; } catch (_e) {}
+    }
+    paintClipHighlighter();
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  function onMove(e) {
+    if (!mode) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const sec = xToSec(x);
+    const prev = document.getElementById('extend-drop-preview');
+    if (mode === 'in') {
+      _clipHl.inSec = Math.max(0, Math.min(sec, _clipHl.outSec - 0.5));
+      if (prev) try { prev.currentTime = _clipHl.inSec; } catch (_e) {}
+    } else if (mode === 'out') {
+      const dur = getSourceDuration();
+      _clipHl.outSec = Math.min(dur, Math.max(sec, _clipHl.inSec + 0.5));
+      if (prev) try { prev.currentTime = _clipHl.outSec; } catch (_e) {}
+    } else {
+      _clipHl.playhead = sec;
+      if (prev) try { prev.currentTime = sec; } catch (_e) {}
+    }
+    paintClipHighlighter();
+    e.preventDefault();
+  }
+  function onUp() { mode = null; }
+
+  if (hL) {
+    hL.addEventListener('mousedown', (e) => onDown(e, 'in'));
+    hL.addEventListener('touchstart', (e) => onDown(e, 'in'), { passive: false });
+  }
+  if (hR) {
+    hR.addEventListener('mousedown', (e) => onDown(e, 'out'));
+    hR.addEventListener('touchstart', (e) => onDown(e, 'out'), { passive: false });
+  }
+  track.addEventListener('mousedown', (e) => {
+    if (e.target === hL || e.target === hR) return;
+    onDown(e, 'seek');
+  });
+  track.addEventListener('touchstart', (e) => {
+    if (e.target === hL || e.target === hR) return;
+    onDown(e, 'seek');
+  }, { passive: false });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onUp);
+})();
+
+/**
+ * FEATURE 2 — Trim (optional, free):
+ * Cut yellow range → save as NEW source clip. Does NOT extend.
+ * FEATURE 3 — Extend: uses current source only (already-trimmed or original). No auto-trim.
+ */
+async function getExtendPayloadSource() {
+  let src = getExtendSource();
+  if (!src || (!src.url && !src.file)) return null;
+  const prev = document.getElementById('extend-drop-preview');
+  const dur = prev && isFinite(prev.duration) ? prev.duration : 0;
+  if (dur > 15.05) {
+    throw new Error(
+      'This clip is over 15s. Set the yellow range, hit Trim (free, saves new clip), then Extend.'
+    );
+  }
+  return src;
+}
+
+/** Free local trim → replace source with new clip. Then user can Extend. */
+async function applyTrimToSource() {
+  hideExtendError();
+  const prev = document.getElementById('extend-drop-preview');
+  if (!prev || !prev.src) {
+    showExtendError('Drop or generate a source video first.');
+    return;
+  }
+  const dur = getSourceDuration();
+  if (!dur) {
+    showExtendError('Wait for the video to load, then set the yellow range.');
+    return;
+  }
+  paintClipHighlighter();
+  const start = _clipHl.inSec || 0;
+  const end = Math.min(dur, _clipHl.outSec || dur);
+  if (end - start < 1.5) {
+    showExtendError('Keep range is too short — drag the yellow handles.');
+    return;
+  }
+  if (start <= 0.05 && end >= dur - 0.05) {
+    showExtendError('Yellow range is the whole clip — nothing to trim. Adjust handles or just Extend.');
+    return;
+  }
+  const btn = document.getElementById('trim-apply-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Trimming…'; }
+  try {
+    const fd = new FormData();
+    fd.append('start', String(start));
+    fd.append('end', String(end));
+    const src = (typeof getExtendSource === 'function') ? getExtendSource() : null;
+    const blobSrc = (prev.src || '').startsWith('blob:');
+    if (src && src.file) {
+      fd.append('video_file', src.file);
+    } else if (src && src.url && !blobSrc) {
+      fd.append('video_url', src.url);
+    } else if (prev.src && !blobSrc) {
+      fd.append('video_url', prev.src);
+    } else if (window._extendInput && window._extendInput.file) {
+      fd.append('video_file', window._extendInput.file);
+    } else {
+      throw new Error('Need a generated or uploaded MP4 to trim.');
+    }
+    if (window._videoChainId) fd.append('chain_id', String(window._videoChainId));
+    if (window._videoSourceId) fd.append('source_id', String(window._videoSourceId));
+    const res = await fetch('/percfectstudios/trim-video', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.error || 'Trim failed.');
+    window._extendInput = null;
+    rememberSessionVideo(data.url, {
+      chain_id: data.chain_id || window._videoChainId,
+      generation_id: data.generation_id,
+      prompt: '[trim]',
+    });
+    try { loadGallery(); } catch (_e) {}
+    const extUrl = document.getElementById('extend-video-url');
+    if (extUrl) extUrl.value = data.url;
+    prev.src = data.url;
+    prev.style.display = 'block';
+    const zone = document.getElementById('extend-drop-zone');
+    if (zone) zone.classList.add('has-video');
+    const lab = document.getElementById('extend-drop-label');
+    if (lab) lab.style.display = 'none';
+    const main = document.getElementById('vid-result');
+    if (main) {
+      main.src = data.url;
+      try { main.load(); } catch (_e) {}
+    }
+    const dl = document.getElementById('vid-download');
+    if (dl) dl.dataset.url = data.url;
+    _clipHl.inSec = 0;
+    _clipHl.outSec = 0;
+    _clipHl.sourceDur = 0;
+    wireExtendTrimFromPreview();
+    const tl = document.getElementById('extend-trim-label');
+    if (tl) tl.textContent = 'Trimmed · new clip is the source · set Extend duration and hit Extend';
+    hideExtendError();
+  } catch (e) {
+    showExtendError((e && e.message) || 'Trim failed.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✂ Trim · save as new clip (free)';
+    }
+  }
+}
+
+function captureVideoRange(videoEl, start, end) {
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = videoEl.captureStream ? videoEl.captureStream() : (videoEl.mozCaptureStream && videoEl.mozCaptureStream());
+      if (!stream) {
+        reject(new Error('Browser cannot trim this video — try Chrome, or upload a clip under 15s.'));
+        return;
+      }
+      const chunks = [];
+      let mime = 'video/webm;codecs=vp9';
+      if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+      const rec = new MediaRecorder(stream, { mimeType: mime });
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onerror = () => reject(new Error('Trim recording failed.'));
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: mime });
+        resolve(new File([blob], 'trim-extend.webm', { type: mime }));
+      };
+      videoEl.pause();
+      videoEl.currentTime = start;
+      const onSeek = () => {
+        videoEl.removeEventListener('seeked', onSeek);
+        rec.start(200);
+        videoEl.play().catch(() => {});
+        const stopAt = () => {
+          if (videoEl.currentTime >= end - 0.05 || videoEl.ended) {
+            videoEl.removeEventListener('timeupdate', stopAt);
+            videoEl.pause();
+            if (rec.state === 'recording') rec.stop();
+          }
+        };
+        videoEl.addEventListener('timeupdate', stopAt);
+        // Hard stop
+        setTimeout(() => {
+          if (rec.state === 'recording') {
+            videoEl.pause();
+            rec.stop();
+          }
+        }, Math.ceil((end - start) * 1000) + 800);
+      };
+      videoEl.addEventListener('seeked', onSeek);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+const studioExtend = (window.PercfectVideoExtend ? PercfectVideoExtend.bind({
+  defaultSec: 6,
+  creditsPerSecond: VIDEO_EXTEND_RATE,
+  chipsSelector: '#extend-chips',
+  chipSelector: '.style-chip',
+  chipActiveClass: 'active',
+  costId: 'extend-cost',
+  btnId: 'extend-btn',
+  promptId: 'extend-prompt',
+  progressWrap: 'extend-progress-wrap',
+  progressBar: 'extend-progress-bar',
+  progressElapsed: null, // no second counter
+  videoId: 'extend-drop-preview', // bottom/extend player only — never top
+  creditsId: 'vid-credits',
+  noSourceMsg: 'Generate a video above, or drop / paste your own MP4 below.',
+  getSource: () => window._extendInput,
+  onBefore: hideExtendError,
+  onError: showExtendError,
+  onSuccess(data) {
+    const url = data.url;
+    if (url) {
+      showExtendResult(url);
+      if (typeof rememberSessionVideo === 'function') rememberSessionVideo(url);
+    }
+    loadGallery();
+  },
+}) : { setDuration() {}, run() { showExtendError('Extend unavailable — refresh the page.'); } });
+
+// Sync rate label + default costs on load
+(function initVideoRateLabels() {
+  const er = document.getElementById('extend-rate-note');
+  if (er) er.textContent = String(VIDEO_EXTEND_RATE);
+  const ec = document.getElementById('extend-cost');
+  if (ec) ec.textContent = String(extendCreditCost(6));
+  if (STUDIO_MODE === 'videos' && typeof updateVidCostUI === 'function') updateVidCostUI();
+})();
+
+const VID_FRAME_STEP = 1 / 24;
+let _movieClips = [];
+
+function vidSetRate(id, rate) {
+  const v = document.getElementById(id);
+  if (!v) return;
+  v.playbackRate = rate;
+  v.play().catch(() => {});
+}
+
+function vidStep(id, dir) {
+  const v = document.getElementById(id);
+  if (!v) return;
+  v.pause();
+  const d = isFinite(v.duration) ? v.duration : 0;
+  let t = (v.currentTime || 0) + dir * VID_FRAME_STEP;
+  if (t < 0) t = 0;
+  if (d && t > d) t = d;
+  try { v.currentTime = t; } catch (_e) {}
+  const lab = document.getElementById('vid-frame-time');
+  if (lab) lab.textContent = t.toFixed(2) + 's';
+}
+
+async function vidCaptureStill(id) {
+  const v = document.getElementById(id);
+  if (!v || !v.src) { alert('Load a video first.'); return; }
+  const t = v.currentTime || 0;
+  const fd = new FormData();
+  fd.append('time', String(t));
+  const src = (v.src || '');
+  if (src.startsWith('http')) fd.append('video_url', src);
+  else if (window._extendInput && window._extendInput.file) fd.append('video_file', window._extendInput.file);
+  else {
+    alert('Need a saved MP4 (generate, trim, or upload) to grab a still.');
+    return;
+  }
+  try {
+    const res = await fetch('/percfectstudios/video-frame', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.error || 'Still failed');
+    const a = document.createElement('a');
+    a.href = data.url;
+    a.download = 'percfect-still.jpg';
+    a.target = '_blank';
+    a.click();
+  } catch (e) {
+    alert((e && e.message) || 'Could not grab that frame.');
+  }
+}
+
+function movieCurrentUrl() {
+  const ext = document.getElementById('extend-video-url');
+  if (ext && ext.value) return ext.value;
+  const prev = document.getElementById('extend-drop-preview');
+  if (prev && prev.src && prev.src.startsWith('http')) return prev.src;
+  const main = document.getElementById('vid-result');
+  if (main && main.src && main.src.startsWith('http')) return main.src;
+  return '';
+}
+
+function paintMovieClips() {
+  const ol = document.getElementById('movie-clips');
+  if (!ol) return;
+  if (!_movieClips.length) {
+    ol.innerHTML = '<li class="credit-note">No clips yet — generate / trim / extend, then Add current clip.</li>';
+    return;
+  }
+  ol.innerHTML = _movieClips.map((c, i) =>
+    `<li><video src="${c.url}" muted></video><span>${i + 1}. ${c.label || 'clip'}</span>` +
+    `<button type="button" class="btn-outline-accent btn-sm" onclick="movieRemove(${i})">✕</button></li>`
+  ).join('');
+}
+
+function movieAddCurrent() {
+  const url = movieCurrentUrl();
+  const err = document.getElementById('movie-error');
+  if (err) err.style.display = 'none';
+  if (!url) {
+    if (err) { err.textContent = 'Need a saved clip (generate, trim, or extend first).'; err.style.display = 'block'; }
+    return;
+  }
+  _movieClips.push({ url, label: 'clip ' + (_movieClips.length + 1) });
+  paintMovieClips();
+}
+
+function movieRemove(i) {
+  _movieClips.splice(i, 1);
+  paintMovieClips();
+}
+
+async function movieMerge() {
+  const err = document.getElementById('movie-error');
+  if (err) err.style.display = 'none';
+  if (_movieClips.length < 2) {
+    if (err) { err.textContent = 'Add at least two clips.'; err.style.display = 'block'; }
+    return;
+  }
+  try {
+    const res = await fetch('/percfectstudios/merge-videos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ urls: _movieClips.map((c) => c.url) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.error || 'Merge failed');
+    const mv = document.getElementById('movie-result');
+    if (mv) { mv.src = data.url; mv.style.display = 'block'; }
+    showVidResult(data.url);
+  } catch (e) {
+    if (err) { err.textContent = (e && e.message) || 'Merge failed'; err.style.display = 'block'; }
+  }
+}
+
+paintMovieClips();
+
+function setExtend(chip, secs) {
+  secs = parseInt(secs, 10);
+  if (!EXTEND_DURATIONS.includes(secs)) secs = 6;
+  _extendSec = secs;
+  studioExtend.setDuration(secs, chip);
+  const ec = document.getElementById('extend-cost');
+  if (ec) ec.textContent = String(extendCreditCost(secs));
+}
+
+async function extendVideo() {
+  requireAuth(async () => {
+    hideExtendError();
+    try {
+      const src = await getExtendPayloadSource();
+      if (!src || (!src.url && !src.file)) {
+        showExtendError('Generate a video above, or drop / paste your own MP4 below.');
+        return;
+      }
+      window._extendInput = src;
+      // Stage progress + 160s via resolve path inside PercfectVideoExtend when studio jobs present
+      const btn = document.getElementById('extend-btn');
+      const t0 = Date.now();
+      const wrap = document.getElementById('extend-progress-wrap');
+      if (wrap) wrap.style.display = 'block';
+      const stage = (window.PercfectStudioJobs && PercfectStudioJobs.makeStageProgress)
+        ? PercfectStudioJobs.makeStageProgress({ bar: 'extend-progress-bar', label: 'extend-progress-label' })
+        : null;
+      if (stage) stage({ status: 'queued' }, 'Starting…');
+      // Monkey-patch: run() uses getSource → _extendInput
+      const origGet = studioExtend;
+      // Call low-level fetch with deadline like generate
+      const fd = new FormData();
+      if (src.file) fd.append('video_file', src.file);
+      else fd.append('video_url', src.url);
+      fd.append('duration', String(_extendSec || 6));
+      const extra = (document.getElementById('extend-prompt')?.value || '').trim();
+      fd.append('prompt', extra ? ('extend this video ' + extra) : 'extend this video');
+      if (window._videoChainId) fd.append('chain_id', String(window._videoChainId));
+      if (window._videoSourceId) fd.append('source_id', String(window._videoSourceId));
+      if (btn) { btn.disabled = true; btn.textContent = 'Extending…'; }
+      const res = await fetch('/percfectstudios/extend-video', { method: 'POST', body: fd, credentials: 'same-origin' });
+      let data;
+      try {
+        data = window.PercfectStudioJobs
+          ? await PercfectStudioJobs.resolveGenerationResponse(res, {
+              kind: 'extend',
+              deadlineMs: VID_JOB_DEADLINE_MS,
+              onProgress: (d, label) => {
+                if (Date.now() - t0 > VID_JOB_DEADLINE_MS) {
+                  throw new Error('Extend took too long with no finish. Retry; not charged if it never completed. Check last 6 — it may still land.');
+                }
+                if (stage) stage(d, label);
+              },
+            })
+          : await res.json();
+      } catch (e) {
+        showExtendError(e.message || 'Extend failed.');
+        if (btn) { btn.disabled = false; btn.innerHTML = '⤢ Extend (+<span id="extend-cost">' + extendCreditCost(_extendSec) + '</span>)'; }
+        if (wrap) wrap.style.display = 'none';
+        return;
+      }
+      if (!data.url) {
+        const err = data.error || data.message || 'Extend failed.';
+        showExtendError(err);
+      } else {
+        if (stage && stage.done) stage.done('Done');
+        showExtendResult(data.url); // bottom player only — never take over top
+        rememberSessionVideo(data.url, {
+          chain_id: data.chain_id || window._videoChainId,
+          generation_id: data.generation_id,
+          prompt: extra ? ('[+extend] ' + extra) : '[+extend]',
+        });
+        const el = document.getElementById('vid-credits');
+        if (el) el.textContent = Math.max(0, parseInt(el.textContent) - (data.charged != null ? data.charged : extendCreditCost(_extendSec)));
+        loadGallery();
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '⤢ Extend (+<span id="extend-cost">' + extendCreditCost(_extendSec) + '</span>)'; }
+      setTimeout(() => { if (wrap) wrap.style.display = 'none'; }, 400);
+    } catch (e) {
+      showExtendError((e && e.message) || 'Extend failed.');
+    }
+  });
+}
+
+if (window.PercfectExtendByo) {
+  PercfectExtendByo.wire({
+    zoneId: 'extend-drop-zone',
+    fileInputId: 'extend-file-input',
+    urlInputId: 'extend-video-url',
+    previewId: 'extend-drop-preview',
+    labelId: 'extend-drop-label',
+    // No videoId → BYO upload stays in bottom/extend player only
+    setInput: setExtendInput,
+  });
+}
+
+/** Top + bottom players independent; only one plays. Pause site music / jukebox when a video starts. */
+(function wireExclusiveVideoPlayers() {
+  if (typeof STUDIO_MODE === 'undefined' || STUDIO_MODE !== 'videos') return;
+  const ids = ['vid-result', 'extend-drop-preview', 'movie-result'];
+  function pauseSiteMusic() {
+    if (typeof window.percfectPauseMusic === 'function') {
+      try { window.percfectPauseMusic(); return; } catch (_e) {}
+    }
+    try {
+      document.querySelectorAll('.percfect-site-music audio, #percfectSiteAudio, #jbAudio').forEach((a) => {
+        if (a && !a.paused) a.pause();
+      });
+    } catch (_e) {}
+  }
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('play', () => {
+      ids.forEach((oid) => {
+        if (oid === id) return;
+        const o = document.getElementById(oid);
+        if (o && !o.paused) o.pause();
+      });
+      pauseSiteMusic();
+    });
+  });
+})();
+
+/* ── Drag & drop ───────────────────────────────── */
+function setupDropZone(zoneId, previewId, labelId, urlInputId, fileVarSetter) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadDroppedFile(file, zoneId, previewId, labelId, urlInputId, fileVarSetter);
+  });
+}
+function handleFileSelect(input) {
+  if (input.files[0]) loadDroppedFile(input.files[0], 'drop-zone', 'drop-preview', 'drop-label', 'vid-image-url', f => window._droppedImageFile = f);
+}
+/** Photo panel refs — character / photo / background into ONE 📸 slot */
+window.applyLibraryImage = async function(p, preferredSlot){
+  if(!p) return -1;
+  const url = p.url || p.thumb || p.primary_image_url || '';
+  if(!url) throw new Error('No image on that library item');
+  // Always a single slot — never fill all boxes from one click
+  if (document.getElementById('img-ref-slots') && typeof photoAddUrl === 'function') {
+    const slot = photoAddUrl(url, preferredSlot != null ? preferredSlot : null);
+    if (slot < 0) throw new Error('All photo refs are full — clear one first');
+    document.getElementById('img-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('img-prompt')?.focus();
+    return slot;
+  }
+  loadImageAsReference(url);
+  return 0;
+};
+
+/** Open the same bottom-right crown library as the FAB. */
+function openStudioPhotoPicker(){
+  if (typeof PercfectLibrary !== 'undefined' && typeof PercfectLibrary.open === 'function') {
+    PercfectLibrary.open();
+    return;
+  }
+  const fab = document.getElementById('user-lib-fab');
+  if (fab) fab.click();
+}
+
+/** Video ref — ONE slot only (pending P-slot or first empty). Never all four. Never jump to Extend. */
+window.applyLibraryVideoImage = async function(p, preferredSlot){
+  if(!p) return -1;
+  const url = p.url || p.thumb || p.primary_image_url || '';
+  if(!url) throw new Error('No image on that library item');
+  if (typeof vidAddUrl === 'function') {
+    const slot = vidAddUrl(url, preferredSlot != null ? preferredSlot : null);
+    if (slot < 0) throw new Error('All 4 video refs are full — clear one first');
+    if (typeof ensureAnimatePrompt === 'function') ensureAnimatePrompt();
+    if (typeof updateVidCostUI === 'function') updateVidCostUI();
+    // Stay on generate board only
+    document.getElementById('vid-refs-col')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return slot;
+  }
+  window._droppedImageFile = null;
+  const urlEl = document.getElementById('vid-image-url');
+  if (urlEl) urlEl.value = url;
+  return 0;
+};
+
+/**
+ * Ref P-button: open corner library on Photos tab (not Characters).
+ */
+function openStudioVideoImagePicker(){
+  if (typeof PercfectLibrary !== 'undefined') {
+    if (typeof PercfectLibrary.openOnTab === 'function') {
+      PercfectLibrary.openOnTab('photos');
+      return;
+    }
+    if (typeof PercfectLibrary.open === 'function') {
+      PercfectLibrary.open();
+      try {
+        document.querySelectorAll('.lib-tab').forEach((el) => {
+          el.classList.toggle('active', el.dataset.tab === 'photos');
+        });
+      } catch (_e) { /* ignore */ }
+      return;
+    }
+  }
+  const fab = document.getElementById('user-lib-fab');
+  if (fab) {
+    fab.click();
+    return;
+  }
+  showError('vid', 'Your library (bottom corner) is not loaded — hard-refresh.');
+}
+
+/** + button — pick image(s) from the user's computer into the next empty ref slot(s) */
+function openLocalVideoRefFile(){
+  const empty = typeof vidFirstEmpty === 'function' ? vidFirstEmpty() : 0;
+  if (empty < 0) {
+    showError('vid', 'All 4 reference slots are full — clear one first.');
+    return;
+  }
+  vidPendingSlot = empty;
+  const inp = document.getElementById('vid-file-input');
+  if (!inp) {
+    showError('vid', 'File picker missing — hard-refresh.');
+    return;
+  }
+  // Allow multi-select when more than one slot is free
+  try {
+    const free = videoRefs.filter((r) => !r).length;
+    if (free > 1) inp.setAttribute('multiple', 'multiple');
+    else inp.removeAttribute('multiple');
+  } catch (_e) { /* ignore */ }
+  inp.value = '';
+  inp.click();
+}
+window.openLocalVideoRefFile = openLocalVideoRefFile;
+
+/** Library picker for extend source (videos · character 360°) */
+function openStudioExtendPicker(){
+  if(typeof PercfectLibrary === 'undefined') return;
+  if(typeof PercfectLibrary.openPicker === 'function'){
+    PercfectLibrary.openPicker({
+      tab: 'videos',
+      kind: 'extend',
+      max: 1,
+      title: 'Pick video to extend (or character with 360°)',
+      open: true,
+      onDone: async (_ids, items) => {
+        const item = items && items[0];
+        if(item) await applyLibraryExtend(item);
+      },
+    });
+    return;
+  }
+  if(PercfectLibrary.open) PercfectLibrary.open();
+}
+
+/** Extend source — library video or character 360° spin */
+window.applyLibraryExtend = async function(p){
+  if(!p) return;
+  const url = (p.kind === 'character' ? (p.spin || p.spin_video_url) : null)
+    || p.url || p.spin || '';
+  if(!url) throw new Error('Pick a video (or a character with 360°) to extend');
+  if(!/\.(mp4|webm|mov)(\?|$)/i.test(url) && p.kind !== 'video' && !p.spin && !p.spin_video_url){
+    // still allow non-extension URLs if kind is video
+    if(p.kind !== 'video' && p.kind !== 'character') throw new Error('That item is not a video');
+  }
+  setExtendInput({ url });
+  const urlEl = document.getElementById('extend-video-url');
+  if(urlEl) urlEl.value = url;
+  const preview = document.getElementById('extend-drop-preview');
+  const zone = document.getElementById('extend-drop-zone');
+  const label = document.getElementById('extend-drop-label');
+  if(preview){ preview.src = url; preview.style.display = 'block'; }
+  if(zone) zone.classList.add('has-video');
+  if(label) label.textContent = '✓ Extend: ' + (p.name || 'Library video');
+  document.getElementById('vid-extend')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+};
+
+// Aliases used by library sidebar auto-wiring
+window.applyLibraryVideo = window.applyLibraryExtend;
+window.applyLibraryBackground = window.applyLibraryImage;
+window.applyLibraryCharacterRef = window.applyLibraryImage;
+
+function loadDroppedFile(file, zoneId, previewId, labelId, urlInputId, fileVarSetter) {
+  // Photos: multi-slot refs (not the legacy single drop zone)
+  if (zoneId === 'img-drop-zone' || zoneId === 'img-ref-slots') {
+    const r = new FileReader();
+    r.onload = (e) => photoPlaceRef({ kind: 'file', file, preview: e.target.result }, null);
+    r.readAsDataURL(file);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const zone = document.getElementById(zoneId);
+    const preview = document.getElementById(previewId);
+    const label = document.getElementById(labelId);
+    if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+    if (label) label.textContent = file.name;
+    if (zone) zone.classList.add('has-image');
+    if (fileVarSetter) fileVarSetter(file);
+    const urlEl = document.getElementById(urlInputId);
+    if (urlEl) urlEl.value = '';
+    if (zoneId === 'drop-zone') ensureAnimatePrompt();
+  };
+  reader.readAsDataURL(file);
+}
+// Video: single start-frame drop only
+setupDropZone('drop-zone', 'drop-preview', 'drop-label', 'vid-image-url', f => window._droppedImageFile = f);
+
+function loadImageUrlRef(url, zoneId, previewId, labelId, urlInputId, fileVarSetter) {
+  if (!url) return;
+  if (zoneId === 'img-drop-zone' || zoneId === 'img-ref-slots' || urlInputId === 'img-image-url') {
+    photoAddUrl(url, null);
+    return;
+  }
+  const preview = document.getElementById(previewId);
+  const zone = document.getElementById(zoneId);
+  const label = document.getElementById(labelId);
+  if (preview) { preview.src = url; preview.style.display = 'block'; }
+  if (label) { label.textContent = 'Image URL'; label.style.display = ''; }
+  if (zone) zone.classList.add('has-image');
+  if (fileVarSetter) fileVarSetter(null);
+  const urlEl = document.getElementById(urlInputId);
+  if (urlEl) urlEl.value = url;
+  if (urlInputId === 'vid-image-url') ensureAnimatePrompt();
+}
+
+/* extend BYO wired via PercfectExtendByo above */
+
+if (window.PercfectPasteDrop) {
+  // Photos: same as Characters — paste/drop into 📸 boxes (fills 1 then 2 then 3)
+  PercfectPasteDrop.bind({
+    zone: 'img-ref-slots', accept: 'image',
+    onFile: f => loadDroppedFile(f, 'img-ref-slots', null, null, null, null),
+    onUrl: u => photoAddUrl(u, null),
+  });
+  // Paste on description box also fills 📸 slots (not the text) — Characters behavior
+  PercfectPasteDrop.bind({
+    zone: 'photo-prompt-wrap', accept: 'image',
+    onFile: f => loadDroppedFile(f, 'img-ref-slots', null, null, null, null),
+    onUrl: u => photoAddUrl(u, null),
+  });
+  PercfectPasteDrop.bind({
+    zone: 'img-prompt', accept: 'image',
+    onFile: f => loadDroppedFile(f, 'img-ref-slots', null, null, null, null),
+    onUrl: u => photoAddUrl(u, null),
+  });
+  // Videos: paste into 4 real ref slots (never the hidden legacy drop-zone)
+  if (document.getElementById('vid-ref-slots')) {
+    PercfectPasteDrop.bind({
+      zone: 'vid-ref-slots', accept: 'image',
+      onFile: f => vidIngestImageFile(f, null),
+      onUrl: u => vidAddUrl(u, null),
+    });
+    PercfectPasteDrop.bind({
+      zone: 'vid-prompt', accept: 'image',
+      onFile: f => vidIngestImageFile(f, null),
+      onUrl: u => vidAddUrl(u, null),
+    });
+  }
+}
+
+// Photos handoff (edit / library → photos page)
+(function applyPhotoRefHandoff() {
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE !== 'photos') return;
+  let src = null;
+  try { src = sessionStorage.getItem('percfect_photo_ref'); } catch (_e) {}
+  if (!src) return;
+  try { sessionStorage.removeItem('percfect_photo_ref'); } catch (_e) {}
+  photoAddUrl(src, null);
+  document.getElementById('img-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+})();
+
+/* ── Saved library ─────────────────────────────── */
+async function loadGallery() {
+  if (!(LOGGED_IN || window.LOGGED_IN)) {
+    const section = document.getElementById('gallery-section');
+    if (section) section.style.display = 'none';
+    return;
+  }
+  try {
+    let items = [];
+    const res = await fetch('/percfectstudios/library', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.status === 401) return;
+    if (res.ok) {
+      const body = await res.json();
+      items = Array.isArray(body) ? body : (body.items || body.generations || []);
+    } else {
+      // Fallback: sidebar library API (uses url instead of output_url)
+      const lr = await fetch('/api/my-library', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (lr.ok) {
+        const bag = await lr.json();
+        items = [
+          ...((bag.photos || []).map((p) => ({
+            id: p.id,
+            type: 'image',
+            output_url: p.output_url || p.url || p.thumb,
+            prompt: p.prompt || p.name || '',
+          }))),
+          ...((bag.videos || []).map((v) => ({
+            id: v.id,
+            type: 'video',
+            output_url: v.output_url || v.url || v.thumb,
+            prompt: v.prompt || v.name || '',
+          }))),
+        ];
+      }
+    }
+    _library.images = (items || [])
+      .filter((g) => (g.type || 'image') === 'image' || g.type === 'photo')
+      .map((g) => ({
+        ...g,
+        type: 'image',
+        output_url: g.output_url || g.url || g.preview_url || '',
+      }))
+      .filter((g) => g.output_url);
+    _library.videos = (items || [])
+      .filter((g) => g.type === 'video')
+      .map((g) => ({
+        ...g,
+        type: 'video',
+        output_url: g.output_url || g.url || '',
+        preview_url: g.preview_url || g.thumb || '',
+        thumb: g.thumb || g.preview_url || '',
+        chain_id: g.chain_id || g.id || null,
+      }))
+      .filter((g) => g.output_url);
+    paintLibrary();
+  } catch (_e) {
+    /* keep last gallery state */
+  }
+}
+loadGallery();
+
+/* Princess / external → Studio handoff (URL param or sessionStorage) */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('image_url') || sessionStorage.getItem('studio_ref_image');
+  if (!ref) return;
+  sessionStorage.removeItem('studio_ref_image');
+  if (typeof STUDIO_MODE !== 'undefined' && STUDIO_MODE === 'photos' && document.getElementById('img-ref-slots')) {
+    photoAddUrl(ref, null);
+    setTimeout(() => document.getElementById('img-panel')?.scrollIntoView({ behavior: 'smooth' }), 300);
+    return;
+  }
+  // Videos: real ref slot + animate prompt
+  if (typeof vidAddUrl === 'function') vidAddUrl(ref, 0);
+  else {
+    const urlEl = document.getElementById('vid-image-url');
+    if (urlEl) urlEl.value = ref;
+  }
+  const vp = document.getElementById('vid-prompt');
+  if (vp && !vp.value.trim()) vp.value = ANIMATE_DEFAULT_PROMPT || 'animate this';
+  if (typeof updateVidCostUI === 'function') updateVidCostUI();
+  setTimeout(() => document.getElementById('vid-panel')?.scrollIntoView({ behavior: 'smooth' }), 300);
+})();
+
+
+function applyExtendHandoff() {
+  if (typeof STUDIO_MODE === 'undefined' || STUDIO_MODE !== 'videos') return;
+  let src = null;
+  try { src = sessionStorage.getItem('percfect_extend_url'); } catch (_e) {}
+  if (!src) return;
+  try { sessionStorage.removeItem('percfect_extend_url'); } catch (_e) {}
+  if (typeof setExtendInput === 'function') setExtendInput({ url: src });
+  const urlEl = document.getElementById('extend-video-url');
+  if (urlEl) urlEl.value = src;
+  const preview = document.getElementById('extend-drop-preview');
+  const zone = document.getElementById('extend-drop-zone');
+  const label = document.getElementById('extend-drop-label');
+  if (preview) { preview.src = src; preview.style.display = 'block'; }
+  if (zone) zone.classList.add('has-video');
+  if (label) label.style.display = 'none';
+  document.getElementById('vid-extend')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  try { applyAnimateHandoff(); } catch (_e) {}
+  try { applyExtendHandoff(); } catch (_e) {}
+});
+
+// Corner library must call these — attach after all defs exist
+window.vidAddUrl = vidAddUrl;
+window.vidPlaceRef = vidPlaceRef;
+window.vidFirstEmpty = vidFirstEmpty;
+window.videoRefCount = videoRefCount;
+window.vidRemoveRef = vidRemoveRef;
+window.photoAddUrl = typeof photoAddUrl === 'function' ? photoAddUrl : window.photoAddUrl;
+window.photoFirstEmpty = typeof photoFirstEmpty === 'function' ? photoFirstEmpty : window.photoFirstEmpty;
+window.ensureAnimatePrompt = ensureAnimatePrompt;
+window.updateVidCostUI = updateVidCostUI;
+window.sendToVideo = sendToVideo;
+</script>
 {% endblock %}
