@@ -211,7 +211,13 @@ def _build_ink_prompt(data: Dict[str, Any]) -> str:
     return " ".join(lines)
 
 
-def _comic_image(prompt: str, refs: List[str], model: str) -> Dict[str, Any]:
+def _comic_image(
+    prompt: str,
+    refs: List[str],
+    model: str,
+    *,
+    aspect_ratio: str = "3:4",
+) -> Dict[str, Any]:
     from xai_keys import next_key
 
     api_key = (next_key() or "").strip()
@@ -224,6 +230,7 @@ def _comic_image(prompt: str, refs: List[str], model: str) -> Dict[str, Any]:
     use_edits = bool(clean_refs)
     url = "https://api.x.ai/v1/images/edits" if use_edits else "https://api.x.ai/v1/images/generations"
     models = [model or "grok-imagine-image-2.0", "grok-imagine-image"]
+    ar = (aspect_ratio or "3:4").strip() or "3:4"
     seen = []
     for m in models:
         if not m or m in seen:
@@ -233,7 +240,7 @@ def _comic_image(prompt: str, refs: List[str], model: str) -> Dict[str, Any]:
             "model": m,
             "prompt": prompt[:4000],
             "n": 1,
-            "aspect_ratio": "3:4",
+            "aspect_ratio": ar,
             "resolution": "1k",
             "response_format": "url",
         }
@@ -508,7 +515,11 @@ _TURN_POSES = {
 @bp.route("/comics/api/turnaround", methods=["POST", "OPTIONS"])
 @bp.route("/studios/comics/api/turnaround", methods=["POST", "OPTIONS"])
 def comics_turnaround():
-    """One full-body shot from a prompt or one photo, in the comic's art style."""
+    """Same character-build front as /characters: Nick's CHARACTER_PROMPT + 1:1 white card.
+
+    Front (and later ortho angles) must match the Characters product, not a comics paraphrase.
+    Comic print style is applied later at ink time via the cast sheet — not here.
+    """
     denied = _spa_auth()
     if denied:
         return denied
@@ -517,44 +528,28 @@ def comics_turnaround():
     pose = _TURN_POSES.get(pose_key)
     if not pose:
         return jsonify({"ok": False, "error": "Pick front, left, right, or back."}), 400
-    style = _INK_STYLES.get(str(body.get("styleId") or ""), _INK_STYLES["classic"])
     details = str(body.get("prompt") or body.get("look") or "").strip()
-    name = str(body.get("name") or "the character").strip()
     photo = str(body.get("photo") or "").strip()
     if not details and not photo:
         return jsonify({"ok": False, "error": "Add a description or a photo first."}), 400
     refs = [photo] if photo.startswith("http") or photo.startswith("data:") else []
-    # Match the Characters build page: reference photo is identity truth → full-body on white.
-    # Comic print style is layered on; we do not invent a different person.
+
+    # Exact Characters path — do not rewrite Nick's locked prompt text.
+    import app as app_mod
     if refs:
-        # Photo path — same idea as CHARACTER_SUPER_ACCURACY / CHARACTER_PROMPT on /characters
-        prompt = " ".join([
-            "Using the reference photo as the single source of truth, redraw this exact person",
-            "or character as a clean full-body standing figure on a pure white background.",
-            f"View: {pose} only. Casual standing pose, head to toe, image filling the frame.",
-            "Match the reference as closely as possible: same face, same hairstyle, same skin tone,",
-            "same body proportions, same outfit and colors. Do not invent a different person or change the identity.",
-            f"Name label for continuity only: {name}.",
-            f"Render this figure in this comic print style: {style}.",
-            "Do not copy the photo's background — replace it with pure white.",
-            "No scenery, no panels, no letters, no logos, no watermarks.",
-            "High detail, sharp lines, consistent lighting.",
-            _INK_SAFETY,
-        ])
-        if details:
-            prompt += (
-                f" Also apply these user details (keep identity and face locked to the reference photo): {details}"
-            )
+        if pose_key == "front":
+            # One photo: Characters ignores typed words and uses CHARACTER_PROMPT only.
+            prompt = app_mod.CHARACTER_PROMPT
+        else:
+            # Later sides/back: Characters pose_edit from the approved front.
+            prompt = app_mod.pose_edit_prompt(pose)
     else:
-        prompt = " ".join([
-            f"Full-body {pose} only of {name}, standing on a pure white background.",
-            f"Details: {details}.",
-            f"Art style: {style}.",
-            "Head to toe visible, casual standing pose, image filling the frame.",
-            "No scenery, no panels, no letters, no logos, no watermarks.",
-            _INK_SAFETY,
-        ])
-    result = _comic_image(prompt, refs, "grok-imagine-image-2.0")
+        # No photo: their words, then Nick's prompt — same as build_character_prompt.
+        base = (details or "a character").rstrip(" .,;")
+        prompt = f"{base}. {app_mod.CHARACTER_PROMPT}"
+
+    # Characters fronts are square 1:1 (see studio_task_handlers character generate).
+    result = _comic_image(prompt, refs, "grok-imagine-image-2.0", aspect_ratio="1:1")
     if not result.get("ok") or not result.get("url"):
         return jsonify({"ok": False, "error": result.get("error") or f"Could not draw the {pose}."}), 502
     return jsonify({"ok": True, "pose": pose_key, "url": result["url"]})
