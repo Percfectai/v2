@@ -524,16 +524,36 @@ def comics_turnaround():
     if not details and not photo:
         return jsonify({"ok": False, "error": "Add a description or a photo first."}), 400
     refs = [photo] if photo.startswith("http") or photo.startswith("data:") else []
-    prompt = " ".join([
-        f"One full-body character, {pose} only, standing, plain pure white background.",
-        f"This is {name}.",
-        f"Details: {details or 'the person in the attached photo'}.",
-        f"Art style: {style}.",
-        "If a photo is attached, keep that person's face and build. Do not copy the photo's background.",
-        "Centered full body, head to feet visible, no crop at ankles.",
-        "No scenery, no panels, no letters, no logos, no shadows on the backdrop.",
-        "All-ages. No nudity, no sexual content, no gore.",
-    ])
+    # Match the Characters build page: reference photo is identity truth → full-body on white.
+    # Comic print style is layered on; we do not invent a different person.
+    if refs:
+        # Photo path — same idea as CHARACTER_SUPER_ACCURACY / CHARACTER_PROMPT on /characters
+        prompt = " ".join([
+            "Using the reference photo as the single source of truth, redraw this exact person",
+            "or character as a clean full-body standing figure on a pure white background.",
+            f"View: {pose} only. Casual standing pose, head to toe, image filling the frame.",
+            "Match the reference as closely as possible: same face, same hairstyle, same skin tone,",
+            "same body proportions, same outfit and colors. Do not invent a different person or change the identity.",
+            f"Name label for continuity only: {name}.",
+            f"Render this figure in this comic print style: {style}.",
+            "Do not copy the photo's background — replace it with pure white.",
+            "No scenery, no panels, no letters, no logos, no watermarks.",
+            "High detail, sharp lines, consistent lighting.",
+            _INK_SAFETY,
+        ])
+        if details:
+            prompt += (
+                f" Also apply these user details (keep identity and face locked to the reference photo): {details}"
+            )
+    else:
+        prompt = " ".join([
+            f"Full-body {pose} only of {name}, standing on a pure white background.",
+            f"Details: {details}.",
+            f"Art style: {style}.",
+            "Head to toe visible, casual standing pose, image filling the frame.",
+            "No scenery, no panels, no letters, no logos, no watermarks.",
+            _INK_SAFETY,
+        ])
     result = _comic_image(prompt, refs, "grok-imagine-image-2.0")
     if not result.get("ok") or not result.get("url"):
         return jsonify({"ok": False, "error": result.get("error") or f"Could not draw the {pose}."}), 502
