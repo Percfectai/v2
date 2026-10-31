@@ -515,10 +515,10 @@ _TURN_POSES = {
 @bp.route("/comics/api/turnaround", methods=["POST", "OPTIONS"])
 @bp.route("/studios/comics/api/turnaround", methods=["POST", "OPTIONS"])
 def comics_turnaround():
-    """Same character-build front as /characters: Nick's CHARACTER_PROMPT + 1:1 white card.
+    """Identical to /characters generate: same prompt, same generate_image_xai flags.
 
-    Front (and later ortho angles) must match the Characters product, not a comics paraphrase.
-    Comic print style is applied later at ink time via the cast sheet — not here.
+    Uses CHARACTER_PROMPT (photo) or "{look}. CHARACTER_PROMPT" (text), 1:1,
+    force_aspect + exact_prompt, default grok-imagine-image — not the comics ink path.
     """
     denied = _spa_auth()
     if denied:
@@ -534,25 +534,40 @@ def comics_turnaround():
         return jsonify({"ok": False, "error": "Add a description or a photo first."}), 400
     refs = [photo] if photo.startswith("http") or photo.startswith("data:") else []
 
-    # Exact Characters path — do not rewrite Nick's locked prompt text.
     import app as app_mod
     if refs:
         if pose_key == "front":
-            # One photo: Characters ignores typed words and uses CHARACTER_PROMPT only.
             prompt = app_mod.CHARACTER_PROMPT
         else:
-            # Later sides/back: Characters pose_edit from the approved front.
             prompt = app_mod.pose_edit_prompt(pose)
     else:
-        # No photo: their words, then Nick's prompt — same as build_character_prompt.
         base = (details or "a character").rstrip(" .,;")
         prompt = f"{base}. {app_mod.CHARACTER_PROMPT}"
 
-    # Characters fronts are square 1:1 (see studio_task_handlers character generate).
-    result = _comic_image(prompt, refs, "grok-imagine-image-2.0", aspect_ratio="1:1")
-    if not result.get("ok") or not result.get("url"):
-        return jsonify({"ok": False, "error": result.get("error") or f"Could not draw the {pose}."}), 502
-    return jsonify({"ok": True, "pose": pose_key, "url": result["url"]})
+    try:
+        # Same call shape as studio_task_handlers._generate_character_xai
+        raw = app_mod.generate_image_xai(
+            prompt,
+            refs[0] if refs else None,
+            aspect_ratio="1:1",
+            force_aspect=True,
+            exact_prompt=True,
+        )
+    except Exception as e:
+        log.warning("comics turnaround xai failed: %s", e)
+        return jsonify({"ok": False, "error": str(e) or f"Could not draw the {pose}."}), 502
+
+    data = (raw or {}).get("data") or []
+    image_url = data[0].get("url") if data else None
+    if not image_url and data and data[0].get("b64_json"):
+        image_url = f"data:image/png;base64,{data[0]['b64_json']}"
+    if not image_url:
+        return jsonify({"ok": False, "error": f"Could not draw the {pose}."}), 502
+    try:
+        image_url = app_mod._persist_image(image_url)
+    except Exception as e:
+        log.warning("comics turnaround persist failed: %s", e)
+    return jsonify({"ok": True, "pose": pose_key, "url": image_url})
 
 
 # Handoff: a finished comic is $20 and "credits are dollars" for comics unlock.
