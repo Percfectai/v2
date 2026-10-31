@@ -59,3 +59,16 @@ export function inkPage({ data }: { data: InkInput }) {
 export function planBeats({ data }: { data: PlanInput }) {
   return post<{ ok: true; beats: string[] } | { ok: false; error: string }>("/plan", data);
 }
+
+/** Charge Percfect wallet for a full-issue unlock ($20 handoff = 20 credits). Free 5th is $0. */
+export function unlockIssue(data: { issueId: string; free?: boolean }) {
+  return post<
+    | { ok: true; credits: number; charged: number; free: boolean }
+    | { ok: false; error: string; login_required?: boolean; credits?: number }
+  >("/unlock", data);
+}
+
+/** Four character fronts → one 2×2 white reference page. */
+export function castSheet(data: { fronts: string[] }) {
+  return post<{ ok: true; url: string } | { ok: false; error: string }>("/cast-sheet", data);
+}

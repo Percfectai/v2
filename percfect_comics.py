@@ -411,30 +411,40 @@ def comics_plan():
 
 
 
-def _collage_page(rows: list) -> str:
-    """Paste saved character shots onto one JPEG. Does not touch the character builder."""
+def _load_collage_image(raw: str):
+    """Load https or data:image for collage cells. Returns RGB PIL Image or None."""
     import io
     from PIL import Image
 
-    cell = 512
-    cols = 4
-    canvas = Image.new("RGB", (cell * cols, cell * max(1, len(rows))), (14, 17, 22))
-    for r, urls in enumerate(rows[:2]):
+    raw = str(raw or "").strip()
+    if not raw:
+        return None
+    try:
+        if raw.startswith("data:image") and "," in raw:
+            blob = base64.b64decode(raw.split(",", 1)[1])
+            return Image.open(io.BytesIO(blob)).convert("RGB")
+        if raw.startswith("https://") or raw.startswith("http://"):
+            got = requests.get(raw, timeout=40)
+            if not got.ok:
+                return None
+            return Image.open(io.BytesIO(got.content)).convert("RGB")
+    except Exception:
+        return None
+    return None
+
+
+def _collage_page(rows: list, *, bg=(14, 17, 22), cell: int = 512, cols: int = 4) -> str:
+    """Paste character shots onto one JPEG. Does not touch the character builder."""
+    import io
+    from PIL import Image
+
+    canvas = Image.new("RGB", (cell * cols, cell * max(1, len(rows))), bg)
+    for r, urls in enumerate(rows[: max(1, len(rows))]):
         if not isinstance(urls, list):
             continue
-        for c, url in enumerate(urls[:4]):
-            raw = str(url or "").strip()
-            if not raw.startswith("https://"):
-                continue
-            try:
-                got = requests.get(raw, timeout=40)
-            except Exception:
-                continue
-            if not got.ok:
-                continue
-            try:
-                im = Image.open(io.BytesIO(got.content)).convert("RGB")
-            except Exception:
+        for c, url in enumerate(urls[:cols]):
+            im = _load_collage_image(str(url or ""))
+            if im is None:
                 continue
             im.thumbnail((cell, cell))
             canvas.paste(im, (c * cell + (cell - im.width) // 2, r * cell + (cell - im.height) // 2))
@@ -462,6 +472,28 @@ def comics_sheet():
     except Exception as e:
         log.warning("comics sheet failed: %s", e)
         return jsonify({"ok": False, "error": "Could not put the pictures together."}), 502
+    return jsonify({"ok": True, "url": url})
+
+
+@bp.route("/comics/api/cast-sheet", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/cast-sheet", methods=["POST", "OPTIONS"])
+def comics_cast_sheet():
+    """One reference page: four character fronts in a 2×2 grid on white."""
+    denied = _spa_auth()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    fronts = body.get("fronts") if isinstance(body.get("fronts"), list) else []
+    urls = [str(u).strip() for u in fronts if isinstance(u, str) and u.strip()]
+    if len(urls) < 4:
+        return jsonify({"ok": False, "error": "Need four front shots — one per character."}), 400
+    # 2×2: row1 = chars 1–2, row2 = chars 3–4
+    rows = [urls[0:2], urls[2:4]]
+    try:
+        url = _collage_page(rows, bg=(255, 255, 255), cell=768, cols=2)
+    except Exception as e:
+        log.warning("comics cast-sheet failed: %s", e)
+        return jsonify({"ok": False, "error": "Could not build the cast reference sheet."}), 502
     return jsonify({"ok": True, "url": url})
 
 
@@ -493,18 +525,66 @@ def comics_turnaround():
         return jsonify({"ok": False, "error": "Add a description or a photo first."}), 400
     refs = [photo] if photo.startswith("http") or photo.startswith("data:") else []
     prompt = " ".join([
-        f"One full-body character, {pose} only, standing, plain light gray background.",
+        f"One full-body character, {pose} only, standing, plain pure white background.",
         f"This is {name}.",
         f"Details: {details or 'the person in the attached photo'}.",
         f"Art style: {style}.",
         "If a photo is attached, keep that person's face and build. Do not copy the photo's background.",
-        "No scenery, no panels, no letters, no logos.",
+        "Centered full body, head to feet visible, no crop at ankles.",
+        "No scenery, no panels, no letters, no logos, no shadows on the backdrop.",
         "All-ages. No nudity, no sexual content, no gore.",
     ])
     result = _comic_image(prompt, refs, "grok-imagine-image-2.0")
     if not result.get("ok") or not result.get("url"):
         return jsonify({"ok": False, "error": result.get("error") or f"Could not draw the {pose}."}), 502
     return jsonify({"ok": True, "pose": pose_key, "url": result["url"]})
+
+
+# Handoff: a finished comic is $20 and "credits are dollars" for comics unlock.
+COMICS_ISSUE_CREDIT_COST = 20
+
+
+@bp.route("/comics/api/unlock", methods=["POST", "OPTIONS"])
+@bp.route("/studios/comics/api/unlock", methods=["POST", "OPTIONS"])
+def comics_unlock():
+    """Spend Percfect wallet credits to unlock the full comic (clean pages + 2 edits each).
+
+    Body: { issueId: str, free?: bool }
+    Free 5th comic (client-computed) charges 0. Otherwise charges COMICS_ISSUE_CREDIT_COST.
+    """
+    if _spa_auth():
+        return jsonify({"ok": False, "error": "Sign in to unlock this comic.", "login_required": True}), 401
+    payload = request.get_json(silent=True) or {}
+    issue_id = str(payload.get("issueId") or "").strip()
+    if not issue_id:
+        return jsonify({"ok": False, "error": "Missing issue id."}), 400
+    free = bool(payload.get("free"))
+    cost = 0 if free else COMICS_ISSUE_CREDIT_COST
+    try:
+        import app as app_mod
+        app_mod.reset_daily_if_needed(current_user.id)
+        res = (
+            app_mod.supabase.table("users")
+            .select("picture_credits,video_credits")
+            .eq("id", current_user.id)
+            .single()
+            .execute()
+        )
+        user_data = res.data or {}
+        bal = app_mod._user_credits(user_data)
+        if cost > 0:
+            if not app_mod._apply_spend(current_user.id, user_data, cost):
+                return jsonify({
+                    "ok": False,
+                    "error": f"Need {cost} credits to unlock. You have {bal}.",
+                    "credits": bal,
+                }), 402
+            bal = max(0, bal - cost)
+        log.info("comics unlock user=%s issue=%s charged=%s bal=%s", current_user.id, issue_id, cost, bal)
+        return jsonify({"ok": True, "credits": bal, "charged": cost, "free": free})
+    except Exception as e:
+        log.warning("comics unlock failed: %s", e)
+        return jsonify({"ok": False, "error": "Could not unlock right now."}), 500
 
 
 @bp.route("/comics/api/save-character", methods=["POST", "OPTIONS"])

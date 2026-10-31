@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { STYLES, styleById, type StyleId } from "@/lib/comics/catalog";
 import { GENRES } from "@/lib/comics/catalog";
-import { inkPage, planBeats, rewriteCopy } from "@/lib/comics/ai.functions";
+import { castSheet, inkPage, planBeats, rewriteCopy, unlockIssue } from "@/lib/comics/ai.functions";
+import { ChatRail } from "@/lib/comics/ChatRail";
+import { helpText, type ChatVerb } from "@/lib/comics/chat-verbs";
 import { fallbackBeat } from "@/lib/comics/ink-prompt";
 import {
   newIssue,
@@ -300,6 +302,11 @@ export function Studio() {
   const issue = lib?.issues.find((i) => i.id === lib.currentId) ?? null;
   const sheetKey = (issue?.characters ?? []).slice(0, 4).map((c) => shotsOf(c).join(",")).join("|");
   useEffect(() => {
+    // Front-only path: one cast sheet with all four fronts
+    if (issue?.castSheetUrl) {
+      setSheets([issue.castSheetUrl]);
+      return;
+    }
     const people = (issue?.characters ?? []).slice(0, 4);
     let cancel = false;
     void (async () => {
@@ -317,7 +324,7 @@ export function Studio() {
     return () => {
       cancel = true;
     };
-  }, [sheetKey]);
+  }, [sheetKey, issue?.castSheetUrl]);
 
   const issueRef = useRef<Issue | null>(null);
   issueRef.current = issue;
@@ -345,18 +352,13 @@ export function Studio() {
     patch((issue) => ({ ...issue, pages: issue.pages.map((p) => (p.n === n ? fn(p) : p)) }));
   }
 
-  function buy(part: keyof Purchase | "all") {
-    if (!issue || !lib) return;
-    if (bookIsPaid(issue)) return;
-    const free = comicNumber(lib.issues, issue.id) % 5 === 0;
-    const have = owned(issue);
-    const next: Purchase = { cover: true, beginning: true, middle: true, ending: true };
-    if (!free && due(have) <= 0) return;
-    setError("");
+  function applyPurchaseLocal() {
     setLib((prev) => {
       if (!prev) return prev;
       const current = prev.issues.find((i) => i.id === prev.currentId);
       if (!current) return prev;
+      const have = owned(current);
+      const next: Purchase = { cover: true, beginning: true, middle: true, ending: true };
       const issues = prev.issues.map((i) => {
         if (i.id !== prev.currentId) return i;
         return {
@@ -370,6 +372,167 @@ export function Studio() {
       localStorage.setItem(KEY, JSON.stringify(forSave(nextLib)));
       return nextLib;
     });
+  }
+
+  /** Real Percfect wallet unlock. Free 5th charges 0. No more fake local unlock. */
+  async function unlockBook(): Promise<string> {
+    if (!issue || !lib) return "Open an issue first.";
+    if (bookIsPaid(issue)) return "This comic is already unlocked.";
+    const free = comicNumber(lib.issues, issue.id) % 5 === 0;
+    setError("");
+    setBusy("unlock");
+    const result = await unlockIssue({ issueId: issue.id, free });
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      if (result.login_required) {
+        return `${result.error} Sign in on PercfectAI, then say unlock again.`;
+      }
+      return result.error;
+    }
+    applyPurchaseLocal();
+    if (result.free || result.charged === 0) {
+      return "Unlocked as your free 5th comic. Clean pages and 2 edits per page are on.";
+    }
+    return `Unlocked for ${result.charged} credits. Balance ${result.credits}. Clean pages and 2 edits per page are on.`;
+  }
+
+  function ensureCastSlot(characters: CastMember[], slot: number): CastMember[] {
+    const next = [...characters];
+    while (next.length <= slot) {
+      next.push({
+        id: crypto.randomUUID(),
+        name: `Character ${next.length + 1}`,
+        look: "",
+        role: "regular",
+        angles: ["", "", "", ""],
+      });
+    }
+    return next;
+  }
+
+  async function runChatVerb(verb: ChatVerb): Promise<string> {
+    const live = issueRef.current;
+    if (!live || !lib) return "Opening the press…";
+
+    switch (verb.type) {
+      case "help":
+        return helpText({
+          tab,
+          title: live.title,
+          castCount: live.characters.length,
+          hasCoverPrompt: Boolean(live.pages[0]?.prompt?.trim()),
+          hasCoverArt: Boolean(live.pages[0]?.imageUrl),
+          coverApproved: Boolean(live.pages[0]?.approved),
+          unlocked: bookIsPaid(live),
+          priceLabel: comicNumber(lib.issues, live.id) % 5 === 0 ? "free 5th" : money(ISSUE_PRICE),
+        });
+      case "go": {
+        const map = { characters: 0, cover: 1, settings: 2 } as const;
+        setTab(map[verb.tab]);
+        return `Opened ${verb.tab}.`;
+      }
+      case "set_title":
+        patch((i) => ({ ...i, title: verb.title.slice(0, 80) }));
+        return `Title set to “${verb.title.slice(0, 80)}”.`;
+      case "set_style":
+        patch((i) => ({ ...i, styleId: verb.styleId }));
+        return `Print style is ${verb.label}.`;
+      case "set_genre":
+        patch((i) => ({ ...i, genre: verb.genre }));
+        return `Genre is ${verb.genre}.`;
+      case "add_library": {
+        const q = verb.nameQuery.toLowerCase();
+        const row = roster.find((r) => r.name.toLowerCase() === q)
+          || roster.find((r) => r.name.toLowerCase().includes(q));
+        if (!row) {
+          const names = roster.filter((r) => r.images.length >= 4).map((r) => r.name).slice(0, 8);
+          return names.length
+            ? `No library match for “${verb.nameQuery}”. Try: ${names.join(", ")}.`
+            : "No saved characters with four shots yet. Make four shots on Characters, or open the character library first.";
+        }
+        if (row.images.length < 4) {
+          return `${row.name} needs four shots before they can join the sheet.`;
+        }
+        let added = false;
+        patch((i) => {
+          if (i.characters.length >= 4) return i;
+          if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
+          added = true;
+          const member: CastMember = {
+            id: `lib-${row.id}`,
+            name: row.name,
+            look: "Saved in the library",
+            role: "regular",
+            refUrl: row.images[0],
+            angles: row.images.slice(0, 4),
+          };
+          return { ...i, characters: [...i.characters, member] };
+        });
+        if (!added) {
+          const cur = issueRef.current;
+          if (cur && cur.characters.some((c) => c.id === `lib-${row.id}`)) {
+            return `${row.name} is already on the cast.`;
+          }
+          return "Cast is full (four characters). Remove one first.";
+        }
+        return `Added ${row.name} from your library.`;
+      }
+      case "name_character": {
+        if (verb.slot < 0 || verb.slot > 3) return "Use character 1 through 4.";
+        patch((i) => {
+          const characters = ensureCastSlot(i.characters, verb.slot).map((c, n) =>
+            n === verb.slot ? { ...c, name: verb.name.slice(0, 80) } : c
+          );
+          return { ...i, characters };
+        });
+        return `Character ${verb.slot + 1} is named ${verb.name.slice(0, 80)}.`;
+      }
+      case "describe_character": {
+        if (verb.slot < 0 || verb.slot > 3) return "Use character 1 through 4.";
+        patch((i) => {
+          const characters = ensureCastSlot(i.characters, verb.slot).map((c, n) =>
+            n === verb.slot ? { ...c, look: verb.look.slice(0, 500) } : c
+          );
+          return { ...i, characters };
+        });
+        return `Got it for character ${verb.slot + 1}. On Characters you can still add a photo and make the four shots.`;
+      }
+      case "rewrite_cover": {
+        setTab(1);
+        await onRewrite("cover", live.pages[0]?.prompt ?? "", 0);
+        return "Cover copy is ready. Say “ink cover” for the free watermarked draft.";
+      }
+      case "ink_cover": {
+        setTab(1);
+        const page = live.pages[0];
+        if (!page) return "No cover page on this issue.";
+        if (page.imageUrl) return "Cover already has art. Unlock for clean edits, or approve when you're happy.";
+        await generateDrafts([0]);
+        return "Inking the cover draft… check the Cover tab.";
+      }
+      case "approve_cover": {
+        const page = live.pages[0];
+        if (!page?.imageUrl) return "Ink the cover draft first.";
+        approvePage(0);
+        return "Cover approved. Beginning unlocks next.";
+      }
+      case "unlock":
+        return unlockBook();
+      case "unknown":
+        return `I only run Characters and Cover moves right now. ${helpText({
+          tab,
+          title: live.title,
+          castCount: live.characters.length,
+          hasCoverPrompt: Boolean(live.pages[0]?.prompt?.trim()),
+          hasCoverArt: Boolean(live.pages[0]?.imageUrl),
+          coverApproved: Boolean(live.pages[0]?.approved),
+          unlocked: bookIsPaid(live),
+          priceLabel: comicNumber(lib.issues, live.id) % 5 === 0 ? "free 5th" : money(ISSUE_PRICE),
+        })}`;
+      default:
+        return "Try “what's next?”";
+    }
   }
 
   const castLine = useMemo(() => {
@@ -466,24 +629,35 @@ export function Studio() {
     const fixing = editing && !!current.imageUrl;
     const onPage = people.slice(0, 4);
     const sheets: string[] = [];
-    for (let i = 0; i < onPage.length; i += 2) {
-      const top = shotsOf(onPage[i]);
-      const bottom = onPage[i + 1] ? shotsOf(onPage[i + 1]) : [];
-      if (top.length < 4) continue;
-      if (bottom.length && bottom.length < 4) continue;
-      const sheet = await pairSheet(top, bottom);
-      if (sheet) sheets.push(sheet);
-    }
-    if (fixing && current.imageUrl) {
-      refs.push(current.imageUrl, ...sheets.slice(0, 2));
+    // Prefer the four-front cast sheet when that path is ready
+    if (live.castSheetUrl) {
+      sheets.push(live.castSheetUrl);
     } else {
+      for (let i = 0; i < onPage.length; i += 2) {
+        const top = shotsOf(onPage[i]);
+        const bottom = onPage[i + 1] ? shotsOf(onPage[i + 1]) : [];
+        if (top.length < 4) continue;
+        if (bottom.length && bottom.length < 4) continue;
+        const sheet = await pairSheet(top, bottom);
+        if (sheet) sheets.push(sheet);
+      }
+    }
+    // PageRef model: 1) cast sheet, 2) previous page, 3) optional extra (prop/location/costume).
+    // Cover has no previous page — cast sheet (+ optional extra).
+    if (fixing && current.imageUrl) {
+      refs.push(...sheets.slice(0, 1));
+      refs.push(current.imageUrl);
+      if (current.extraRefUrl) refs.push(current.extraRefUrl);
+    } else {
+      refs.push(...sheets.slice(0, 1));
       const prev = live.pages.find((p) => p.n === current.n - 1);
       if (current.n > 0 && prev?.imageUrl) {
         refs.push(prev.imageUrl);
         hasPrevPage = true;
       }
-      refs.push(...sheets.slice(0, Math.max(0, 3 - refs.length)));
+      if (current.extraRefUrl) refs.push(current.extraRefUrl);
     }
+    refs.splice(3); // ink API max 3 refs
     const actSummary = current.n === 0 ? live.summary : current.n <= 3 ? live.beginning : current.n <= 6 ? live.middle : live.ending;
     const result = await inkPage({
       data: {
@@ -567,47 +741,134 @@ export function Studio() {
     else setTab(n + 1 <= 3 ? 4 : n + 1 <= 6 ? 5 : 6);
   }
 
-  async function makeFourShots(index: number) {
+  /** Front-only for speed. Sides/back come later. White-background full-body. */
+  async function makeFrontShot(index: number): Promise<boolean> {
     const member = issueRef.current?.characters[index];
     const photo = member?.refUrl || "";
     if (!photo && !(member?.look || "").trim()) {
-      setError("Write the character, or add one photo. That makes the four shots.");
-      return;
+      setError("Drop a reference photo, or write what they look like.");
+      return false;
     }
-    setBusy("make-four");
+    setBusy(`front-${index}`);
     setError("");
-    const poses = ["front", "left", "right", "back"] as const;
-    const images = ["", "", "", ""];
     try {
-      for (let slot = 0; slot < poses.length; slot += 1) {
-        const res = await fetch(`${import.meta.env.BASE_URL}api/turnaround`, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            styleId: issueRef.current?.styleId,
-            name: member?.name || `Character ${index + 1}`,
-            prompt: member?.look || "",
-            photo,
-            pose: poses[slot],
-          }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!data?.ok || typeof data.url !== "string") {
-          throw new Error(data?.error || `Could not draw the ${poses[slot]} shot.`);
-        }
-        images[slot] = data.url;
-        const ready = images.slice();
-        patch((i) => ({
-          ...i,
-          characters: i.characters.map((c, n) => n === index ? { ...c, angles: ready } : c),
-        }));
+      const res = await fetch(`${import.meta.env.BASE_URL}api/turnaround`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          styleId: issueRef.current?.styleId,
+          name: member?.name || `Character ${index + 1}`,
+          prompt: member?.look || "",
+          photo,
+          pose: "front",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.ok || typeof data.url !== "string") {
+        throw new Error(data?.error || "Could not draw the front shot.");
       }
+      patch((i) => ({
+        ...i,
+        castSheetUrl: undefined,
+        characters: i.characters.map((c, n) => {
+          if (n !== index) return c;
+          const angles = ["", "", "", ""];
+          angles[0] = data.url;
+          return { ...c, angles, refUrl: c.refUrl || data.url };
+        }),
+      }));
+      return true;
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not make the four shots.");
+      setError(e instanceof Error ? e.message : "Could not draw the front shot.");
+      return false;
     } finally {
       setBusy(null);
     }
+  }
+
+  async function makeAllFronts() {
+    const live = issueRef.current;
+    if (!live || busy) return;
+    const slots = [0, 1, 2, 3].filter((index) => {
+      const c = live.characters[index];
+      if (!c) return false;
+      if (c.angles?.[0]) return false;
+      return Boolean(c.refUrl || (c.look || "").trim());
+    });
+    if (!slots.length) {
+      setError("Add up to four reference photos (or looks), then make fronts.");
+      return;
+    }
+    for (const index of slots) {
+      const ok = await makeFrontShot(index);
+      if (!ok) break;
+    }
+    const after = issueRef.current;
+    const fronts = (after?.characters || []).slice(0, 4).map((c) => c.angles?.[0] || "").filter(Boolean);
+    if (fronts.length === 4) {
+      await makeCastSheet();
+    }
+  }
+
+  async function makeCastSheet() {
+    const live = issueRef.current;
+    if (!live) return;
+    const fronts = live.characters.slice(0, 4).map((c) => c.angles?.[0] || "");
+    if (fronts.some((u) => !u) || fronts.length < 4) {
+      setError("Make a front shot for all four characters first.");
+      return;
+    }
+    setBusy("cast-sheet");
+    setError("");
+    try {
+      const result = await castSheet({ fronts });
+      if (!result.ok) throw new Error(result.error || "Could not build the cast sheet.");
+      patch((i) => ({ ...i, castSheetUrl: result.url }));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Could not build the cast sheet.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function dropCastPhotos(files: FileList | File[] | null) {
+    if (!files || busy) return;
+    const list = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 4);
+    if (!list.length) {
+      setError("Drop JPG or PNG photos.");
+      return;
+    }
+    setError("");
+    const dataUrls: string[] = [];
+    for (const file of list) {
+      try {
+        dataUrls.push(await shrinkRef(file));
+      } catch {
+        setError("One photo couldn't be read. Try JPG or PNG.");
+        return;
+      }
+    }
+    patch((i) => {
+      const characters = [...i.characters];
+      dataUrls.forEach((dataUrl, index) => {
+        while (characters.length <= index) {
+          characters.push({
+            id: crypto.randomUUID(),
+            name: `Character ${characters.length + 1}`,
+            look: "",
+            role: "regular",
+            angles: ["", "", "", ""],
+          });
+        }
+        characters[index] = {
+          ...characters[index],
+          refUrl: dataUrl,
+          angles: ["", "", "", ""],
+        };
+      });
+      return { ...i, characters: characters.slice(0, 4), castSheetUrl: undefined };
+    });
   }
 
   async function saveCharacter(member: CastMember) {
@@ -855,18 +1116,20 @@ export function Studio() {
               <section className={`subpage${tab === 0 ? " on" : ""}`}>
                 <div>
                   <div className="kicker">1 · Characters</div>
-                  <h1 className="head">Four characters.</h1>
-                  <p className="subhead">Each one has a prompt or one reference photo, then four shots in the comic style. Cover is next.</p>
+                  <h1 className="head">Four fronts. One sheet.</h1>
+                  <p className="subhead">
+                    Drop up to four reference photos. We draw a full-body front on white for each, then build one cast reference page with all four.
+                  </p>
                 </div>
                 <div className="block">
-                  <div className="label">Print style for these shots</div>
+                  <div className="label">Print style for these fronts</div>
                   <div className="styles">
                     {STYLES.map((s) => (
                       <button
                         key={s.id}
                         className={`style${issue.styleId === s.id ? " sel" : ""}`}
                         type="button"
-                        onClick={() => patch((i) => ({ ...i, styleId: s.id as StyleId }))}
+                        onClick={() => patch((i) => ({ ...i, styleId: s.id as StyleId, castSheetUrl: undefined }))}
                       >
                         <div className="sn">{s.label}</div>
                         <div className="sb">{s.blurb}</div>
@@ -874,86 +1137,129 @@ export function Studio() {
                     ))}
                   </div>
                 </div>
-                                    <div className="block">
-                                      <div className="label">Characters</div>
-                                      <p className="help">Four characters, one under the other. Each one has four shots side by side: front, left side, right side, back.</p>
-                                      <div className="cast__grid">
-                                        {roster.filter((row) => row.images.length >= 4).map((row) => (
-                                          <button
-                                            key={row.id}
-                                            className="btn-sm"
-                                            type="button"
-                                            onClick={() => patch((i) => {
-                                              if (i.characters.length >= 4) return i;
-                                              if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
-                                              const member: CastMember = {
-                                                id: `lib-${row.id}`,
-                                                name: row.name,
-                                                look: "Saved in the library",
-                                                role: "regular",
-                                                refUrl: row.images[0],
-                                                angles: row.images.slice(0, 4),
-                                              };
-                                              return { ...i, characters: [...i.characters, member] };
-                                            })}
-                                          >
-                                            Use saved {row.name}
-                                          </button>
-                                        ))}
-                                      </div>
-                                      <div className="caststack">
-                                      {[0, 1, 2, 3].map((index) => {
-                                        const c = issue.characters[index];
-                                        const angles = ["", "", "", ""].map((empty, slot) => c?.angles?.[slot] || empty);
-                                        const saved = Boolean(c?.id.startsWith("lib-"));
-                                        const touch = (apply: (characters: CastMember[]) => CastMember[]) => patch((i) => {
-                                          const characters = [...i.characters];
-                                          while (characters.length <= index) {
-                                            characters.push({ id: crypto.randomUUID(), name: `Character ${characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] });
-                                          }
-                                          return { ...i, characters: apply(characters) };
-                                        });
-                                        return (
-                                          <article key={c?.id || `slot-${index}`} className="castrow">
-                                            <div className="label">Character {index + 1}</div>
-                                            <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
-                                            <textarea className="inp" rows={3} placeholder="Details — face, outfit, hair. Or leave this and use a photo." value={c?.look || ""} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, look: e.target.value } : x))} />
-                                            <p className="help">A prompt or one photo. The four shots use the comic style you picked.</p>
-                                            {!saved && (
-                                              <label className="refshot">
-                                                {c?.refUrl ? <img src={c.refUrl} alt="" /> : <span>Reference photo{"\n"}drop or tap</span>}
-                                                <input
-                                                  type="file"
-                                                  accept="image/png,image/jpeg,image/webp"
-                                                  onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    e.target.value = "";
-                                                    void readRefPhoto(file, (dataUrl) => {
-                                                      touch((characters) => characters.map((x, n) => n === index ? { ...x, refUrl: dataUrl, angles: [] } : x));
-                                                    });
-                                                  }}
-                                                />
-                                              </label>
-                                            )}
-                                            {!saved && (
-                                              <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeFourShots(index)}>Make the four shots</button>
-                                            )}
-                                            <div className="shotrow">
-                                              {POSE_LABELS.map((label, slot) => (
-                                                <div key={label} className="shotshow">
-                                                  {angles[slot] ? <img src={angles[slot]} alt={label} /> : <span>{label}</span>}
-                                                </div>
-                                              ))}
-                                            </div>
-                                            {c && (saved ? <p className="help">Already in the library.</p> : (
-                                              <button className="btn-sm primary" type="button" disabled={!!busy || angles.filter(Boolean).length < 4} onClick={() => void saveCharacter(c)}>Save to library</button>
-                                            ))}
-                                            {c && <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id) }))}>Remove</button>}
-                                          </article>
-                                        );
-                                      })}
-                                      </div>
-                                    </div>
+                <div className="block">
+                  <div className="label">Drop references</div>
+                  <label
+                    className="castdrop"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      void dropCastPhotos(e.dataTransfer.files);
+                    }}
+                  >
+                    <span>Drop 1–4 photos here, or tap to pick</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      multiple
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        e.target.value = "";
+                        void dropCastPhotos(files);
+                      }}
+                    />
+                  </label>
+                  <div className="cast__actions">
+                    <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeAllFronts()}>
+                      {busy?.startsWith("front") ? "Drawing fronts…" : "Make all fronts"}
+                    </button>
+                    <button
+                      className="btn-sm primary"
+                      type="button"
+                      disabled={
+                        !!busy ||
+                        issue.characters.slice(0, 4).length < 4 ||
+                        issue.characters.slice(0, 4).some((c) => !c.angles?.[0])
+                      }
+                      onClick={() => void makeCastSheet()}
+                    >
+                      {busy === "cast-sheet" ? "Building sheet…" : "Make cast reference sheet"}
+                    </button>
+                  </div>
+                  <p className="help">Sides and back come later. Right now: front only, then one page with all four.</p>
+                </div>
+                {issue.castSheetUrl && (
+                  <div className="block castsheet">
+                    <div className="label">Cast reference sheet</div>
+                    <img src={issue.castSheetUrl} alt="Four character fronts on one page" />
+                  </div>
+                )}
+                <div className="block">
+                  <div className="label">Characters</div>
+                  <div className="cast__grid">
+                    {roster.filter((row) => row.images.length >= 1).map((row) => (
+                      <button
+                        key={row.id}
+                        className="btn-sm"
+                        type="button"
+                        onClick={() => patch((i) => {
+                          if (i.characters.length >= 4) return i;
+                          if (i.characters.some((c) => c.id === `lib-${row.id}`)) return i;
+                          const front = row.images[0];
+                          const member: CastMember = {
+                            id: `lib-${row.id}`,
+                            name: row.name,
+                            look: "Saved in the library",
+                            role: "regular",
+                            refUrl: front,
+                            angles: [front, "", "", ""],
+                          };
+                          return { ...i, characters: [...i.characters, member], castSheetUrl: undefined };
+                        })}
+                      >
+                        Use saved {row.name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="caststack">
+                    {[0, 1, 2, 3].map((index) => {
+                      const c = issue.characters[index];
+                      const front = c?.angles?.[0] || "";
+                      const saved = Boolean(c?.id.startsWith("lib-"));
+                      const touch = (apply: (characters: CastMember[]) => CastMember[]) => patch((i) => {
+                        const characters = [...i.characters];
+                        while (characters.length <= index) {
+                          characters.push({ id: crypto.randomUUID(), name: `Character ${characters.length + 1}`, look: "", role: "regular", angles: ["", "", "", ""] });
+                        }
+                        return { ...i, characters: apply(characters), castSheetUrl: undefined };
+                      });
+                      return (
+                        <article key={c?.id || `slot-${index}`} className="castrow">
+                          <div className="label">Character {index + 1}</div>
+                          <input className="inp" value={c?.name || ""} placeholder={`Character ${index + 1}`} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, name: e.target.value } : x))} />
+                          <textarea className="inp" rows={2} placeholder="Optional details — face, outfit, hair." value={c?.look || ""} onChange={(e) => touch((characters) => characters.map((x, n) => n === index ? { ...x, look: e.target.value } : x))} />
+                          {!saved && (
+                            <label className="refshot">
+                              {c?.refUrl ? <img src={c.refUrl} alt="" /> : <span>Reference photo{"\n"}drop or tap</span>}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = "";
+                                  void readRefPhoto(file, (dataUrl) => {
+                                    touch((characters) => characters.map((x, n) => n === index ? { ...x, refUrl: dataUrl, angles: ["", "", "", ""] } : x));
+                                  });
+                                }}
+                              />
+                            </label>
+                          )}
+                          {!saved && (
+                            <button className="btn-sm primary" type="button" disabled={!!busy} onClick={() => void makeFrontShot(index)}>
+                              {busy === `front-${index}` ? "Drawing front…" : "Make front"}
+                            </button>
+                          )}
+                          <div className="shotrow shotrow--front">
+                            <div className="shotshow">
+                              {front ? <img src={front} alt="Front" /> : <span>Front</span>}
+                            </div>
+                          </div>
+                          {c && <button className="btn-sm" type="button" onClick={() => patch((i) => ({ ...i, characters: i.characters.filter((x) => x.id !== c.id), castSheetUrl: undefined }))}>Remove</button>}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
               </section>
 
               <section className={`subpage${tab === 1 ? " on" : ""}`}>
@@ -979,7 +1285,12 @@ export function Studio() {
                     const page = issue.pages[0];
                     if (page) void ink(page, "rewrite");
                   }}
-                  onBuy={() => buy("all")}
+                  onBuy={() => void unlockBook()}
+                  onExtraRef={(dataUrl) => patchPage(0, (p) => ({ ...p, extraRefUrl: dataUrl }))}
+                  onClearExtra={() => patchPage(0, (p) => {
+                    const { extraRefUrl: _drop, ...rest } = p;
+                    return rest;
+                  })}
                   freeBook={freeBook}
                 />
                 </PageRail>
@@ -996,11 +1307,17 @@ export function Studio() {
                     onSummary={(v) => patch((i) => ({ ...i, [act]: v }))}
                     onMode={(mode: WriterMode) => patch((i) => ({ ...i, mode }))}
                     onRewriteSummary={() => onRewrite(act, issue[act])}
+                    onSplitPages={() => onRewrite(act, issue[act])}
                     onPrompt={(n, v) => patchPage(n, (p) => ({ ...p, prompt: v, status: p.imageUrl ? p.status : v.trim() ? "ready" : "draft" }))}
                     onRewritePage={(n) => {
                       const page = issue.pages.find((p) => p.n === n);
                       void onRewrite("page", page?.prompt ?? "", n);
                     }}
+                    onExtraRef={(n, dataUrl) => patchPage(n, (p) => ({ ...p, extraRefUrl: dataUrl }))}
+                    onClearExtra={(n) => patchPage(n, (p) => {
+                      const { extraRefUrl: _drop, ...rest } = p;
+                      return rest;
+                    })}
                     onToggle={toggleOnPage}
                     onInk={(n) => {
                       const page = issue.pages.find((p) => p.n === n);
@@ -1015,7 +1332,7 @@ export function Studio() {
                       const page = issue.pages.find((p) => p.n === n);
                       if (page) void ink({ ...page }, "rewrite");
                     }}
-                    onBuy={() => buy("all")}
+                    onBuy={() => void unlockBook()}
                     onGenerate={() => {
                       const next = pages.find((n) => {
                         const page = issue.pages.find((p) => p.n === n);
@@ -1077,7 +1394,7 @@ export function Studio() {
                 </div>
                 <p className="help">Each page is drawn after you approve the one before it. A mistake on page 2 would be copied onto every page after it.</p>
                 {due(owned(issue)) > 0 ? (
-                  <button className="btn-publish" type="button" onClick={() => buy("all")}>
+                  <button className="btn-publish" type="button" onClick={() => void unlockBook()}>
                     {freeBook ? "Claim this free comic · 2 edits per page" : `Purchase full comic · ${money(due(owned(issue)))} · 2 edits per page`}
                   </button>
                 ) : (
@@ -1099,9 +1416,26 @@ export function Studio() {
           )}
         </div>
 
-        <aside className="samplecover">
-          <img src={`${import.meta.env.BASE_URL}example-cover.jpg`} alt="Example comic cover" />
-        </aside>
+        {tab === 0 || tab === 1 ? (
+          <ChatRail
+            busy={!!busy}
+            context={{
+              tab,
+              title: issue.title,
+              castCount: issue.characters.length,
+              hasCoverPrompt: Boolean(issue.pages[0]?.prompt?.trim()),
+              hasCoverArt: Boolean(issue.pages[0]?.imageUrl),
+              coverApproved: Boolean(issue.pages[0]?.approved),
+              unlocked: bookIsPaid(issue),
+              priceLabel: freeBook ? "free 5th" : money(ISSUE_PRICE),
+            }}
+            runVerb={runChatVerb}
+          />
+        ) : (
+          <aside className="samplecover">
+            <img src={`${import.meta.env.BASE_URL}example-cover.jpg`} alt="Example comic cover" />
+          </aside>
+        )}
       </div>
 
       <div className="pricedock">
@@ -1193,19 +1527,71 @@ function PromptBox({
   );
 }
 
-function RefLock({ pageN, pages, sheets }: { pageN: number; pages: ComicPage[]; sheets: string[] }) {
+function RefLock({
+  pageN,
+  pages,
+  sheets,
+  onExtraRef,
+  onClearExtra,
+}: {
+  pageN: number;
+  pages: ComicPage[];
+  sheets: string[];
+  onExtraRef?: (dataUrl: string) => void;
+  onClearExtra?: () => void;
+}) {
+  const page = pages.find((p) => p.n === pageN);
   const prev = pageN > 0 ? pages.find((p) => p.n === pageN - 1) : undefined;
   const cells = [
-    { title: "Ref 1 · previous page", src: prev?.imageUrl, empty: pageN === 0 ? "Cover uses the cards only" : "Approve the page before this one" },
-    { title: "Ref 2 · card A", src: sheets[0], empty: "Needs characters 1 and 2, four shots each" },
-    { title: "Ref 3 · card B", src: sheets[1], empty: "Only if characters 3 and 4 are both on the sheet" },
+    { title: "Ref 1 · cast sheet", src: sheets[0], empty: "Make four fronts, then the cast reference sheet" },
+    {
+      title: pageN === 0 ? "Ref 2 · (cover has no prior page)" : `Ref 2 · ${pageN - 1 === 0 ? "cover" : `page ${pageN - 1}`}`,
+      src: pageN === 0 ? undefined : prev?.imageUrl,
+      empty: pageN === 0 ? "Cover only needs the cast sheet (+ optional extra)" : "Approve the page before this one",
+    },
+    {
+      title: "Ref 3 · optional extra",
+      src: page?.extraRefUrl,
+      empty: "Prop, location, or costume — only if needed",
+      optional: true as const,
+    },
   ];
   return (
     <div className="reflock">
       {cells.map((cell) => (
         <figure key={cell.title}>
-          {cell.src ? <img src={cell.src} alt="" /> : <div className="reflock__ph">{cell.empty}</div>}
-          <figcaption>{cell.title}</figcaption>
+          {cell.src ? (
+            <img src={cell.src} alt="" />
+          ) : "optional" in cell && cell.optional && onExtraRef ? (
+            <label className="reflock__drop">
+              <span>{cell.empty}</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file || !file.type.startsWith("image/")) return;
+                  void shrinkRef(file)
+                    .then((dataUrl) => onExtraRef(dataUrl))
+                    .catch(() => undefined);
+                }}
+              />
+            </label>
+          ) : (
+            <div className="reflock__ph">{cell.empty}</div>
+          )}
+          <figcaption>
+            {cell.title}
+            {"optional" in cell && cell.optional && page?.extraRefUrl && onClearExtra ? (
+              <>
+                {" · "}
+                <button type="button" className="linkish" onClick={onClearExtra}>
+                  clear
+                </button>
+              </>
+            ) : null}
+          </figcaption>
         </figure>
       ))}
     </div>
@@ -1245,6 +1631,8 @@ function CoverBlock({
   onRewriteImage,
   onBuy,
   onApprove,
+  onExtraRef,
+  onClearExtra,
   freeBook,
   belowPrompt,
 }: {
@@ -1260,6 +1648,8 @@ function CoverBlock({
   onSmall: (note: string) => void;
   onRewriteImage: () => void;
   onBuy: () => void;
+  onExtraRef: (dataUrl: string) => void;
+  onClearExtra: () => void;
   freeBook: boolean;
 }) {
   const page = issue.pages[0];
@@ -1269,14 +1659,14 @@ function CoverBlock({
       <div>
         <div className="kicker">2 · Cover</div>
         <h1 className="head">Cover</h1>
-        <p className="subhead">The characters are on the page before this. Name any of them in the cover prompt. Their front shots stay on the left.</p>
+        <p className="subhead">The cast sheet from Characters is the face bible for this cover. Name any of them in the prompt.</p>
       </div>
       <div className="block">
-        <div className="label">Character sheet</div>
+        <div className="label">Cast reference sheet</div>
         {sheets[0] ? (
-          <img src={sheets[0]} alt="Main character sheet" style={{ width: "100%", maxWidth: 420, borderRadius: 12 }} />
+          <img src={sheets[0]} alt="Four character fronts" style={{ width: "100%", maxWidth: 420, borderRadius: 12 }} />
         ) : (
-          <p className="help">Make the four shots on Characters first. Those shots become this sheet, and the cover uses it for the face.</p>
+          <p className="help">On Characters: drop four photos → Make all fronts → cast reference sheet. Then the cover can ink.</p>
         )}
       </div>
       <div className="block">
@@ -1297,7 +1687,13 @@ function CoverBlock({
         onRewrite={onRewrite}
       />
       {belowPrompt}
-      <RefLock pageN={0} pages={issue.pages} sheets={sheets} />
+      <RefLock
+        pageN={0}
+        pages={issue.pages}
+        sheets={sheets}
+        onExtraRef={onExtraRef}
+        onClearExtra={onClearExtra}
+      />
       {page?.imageUrl && <PageArt url={page.imageUrl} clean={owned(issue).cover} alt="Cover" className="pageimg" />}
       <p className="help">The first draft is free and watermarked. That is picture 1 of 3. Unlock it for 2 edits. All three use the 2.0 model.</p>
       {!page?.imageUrl && (
@@ -1336,8 +1732,11 @@ function ActBlock({
   onSummary,
   onMode,
   onRewriteSummary,
+  onSplitPages,
   onPrompt,
   onRewritePage,
+  onExtraRef,
+  onClearExtra,
   onToggle,
   onInk,
   onSmall,
@@ -1355,8 +1754,11 @@ function ActBlock({
   onSummary: (v: string) => void;
   onMode: (m: WriterMode) => void;
   onRewriteSummary: () => void;
+  onSplitPages: () => void;
   onPrompt: (n: number, v: string) => void;
   onRewritePage: (n: number) => void;
+  onExtraRef: (n: number, dataUrl: string) => void;
+  onClearExtra: (n: number) => void;
   onToggle: (n: number, id: string) => void;
   onInk: (n: number) => void;
   onSmall: (n: number, note: string) => void;
@@ -1368,12 +1770,13 @@ function ActBlock({
 }) {
   const [notes, setNotes] = useState<Record<number, string>>({});
   const summary = issue[act];
+  void onMode;
   return (
     <>
       <div>
         <div className="kicker">{act} · pages {pages[0]}–{pages[2]}</div>
         <h1 className="head">Write the {act}.</h1>
-        <p className="subhead">The summary at the top writes these three pages. Fix any one page on its own, or write each page yourself.</p>
+        <p className="subhead">Write one act summary, then split it into three page beats. Ink uses the cast sheet, the previous page, and an optional extra ref.</p>
       </div>
       <PromptBox
         value={summary}
@@ -1383,7 +1786,17 @@ function ActBlock({
         onChange={onSummary}
         onRewrite={onRewriteSummary}
       />
-      <p className="help">Approve a page before the next one is drawn. The next page copies the picture you approved.</p>
+      <div className="cast__actions">
+        <button
+          className="btn-sm primary"
+          type="button"
+          disabled={!!busy || !summary.trim()}
+          onClick={onSplitPages}
+        >
+          {busy === `write-${act}-` ? "Splitting…" : "Split into 3 pages"}
+        </button>
+      </div>
+      <p className="help">Split fills the three page prompts below. Approve a page before the next one is drawn — that picture becomes ref 2.</p>
       <button className="btn-genpage" type="button" disabled={!!busy || pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl)} onClick={onGenerate}>
         {pages.every((n) => issue.pages.find((p) => p.n === n)?.imageUrl) ? "These pages are drawn" : "Generate the next page"}
       </button>
@@ -1422,7 +1835,13 @@ function ActBlock({
                         <PageArt url={prev.imageUrl} clean={owned(issue)[prev.act]} alt="" />
                       </figure>
                     )}
-                    <RefLock pageN={n} pages={issue.pages} sheets={sheets} />
+                    <RefLock
+                      pageN={n}
+                      pages={issue.pages}
+                      sheets={sheets}
+                      onExtraRef={(dataUrl) => onExtraRef(n, dataUrl)}
+                      onClearExtra={() => onClearExtra(n)}
+                    />
                     <div>
                       <span className="label">Who's on this page</span>
                       <div className="chips">

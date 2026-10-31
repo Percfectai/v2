@@ -25,6 +25,11 @@ export type ComicPage = {
   imageUrl?: string;
   /** Clean file. Kept in memory until the block is claimed, then it replaces imageUrl. */
   cleanUrl?: string;
+  /**
+   * Optional third ink reference (prop / location / costume beat).
+   * Ref 1 = cast sheet, ref 2 = previous page, ref 3 = this when set.
+   */
+  extraRefUrl?: string;
   /** Paid edits left on this page. Granted when its block is unlocked. */
   editsLeft?: number;
   /** Page-by-page only. The next page stays closed until this is true. */
@@ -60,6 +65,8 @@ export type Issue = {
   ending: string;
   mode: WriterMode;
   characters: CastMember[];
+  /** One page: all four character fronts in a 2×2 sheet (front-only cast path). */
+  castSheetUrl?: string;
   pages: ComicPage[];
   rewritesLeft: number;
   smallChangesLeft: number;
