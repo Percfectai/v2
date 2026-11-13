@@ -36,6 +36,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { isRetiredAssetUrl } from '/static/js/rivals/retired_assets.js';
 
 const LOCAL_MANIFEST = '/static/motion-lab/animated/manifest.json';
 const REMOTE_MANIFEST = '/static/motion-lab/animated/manifest_remote.json';
@@ -92,7 +93,13 @@ async function loadCharacter(charName){
   stateEl.textContent = 'loading…';
   try {
     const baseEntry = anims.idle || Object.values(anims)[0];
-    const baseGLB = await loader.loadAsync(resolveGlbUrl(baseEntry));
+    const baseUrl = resolveGlbUrl(baseEntry);
+    if (isRetiredAssetUrl(baseUrl)) {
+      stateEl.textContent = 'clips offline';
+      errEl.textContent = 'Those clips point at the retired Supabase project. The stage stays up without them.';
+      return;
+    }
+    const baseGLB = await loader.loadAsync(baseUrl);
     baseGLB.scene.name = 'CHAR';
     const box = new THREE.Box3().setFromObject(baseGLB.scene);
     baseGLB.scene.position.y -= box.min.y;
@@ -105,8 +112,10 @@ async function loadCharacter(charName){
     }
     await Promise.all(Object.entries(anims).map(async ([name, file]) => {
       if(name==='idle' || !file) return;
+      const clipUrl = resolveGlbUrl(file);
+      if (isRetiredAssetUrl(clipUrl)) return;
       try{
-        const g = await loader.loadAsync(resolveGlbUrl(file));
+        const g = await loader.loadAsync(clipUrl);
         if(g.animations[0]) clips[name] = mixer.clipAction(g.animations[0]);
       }catch(e){ console.warn('clip fail', name, e); }
     }));

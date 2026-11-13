@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eternal Rivals — The Dome 3D Stage</title>
+  <style>
+    :root {
+      --bg-hud: rgba(12, 14, 20, 0.78);
+      --border-hud: rgba(255, 255, 255, 0.14);
+      --accent: #f59e0b;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0f19;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      user-select: none;
+    }
+    #stage-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Top Booth Bar */
+    .hud-top {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-pill {
+      pointer-events: auto;
+      background: var(--bg-hud);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-hud);
+      border-radius: 999px;
+      padding: 6px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      max-width: 100%;
+      font-size: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .ai-badge {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+    }
+    .hud-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid var(--border-hud);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .hud-btn:hover { background: rgba(255, 255, 255, 0.16); }
+    .hud-btn.active {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: var(--accent);
+      color: #fde68a;
+    }
+    .hud-btn.danger {
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+    .hud-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    /* World-space 3D Speech Bubbles & Nameplates */
+    #overlay-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 5;
+    }
+    .char-anchor {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+    .speech-bubble {
+      max-width: 240px;
+      background: rgba(15, 23, 42, 0.92);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      padding: 7px 11px;
+      font-size: 12.5px;
+      line-height: 1.35;
+      text-align: center;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transform: translateY(6px) scale(0.95);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none;
+    }
+    .speech-bubble.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .char-label {
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #e5e7eb;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .char-state-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    /* Bottom HUD + Tripo Credit */
+    .hud-bottom {
+      position: fixed;
+      bottom: 12px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .tripo-credit {
+      pointer-events: auto;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg-hud);
+      border: 1px solid var(--border-hud);
+      padding: 4px 10px;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+    }
+  </style>
+
+  <!-- Pinned three@0.160.0 importmap per repo standard -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="stage-canvas"></canvas>
+  <div id="overlay-layer"></div>
+
+  <!-- Top Booth Controls -->
+  <div class="hud-top">
+    <div class="hud-pill">
+      <span class="ai-badge">AI CHARACTERS</span>
+      <button id="btn-break-char" class="hud-btn danger">Break Character</button>
+      <span id="hud-clock-label">☀️ Day (12:00)</span>
+      <input id="hud-time-slider" type="range" min="0" max="24" step="0.1" value="10.5" style="width:80px; accent-color:#f59e0b; cursor:pointer;" title="Scrub Sun Clock" />
+      <button id="btn-auto-sun" class="hud-btn active" title="Toggle automatic day/night cycle">Auto Cycle</button>
+    </div>
+
+    <div class="hud-pill">
+      <button id="btn-cam-reset" class="hud-btn">Reset Cam</button>
+      <button id="btn-demo-walk" class="hud-btn">Test Walk</button>
+      <button id="btn-demo-idle" class="hud-btn">Hold / Idle</button>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="hud-bottom">
+    <div class="hud-pill" id="hud-status">Stage ready · waiting for character...</div>
+    <div class="tripo-credit">3D powered by Tripo</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+    // Optional existing repo CharacterController import
+    let ExternalCharacterController = null;
+    try {
+      const mod = await import('/static/js/rivals/character_controller.js');
+      ExternalCharacterController = mod.CharacterController || mod.default || null;
+    } catch (_) { }
+
+    // =========================================================================
+    // 1. SCENE, CAMERA, RENDERER
+    // =========================================================================
+    const canvas = document.getElementById('stage-canvas');
+    const overlayLayer = document.getElementById('overlay-layer');
+    const statusEl = document.getElementById('hud-status');
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x87b5d6, 0.014);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 250);
+    camera.position.set(0, 4.2, 9.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.1, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 2.2;
+    controls.maxDistance = 28;
+    controls.update();
+
+    const gltfLoader = new GLTFLoader();
+
+    // =========================================================================
+    // 2. PROCEDURAL GRASS GROUND, TREES & OPTIONAL STAGE GLB
+    // =========================================================================
+    function createGrassTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#3f6e36';
+      ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 6000; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+        ctx.fillStyle = Math.random() > 0.5 ? '#497d3e' : '#355e2d';
+        ctx.fillRect(x, y, 2, 4);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(28, 28);
+      return tex;
+    }
+
+    const groundGeo = new THREE.CircleGeometry(45, 64);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: createGrassTexture(),
+      roughness: 0.92,
+      metalness: 0.02
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const ringGeo = new THREE.RingGeometry(5.8, 6.05, 48);
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x8b8578, roughness: 0.9, side: THREE.DoubleSide });
+    const arenaRing = new THREE.Mesh(ringGeo, ringMat);
+    arenaRing.rotation.x = -Math.PI / 2;
+    arenaRing.position.y = 0.01;
+    arenaRing.receiveShadow = true;
+    scene.add(arenaRing);
+
+    const trees = [];
+    function createTree(x, z, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+      group.scale.setScalar(scale);
+
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 1.6, 7), trunkMat);
+      trunk.position.y = 0.8;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      group.add(trunk);
+
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.8, flatShading: true });
+      const levels = [
+        { r: 1.25, h: 1.7, y: 2.0 },
+        { r: 0.98, h: 1.5, y: 2.9 },
+        { r: 0.65, h: 1.2, y: 3.7 }
+      ];
+      levels.forEach((lvl) => {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(lvl.r, lvl.h, 7), foliageMat);
+        cone.position.y = lvl.y;
+        cone.castShadow = true;
+        cone.receiveShadow = true;
+        group.add(cone);
+      });
+      scene.add(group);
+      trees.push({ group, phase: Math.random() * Math.PI * 2 });
+    }
+
+    [[-5.5, -4.8, 1.1], [6.2, -5.0, 0.95], [-7.4, 3.2, 1.25], [7.0, 4.5, 0.85], [0.8, -7.8, 1.15]].forEach(([x, z, s]) => createTree(x, z, s));
+
+    // =========================================================================
+    // 3. DAY / NIGHT SUN CLOCK & SKY SYSTEM
+    // =========================================================================
+    const hemiLight = new THREE.HemisphereLight(0x9be2ff, 0x3b5e2b, 0.65);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff4d6, 1.65);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 65;
+    const d = 14;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    const sunOrb = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 24), new THREE.MeshBasicMaterial({ color: 0xffdd77 }));
+    scene.add(sunOrb);
+
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 300;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 0.85 + 0.15);
+      const r = 85;
+      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      starPos[i * 3 + 1] = r * Math.cos(phi);
+      starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.45, transparent: true, opacity: 0 });
+    const stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
+
+    const worldState = {
+      clockHours: 10.5,
+      autoCycle: true,
+      cycleSpeedHoursPerSec: 0.25,
+      time_of_day: 'day',
+      events: []
+    };
+
+    const clockLabel = document.getElementById('hud-clock-label');
+    const timeSlider = document.getElementById('hud-time-slider');
+    const btnAutoSun = document.getElementById('btn-auto-sun');
+    const btnBreakChar = document.getElementById('btn-break-char');
+
+    timeSlider.addEventListener('input', (e) => {
+      worldState.clockHours = parseFloat(e.target.value);
+      updateSunClock(0);
+    });
+    btnAutoSun.addEventListener('click', () => {
+      worldState.autoCycle = !worldState.autoCycle;
+      btnAutoSun.classList.toggle('active', worldState.autoCycle);
+    });
+    btnBreakChar.addEventListener('click', () => {
+      board.aiPaused = !board.aiPaused;
+      btnBreakChar.classList.toggle('active', board.aiPaused);
+      btnBreakChar.textContent = board.aiPaused ? 'Resume Character' : 'Break Character';
+      window.dispatchEvent(new CustomEvent('rivals:break-character', { detail: { paused: board.aiPaused } }));
+    });
+
+    const cSkyDay = new THREE.Color(0x7ec0ee), cSkyDusk = new THREE.Color(0xd96b43), cSkyNight = new THREE.Color(0x0b1021);
+    const cSunDay = new THREE.Color(0xfff5db), cSunDusk = new THREE.Color(0xff7b39), cSunNight = new THREE.Color(0x3b5998);
+
+    function updateSunClock(dt) {
+      if (worldState.autoCycle && dt > 0) {
+        worldState.clockHours = (worldState.clockHours + dt * worldState.cycleSpeedHoursPerSec) % 24;
+        timeSlider.value = worldState.clockHours.toFixed(1);
+      }
+      const h = worldState.clockHours;
+      const angle = ((h - 6) / 24) * Math.PI * 2;
+      const orbitRadius = 36;
+      const sunY = Math.sin(angle) * orbitRadius;
+      const sunX = Math.cos(angle) * orbitRadius;
+      const sunZ = -14;
+
+      sunOrb.position.set(sunX, sunY, sunZ);
+      sunLight.position.set(sunX, Math.max(sunY, 3.5), sunZ);
+
+      const elev = Math.sin(angle);
+      let skyColor = new THREE.Color();
+      let sunColor = new THREE.Color();
+
+      if (elev > 0.25) {
+        worldState.time_of_day = 'day';
+        const t = Math.min(1, (elev - 0.25) / 0.75);
+        skyColor.lerpColors(cSkyDusk, cSkyDay, t);
+        sunColor.lerpColors(cSunDusk, cSunDay, t);
+        sunLight.intensity = 1.1 + 0.65 * t;
+        hemiLight.intensity = 0.5 + 0.25 * t;
+        starMat.opacity = 0;
+      } else if (elev > -0.15) {
+        worldState.time_of_day = h < 12 ? 'dawn' : 'dusk';
+        const t = (elev + 0.15) / 0.4;
+        skyColor.lerpColors(cSkyNight, cSkyDusk, t);
+        sunColor.lerpColors(cSunNight, cSunDusk, t);
+        sunLight.intensity = 0.35 + 0.75 * t;
+        hemiLight.intensity = 0.25 + 0.25 * t;
+        starMat.opacity = 1 - t;
+      } else {
+        worldState.time_of_day = 'night';
+        skyColor.copy(cSkyNight);
+        sunColor.copy(cSunNight);
+        sunLight.intensity = 0.32;
+        hemiLight.intensity = 0.22;
+        starMat.opacity = 0.85;
+      }
+      renderer.setClearColor(skyColor);
+      scene.fog.color.copy(skyColor);
+      sunLight.color.copy(sunColor);
+      sunOrb.material.color.copy(sunColor);
+      sunOrb.visible = elev > -0.08;
+
+      const hh = Math.floor(h).toString().padStart(2, '0');
+      const mm = Math.floor((h % 1) * 60).toString().padStart(2, '0');
+      const icon = worldState.time_of_day === 'night' ? '🌙' : (worldState.time_of_day === 'day' ? '☀️' : '🌅');
+      clockLabel.textContent = `${icon} ${worldState.time_of_day.toUpperCase()} (${hh}:${mm})`;
+    }
+    updateSunClock(0);
+
+    // =========================================================================
+    // 4. BUILT-IN FALLBACK CONTROLLER
+    // =========================================================================
+    class BuiltInStageController {
+      constructor({ id, name, root, animations = [], spawn = [0, 0] }) {
+        this.id = id;
+        this.name = name || id;
+        this.root = root;
+        this.mixer = new THREE.AnimationMixer(root);
+        this.clips = {};
+        this.activeAction = null;
+        this.state = 'idle';
+        this.health = 100;
+        this.moveTarget = null;
+        this.moveSpeed = 1.9;
+        this.proceduralPhase = 0;
+
+        this.root.position.set(spawn[0] || 0, 0, spawn[1] || 0);
+        this._fitAndPlantFeet();
+        this.attachAnimationSet(animations);
+        this._playClipOrFallback('idle');
+      }
+
+      _fitAndPlantFeet() {
+        this.root.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(this.root);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        if (size.y > 0.01 && (size.y < 1.0 || size.y > 3.2)) {
+          const scale = 1.8 / size.y;
+          this.root.scale.multiplyScalar(scale);
+          this.root.updateMatrixWorld(true);
+        }
+        const scaledBox = new THREE.Box3().setFromObject(this.root);
+        this.root.position.y -= scaledBox.min.y;
+        this.height = Math.max(1.5, scaledBox.max.y - scaledBox.min.y);
+      }
+
+      attachAnimationSet(animations = []) {
+        animations.forEach((clip) => {
+          const lower = clip.name.toLowerCase();
+          this.clips[lower] = clip;
+          if (lower.includes('idle') || lower.includes('stand')) this.clips.idle = clip;
+          if (lower.includes('walk') || lower.includes('run') || lower.includes('move')) this.clips.walk = clip;
+          if (lower.includes('attack') || lower.includes('punch') || lower.includes('slash')) this.clips.attack_light = clip;
+        });
+        if (!this.clips.idle && animations[0]) this.clips.idle = animations[0];
+        if (!this.clips.walk && animations[1]) this.clips.walk = animations[1];
+      }
+
+      _playClipOrFallback(kind) {
+        const clip = this.clips[kind] || (kind === 'walk' ? this.clips.idle : null);
+        if (!clip) return;
+        const next = this.mixer.clipAction(clip);
+        if (this.activeAction !== next) {
+          if (this.activeAction) this.activeAction.fadeOut(0.2);
+          next.reset().fadeIn(0.2).play();
+          this.activeAction = next;
+        }
+      }
+
+      command(action, params = {}) {
+        const act = (action || 'idle').toLowerCase();
+        if (act === 'walk' || act === 'move' || act === 'run') {
+          const tgt = params.target || params;
+          if (tgt && typeof tgt.x === 'number' && typeof tgt.z === 'number') {
+            this.moveTarget = new THREE.Vector3(THREE.MathUtils.clamp(tgt.x, -12, 12), 0, THREE.MathUtils.clamp(tgt.z, -12, 12));
+          } else {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 1.5 + Math.random() * 3.0;
+            this.moveTarget = new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+          }
+          this.state = 'walk';
+          this._playClipOrFallback('walk');
+          return;
+        }
+
+        if (act === 'turn' && params.target) {
+          this.root.lookAt(params.target.x ?? 0, this.root.position.y, params.target.z ?? 0);
+          return;
+        }
+
+        if (act === 'idle' || act === 'stop') {
+          this.moveTarget = null;
+          this.state = 'idle';
+          this._playClipOrFallback('idle');
+          return;
+        }
+
+        this.state = act;
+        this.moveTarget = null;
+        this._playClipOrFallback(act);
+        setTimeout(() => { if (this.state === act) this.command('idle'); }, 1100);
+      }
+
+      getState() {
+        return {
+          id: this.id,
+          name: this.name,
+          pos: [Number(this.root.position.x.toFixed(2)), Number(this.root.position.z.toFixed(2))],
+          health: this.health,
+          state: this.state
+        };
+      }
+
+      update(dt) {
+        this.mixer.update(dt);
+        if (this.state === 'walk' && this.moveTarget) {
+          const pos = this.root.position;
+          const dx = this.moveTarget.x - pos.x;
+          const dz = this.moveTarget.z - pos.z;
+          const dist = Math.hypot(dx, dz);
+
+          if (dist < 0.12) {
+            this.command('idle');
+          } else {
+            const step = Math.min(dist, this.moveSpeed * dt);
+            pos.x += (dx / dist) * step;
+            pos.z += (dz / dist) * step;
+            const targetYaw = Math.atan2(dx, dz);
+            this.root.rotation.y = targetYaw;
+
+            if (!this.clips.walk) {
+              this.proceduralPhase += dt * 11;
+              pos.y = Math.abs(Math.sin(this.proceduralPhase)) * 0.08;
+            }
+          }
+        } else {
+          this.root.position.y = THREE.MathUtils.lerp(this.root.position.y, 0, dt * 10);
+        }
+      }
+    }
+
+    // =========================================================================
+    // 5. BOARD CONTRACT (`window.board`)
+    // =========================================================================
+    const characters = new Map();
+    const chatRingBuffer = [];
+
+    function createCharacterOverlay(id, name) {
+      const anchor = document.createElement('div');
+      anchor.className = 'char-anchor';
+      anchor.innerHTML = `
+        <div class="speech-bubble" id="bubble-${id}"></div>
+        <div class="char-label">
+          <span class="char-state-dot" id="dot-${id}"></span>
+          <span class="char-name-span"></span>
+        </div>
+      `;
+      anchor.querySelector('.char-name-span').textContent = name;
+      overlayLayer.appendChild(anchor);
+      return { anchor, bubble: anchor.querySelector('.speech-bubble'), dot: anchor.querySelector('.char-state-dot'), bubbleTimer: null };
+    }
+
+    function createProceduralMannequin() {
+      const group = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.45, metalness: 0.2 });
+      const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.7, 8, 16), bodyMat);
+      torso.position.y = 0.95;
+      torso.castShadow = true;
+      group.add(torso);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.4 }));
+      head.position.y = 1.62;
+      head.castShadow = true;
+      group.add(head);
+      return group;
+    }
+
+    const board = {
+      aiPaused: false,
+
+      async addCharacter({ id = 'c1', name = 'Rival', riggedUrl, animatedUrls = [], spawn = [0, 0] } = {}) {
+        statusEl.textContent = `Loading ${name}...`;
+
+        let gltf = null;
+        let animGltfs = [];
+
+        if (riggedUrl) {
+          try {
+            gltf = await gltfLoader.loadAsync(riggedUrl);
+          } catch (err) {
+            console.warn(`[board.addCharacter] Failed to load rigged GLB (${riggedUrl}):`, err);
+          }
+        }
+        for (const aUrl of animatedUrls) {
+          if (aUrl) {
+            try {
+              animGltfs.push(await gltfLoader.loadAsync(aUrl));
+            } catch (err) {
+              console.warn(`[board.addCharacter] Failed to load anim GLB (${aUrl}):`, err);
+            }
+          }
+        }
+
+        if (!gltf) {
+          gltf = { scene: createProceduralMannequin(), animations: [] };
+        }
+
+        gltf.scene.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+
+        let controller;
+        let rootMesh;
+
+        if (ExternalCharacterController) {
+          try {
+            controller = new ExternalCharacterController({ id, parent: scene, config: {} });
+            controller.attachGltf(gltf, { x: spawn[0], z: spawn[1] });
+            for (const ag of animGltfs) {
+              if (typeof controller.attachMotionGltf === 'function') {
+                controller.attachMotionGltf(ag);
+              }
+            }
+            rootMesh = controller.root;
+          } catch (err) {
+            console.warn("External controller failed, falling back to built-in:", err);
+            controller = null;
+          }
+        }
+
+        if (!controller) {
+          rootMesh = typeof SkeletonUtils !== 'undefined' && gltf.scene.clone ? SkeletonUtils.clone(gltf.scene) : gltf.scene;
+          scene.add(rootMesh);
+          let clips = [...(gltf.animations || [])];
+          animGltfs.forEach(ag => clips.push(...(ag.animations || [])));
+          controller = new BuiltInStageController({ id, name, root: rootMesh, animations: clips, spawn });
+        }
+
+        if (characters.has(id)) {
+          const prev = characters.get(id);
+          if (prev.root && prev.root.parent) prev.root.parent.remove(prev.root);
+          prev.ui.anchor.remove();
+        }
+
+        const ui = createCharacterOverlay(id, name);
+        characters.set(id, { id, name, controller, root: rootMesh, ui });
+
+        statusEl.textContent = `Active on stage: ${Array.from(characters.values()).map((c) => c.name).join(', ')}`;
+        return controller;
+      },
+
+      getSnapshot(id) {
+        const entry = characters.get(id);
+        if (!entry) return null;
+
+        const parseState = (c, idStr, root) => {
+          const s = c.getState ? c.getState() : {};
+          let pos = [0, 0];
+          if (s.position) {
+            pos = [Number(s.position.x.toFixed(2)), Number(s.position.z.toFixed(2))];
+          } else if (s.pos) {
+            pos = s.pos;
+          } else if (root) {
+            pos = [Number(root.position.x.toFixed(2)), Number(root.position.z.toFixed(2))];
+          }
+          return {
+            id: s.id || idStr,
+            pos,
+            health: s.health ?? 100,
+            state: s.state || 'idle'
+          };
+        };
+
+        const selfState = parseState(entry.controller, entry.id, entry.root);
+        const others = [];
+
+        for (const [otherId, otherEntry] of characters.entries()) {
+          if (otherId === entry.id) continue;
+          const st = parseState(otherEntry.controller, otherId, otherEntry.root);
+          const dx = st.pos[0] - selfState.pos[0];
+          const dz = st.pos[1] - selfState.pos[1];
+          others.push({
+            id: otherId,
+            name: otherEntry.name,
+            pos: st.pos,
+            distance: Number(Math.hypot(dx, dz).toFixed(2)),
+            state: st.state,
+            health: st.health
+          });
+        }
+
+        return {
+          self: { id: entry.id, pos: selfState.pos, health: selfState.health, state: selfState.state },
+          others,
+          world: { time_of_day: worldState.time_of_day, events: [...worldState.events] },
+          chat: [...chatRingBuffer]
+        };
+      },
+
+      apply(id, action = 'idle', params = {}) {
+        const entry = characters.get(id);
+        if (!entry) return false;
+        
+        let act = action.toLowerCase();
+        if ((act === 'walk' || act === 'run') && params.target) act = 'move';
+
+        if (typeof entry.controller.command === 'function') {
+          entry.controller.command(act, params);
+          return true;
+        }
+        return false;
+      },
+
+      say(id, text) {
+        if (!text || !text.trim()) return false;
+        const entry = characters.get(id);
+        if (!entry) return false;
+
+        const clean = text.trim();
+        chatRingBuffer.push(`${entry.name}: ${clean}`);
+        if (chatRingBuffer.length > 8) chatRingBuffer.shift();
+
+        if (entry.ui) {
+          entry.ui.bubble.textContent = clean;
+          entry.ui.bubble.classList.add('visible');
+          clearTimeout(entry.ui.bubbleTimer);
+          entry.ui.bubbleTimer = setTimeout(() => {
+            entry.ui.bubble.classList.remove('visible');
+          }, 5500);
+        }
+        window.dispatchEvent(new CustomEvent('rivals:board-say', { detail: { id, character_id: id, name: entry.name, board: 'middle', text: clean } }));
+        return true;
+      },
+
+      pushWorldEvent(eventText) {
+        if (!eventText) return;
+        worldState.events.push(eventText);
+        if (worldState.events.length > 5) worldState.events.shift();
+      },
+      characters
+    };
+    window.board = board;
+
+    // =========================================================================
+    // 6. MAIN ANIMATION LOOP (Started before character load)
+    // =========================================================================
+    const clock = new THREE.Clock();
+    const projVec = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.elapsedTime;
+
+      updateSunClock(dt);
+
+      for (const t of trees) {
+        t.group.rotation.z = Math.sin(elapsed * 1.4 + t.phase) * 0.018;
+      }
+
+      for (const entry of characters.values()) {
+        if (typeof entry.controller.update === 'function') {
+          entry.controller.update(dt, camera);
+        }
+        if (entry.root) {
+          const headHeight = entry.controller.height ? entry.controller.height + 0.25 : 2.05;
+          projVec.copy(entry.root.position);
+          projVec.y += headHeight;
+          projVec.project(camera);
+
+          if (projVec.z > 1) {
+            entry.ui.anchor.style.opacity = '0';
+          } else {
+            const x = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(projVec.y * 0.5) + 0.5) * window.innerHeight;
+            entry.ui.anchor.style.opacity = '1';
+            entry.ui.anchor.style.left = `${x}px`;
+            entry.ui.anchor.style.top = `${y}px`;
+          }
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    
+    animate();
+
+    // =========================================================================
+    // 7. URL PARAMS BOOTSTRAP & DEMO UI
+    // =========================================================================
+    const params = new URLSearchParams(window.location.search);
+    const glb1 = params.get('glb') || params.get('char');
+    const glb2 = params.get('glb2');
+    const stageGlb = params.get('stage');
+
+    if (stageGlb) {
+      gltfLoader.load(stageGlb, (gltf) => {
+        gltf.scene.traverse((n) => {
+          if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }
+        });
+        scene.add(gltf.scene);
+      }, undefined, (err) => console.warn('[Stage GLB] Optional stage load skipped:', err));
+    }
+
+    if (glb1) {
+      const anim1 = params.get('anim1');
+      await board.addCharacter({
+        id: 'c1',
+        name: params.get('name1') || 'Rival Alpha',
+        riggedUrl: glb1,
+        animatedUrls: anim1 ? [anim1] : [],
+        spawn: glb2 ? [-1.8, 0] : [0, 0]
+      });
+    } else {
+      await board.addCharacter({ id: 'c1', name: 'Procedural Alpha', spawn: glb2 ? [-1.8, 0] : [0, 0] });
+    }
+
+    if (glb2) {
+      const anim2 = params.get('anim2');
+      await board.addCharacter({
+        id: 'c2',
+        name: params.get('name2') || 'Rival Beta',
+        riggedUrl: glb2,
+        animatedUrls: anim2 ? [anim2] : [],
+        spawn: [1.8, 0]
+      });
+    }
+
+    document.getElementById('btn-cam-reset').addEventListener('click', () => {
+      camera.position.set(0, 4.2, 9.5);
+      controls.target.set(0, 1.1, 0);
+      controls.update();
+    });
+    document.getElementById('btn-demo-walk').addEventListener('click', () => {
+      for (const id of characters.keys()) {
+        board.apply(id, 'walk', { target: { x: (Math.random() - 0.5) * 7, z: (Math.random() - 0.5) * 7 } });
+      }
+    });
+    document.getElementById('btn-demo-idle').addEventListener('click', () => {
+      for (const id of characters.keys()) { board.apply(id, 'idle'); }
+    });
+
+    // Off unless asked. A missing Gemini key only logs; the brain route returns disabled
+    // before any model call. Roster characters are added only when this flag is set.
+    if (params.get('agents') === '1') {
+      try {
+        const loop = await import('/static/js/rivals/board_agent_loop.js');
+        const roster = await loop.loadRoster();
+        const withAgents = (roster.characters || []).filter((c) => c.hasAgent);
+        let ids = Array.from(characters.keys());
+        if (withAgents.length) {
+          ids = await loop.spawnRoster(board, withAgents);
+        }
+        window.rivalsAgentLoop = loop.startAgentLoop(board, ids, {
+          onLog: (msg) => console.info('[board]', msg),
+        });
+      } catch (err) {
+        console.warn('[board] agent loop did not start:', err);
+      }
+    }
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

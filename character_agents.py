@@ -17,8 +17,10 @@ Access model (read carefully):
     here — the page shows only the user's own roster, but a crafted character_id within the
     valid charset will still save under that user's own namespace. Roster-membership enforcement
     is a future tightening (see HANDOFFS/2026-11-12_RIVALS_SYSTEM_DESIGN.md).
-  - Storage is data/agent_personas/<user_id>/<char_id>.json — gitignored, NOT web-served, and
-    EPHEMERAL on Render (wiped on each deploy). Durable storage (Supabase) is a follow-up.
+  - Storage is the rivals_personas table (migrations/20261113_rivals_storage.sql), written with
+    SUPABASE_SERVICE_ROLE_KEY. Disk files under data/agent_personas/ are not used.
+  - This module never reads rivals_journals. A think snapshot that carries a journal key is stripped
+    before it reaches the brain.
 
 Routes (registered via init_app):
   GET  /studios/3d/agent-setup?character=<char_id>   → setup form (or character picker)
@@ -33,7 +35,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,13 +49,18 @@ except Exception:  # pragma: no cover
 bp = Blueprint("character_agents", __name__)
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent / "static" / "data" / "agent_persona_template.json"
-# User persona content is private → non-served, gitignored dir.
-_STORE_ROOT = Path(os.environ.get("AGENT_PERSONA_DIR") or (Path(__file__).resolve().parent / "data" / "agent_personas"))
 
 # Only these user fields are accepted; everything else is ignored (no injection via extra keys).
 _ALLOWED_FIELDS = ("display_name", "identity", "speech_style", "wants", "demeanor")
 _MAX_FIELD_LEN = 4000
 _CHAR_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_WORLD_ID = (os.environ.get("RIVALS_WORLD_ID") or "eternal-rivals").strip() or "eternal-rivals"
+_JOURNAL_KEYS = ("journal", "journals", "private_journal")
+_sb_client = None
+
+
+class PersonaStoreError(RuntimeError):
+    """Supabase persona storage is missing or refused the call. Never fall back to disk."""
 
 
 # --- template ---------------------------------------------------------------
@@ -98,25 +104,71 @@ def _valid_char_id(char_id: str) -> bool:
     return bool(_CHAR_ID_RE.match(char_id or ""))
 
 
-def _safe_segment(s: str) -> str:
-    return "".join(c for c in str(s or "") if c.isalnum() or c in "-_") or "anon"
+def _supabase():
+    """Service-role client. The app-wide client uses the anon key and cannot pass RLS."""
+    global _sb_client
+    if _sb_client is not None:
+        return _sb_client
+    url = (os.environ.get("SUPABASE_URL") or "").strip()
+    key = (os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not key:
+        raise PersonaStoreError("persona storage unavailable")
+    from supabase import create_client
+    _sb_client = create_client(url, key)
+    return _sb_client
 
 
-def _store_path(user_id: str, char_id: str) -> Path:
-    return _STORE_ROOT / _safe_segment(user_id) / f"{char_id}.json"
+def _row_to_record(row: Dict[str, Any]) -> Dict[str, Any]:
+    fields = row.get("fields") or {}
+    if isinstance(fields, str):
+        try:
+            fields = json.loads(fields)
+        except Exception:
+            fields = {}
+    return {
+        "character_id": row.get("character_id"),
+        "user_id": row.get("user_id"),
+        "world_id": row.get("world_id") or _WORLD_ID,
+        "fields": fields,
+        "system_prompt": row.get("system_prompt") or "",
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def strip_journals(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop journal keys before a snapshot is handed to an agent."""
+    if not isinstance(snapshot, dict):
+        return {}
+    out = {k: v for k, v in snapshot.items() if k not in _JOURNAL_KEYS}
+    world = out.get("world")
+    if isinstance(world, dict):
+        out["world"] = {k: v for k, v in world.items() if k not in _JOURNAL_KEYS}
+    return out
 
 
 # --- store ------------------------------------------------------------------
 def get_persona(user_id: str, char_id: str) -> Optional[Dict[str, Any]]:
-    if not _valid_char_id(char_id):
-        return None
-    p = _store_path(user_id, char_id)
-    if not p.exists():
+    if not _valid_char_id(char_id) or not user_id:
         return None
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+        res = (
+            _supabase()
+            .table("rivals_personas")
+            .select("world_id,user_id,character_id,fields,system_prompt,updated_at")
+            .eq("world_id", _WORLD_ID)
+            .eq("user_id", str(user_id))
+            .eq("character_id", char_id)
+            .limit(1)
+            .execute()
+        )
+    except PersonaStoreError:
+        raise
+    except Exception as exc:
+        raise PersonaStoreError("persona storage unavailable") from exc
+    rows = res.data or []
+    if not rows:
         return None
+    return _row_to_record(rows[0])
 
 
 def save_persona(user_id: str, char_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
@@ -127,17 +179,26 @@ def save_persona(user_id: str, char_id: str, fields: Dict[str, Any]) -> Dict[str
         v = fields.get(k, defaults.get(k, ""))
         clean[k] = str(v or "").strip()
     record = {
+        "world_id": _WORLD_ID,
         "character_id": char_id,
-        "user_id": _safe_segment(user_id),
+        "user_id": str(user_id),
         "fields": clean,
         "system_prompt": assemble_prompt(clean, tmpl),
-        "updated_at": int(time.time()),
     }
-    dest = _store_path(user_id, char_id)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-    tmp.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, dest)  # atomic — never a half-written persona
+    try:
+        res = (
+            _supabase()
+            .table("rivals_personas")
+            .upsert(record, on_conflict="world_id,user_id,character_id")
+            .execute()
+        )
+    except PersonaStoreError:
+        raise
+    except Exception as exc:
+        raise PersonaStoreError("persona storage unavailable") from exc
+    rows = res.data or []
+    if rows:
+        return _row_to_record(rows[0])
     return record
 
 
@@ -206,7 +267,12 @@ def agent_setup_page():
         return _render("agent_setup.html", needs_login=False, template=tmpl,
                        picker=True, characters=roster)
 
-    existing = get_persona(uid, char_id)
+    try:
+        existing = get_persona(uid, char_id)
+    except PersonaStoreError:
+        return _render("agent_setup.html", needs_login=False, template=tmpl, picker=False,
+                       character_id=char_id, character=match, characters=roster, existing=None,
+                       storage_error="Persona storage is not available yet.")
     return _render("agent_setup.html", needs_login=False, template=tmpl, picker=False,
                    character_id=char_id, character=match, characters=roster, existing=existing)
 
@@ -223,7 +289,10 @@ def api_get_persona(char_id: str):
         return err
     if not _valid_char_id(char_id):
         return jsonify({"error": "invalid character id"}), 400
-    rec = get_persona(uid, char_id)
+    try:
+        rec = get_persona(uid, char_id)
+    except PersonaStoreError:
+        return jsonify({"error": "persona storage unavailable"}), 503
     if not rec:
         return jsonify({"exists": False, "character_id": char_id}), 404
     return jsonify({"exists": True, **rec})
@@ -252,7 +321,10 @@ def api_save_persona():
     if missing:
         return jsonify({"error": "required fields missing", "missing": missing}), 400
 
-    rec = save_persona(uid, char_id, fields)
+    try:
+        rec = save_persona(uid, char_id, fields)
+    except PersonaStoreError:
+        return jsonify({"error": "persona storage unavailable"}), 503
     return jsonify({"ok": True, **rec})
 
 
@@ -269,12 +341,16 @@ def api_agent_think():
     char_id = (data.get("character_id") or data.get("character") or "").strip()
     if not _valid_char_id(char_id):
         return jsonify({"error": "invalid character id"}), 400
-    system_prompt = build_character_instructions(uid, char_id)
+    try:
+        system_prompt = build_character_instructions(uid, char_id)
+    except PersonaStoreError:
+        return jsonify({"error": "persona storage unavailable"}), 503
     if not system_prompt:
         return jsonify({"error": "no agent set up for this character", "character_id": char_id}), 404
     snapshot = data.get("world_state") if isinstance(data.get("world_state"), dict) else {}
     if not snapshot and isinstance(data.get("snapshot"), dict):
         snapshot = data["snapshot"]
+    snapshot = strip_journals(snapshot)
     try:
         import character_brain
     except Exception as e:
@@ -306,8 +382,4 @@ def init_app(app) -> None:
     """Register the character-agents blueprint (idempotent)."""
     if "character_agents" in app.blueprints:
         return
-    try:
-        _STORE_ROOT.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
     app.register_blueprint(bp)

@@ -103,6 +103,7 @@
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
   import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+  import { isRetiredAssetUrl } from '/static/js/rivals/retired_assets.js';
 
   const SB = 'https://biofeygmxomcpaxqkgfe.supabase.co/storage/v1/object/public/arena-anims';
   const ACTIONS = [
@@ -201,6 +202,9 @@
   /** Load full 17-set onto one body (same character's baked clips — controller.html pattern). */
   async function loadAgent(entry, x, z, isPilot) {
     const urls = setUrls(entry.charKey);
+    if (isRetiredAssetUrl(urls.idle)) {
+      throw new Error('arena clips are on the retired Supabase project and were not re-uploaded');
+    }
     setHud(`Loading ${entry.label} · ${entry.charKey}…`);
     const idleG = await getGltf(urls.idle);
     // SkeletonUtils.clone keeps skinned mesh + bones intact (scene.clone breaks skins)
