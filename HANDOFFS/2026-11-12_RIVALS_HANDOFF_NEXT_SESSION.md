@@ -67,3 +67,29 @@ Also open: job-runner wrapper for `tripo_pipeline.build_animated_character` (it 
 - The three starting personas and the world-framing wording (permanent once used).
 - The daily cutoff time for the Mediator's event.
 - Open questions listed in design doc sections 10 and 11 (credits, phone reach across boards, whether A and B know the Mediator has powers, keeping the puppet override).
+
+## STATUS UPDATE — 2026-11-13 (latest; wins over everything above)
+**Where things are**
+- Working repo: `~/percfect-v2` → `github.com/Percfectai/v2` (PUBLIC by Nick's decision, 2026-11-13). Branch `lane/eternal-rivals-pipeline` holds all pipeline work.
+- Old repo renamed `nickpelectrical/old-version-1`: private, archived, reference only. The old local folder `~/percfectstudios` still exists; do not work there.
+- Supabase for V2: project `fyxofxprzffcdgbkdyax`. Old `biofeygmxomcpaxqkgfe` is deleted. `czeovrjzlsfdcdvlbwoq` is PerfectNDA (hands off). The Supabase MCP connector in Claude is signed in to the PerfectNDA account, so V2 table changes go through a SQL file in `migrations/` that Nick runs, unless the connector is re-signed-in.
+- Confirm on Render: V2 service `percfect-studios-v2` has `SUPABASE_URL` beginning `fyxofxprzffcdgbkdyax`.
+
+**Honest state of the build: nothing in test run 1 works end to end yet.**
+Built and unit-tested offline only: Tripo script, persona store + setup page, brain route, board loop, POV helper. Never run with live keys. Not built: storage tables, three-board world, Mediator, phones, journals/growth, daily job, research view, job-runner wrapper for Tripo, "Make 3D" button.
+
+**Blockers, in order**
+1. **Tripo API wallet is 0.** Key is valid (v2 and v3 APIs) but a test task returned error 2010 "not enough credit". Nick has 3,000 credits somewhere, probably on a different Tripo account or in the app wallet. Fix: create the key from the account whose developer console shows the credits. Free check: `GET https://openapi.tripo3d.ai/v3/account/balance`.
+2. **No Gemini key yet.** Brain returns 503 "disabled" until `GEMINI_API_KEY` is set.
+3. **Storage.** Personas save to local disk (`data/agent_personas/`), wiped on every Render deploy. Must move to Supabase before any character starts living (no-reset rule).
+4. **Gemini's patched board file is not in the repo.** Only its summary exists. Needs a path and a route; verify it imports `/static/js/rivals/character_controller.js` (it is an ES module, there is no `window.CharacterController`).
+5. **157 dead storage links** in V2 data files point at the deleted Supabase (145 `arena-anims`, 12 `previews`). No local copies of those files were found.
+
+**Next steps for whoever picks this up**
+1. Write `migrations/2026xxxx_rivals_storage.sql` for V2: personas, memory, growth, journals, phone messages, append-only turn log; every table with `world_id`, `character_id`, `user_id`. Journals must never be readable by an agent path.
+2. Switch `character_agents.py` storage from disk to those tables.
+3. Decide Tripo v2 vs v3 (key works on both; v3 is current, script is written for v2).
+4. Then section 12 build order in `2026-11-12_RIVALS_SYSTEM_DESIGN.md`.
+
+**Secrets**
+- Nick keeps keys in a local file outside this repo. Read keys from it inside a command; never print, paste or commit them. This repo is public.
