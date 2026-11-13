@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Eternal Rivals — The Dome 3D Stage</title>
+  <title>Eternal Rivals — The Dome 3D Stage (GTA Vision)</title>
   <style>
     :root {
       --bg-hud: rgba(12, 14, 20, 0.78);
@@ -253,6 +253,47 @@
     controls.update();
 
     const gltfLoader = new GLTFLoader();
+
+    // Shoulder view is rendered into this target, never the director canvas,
+    // so a vision grab cannot flash the booth or depend on preserveDrawingBuffer.
+    const VISION_W = 640;
+    const VISION_H = 360;
+    const visionTarget = new THREE.WebGLRenderTarget(VISION_W, VISION_H);
+    const visionCanvas = document.createElement('canvas');
+    visionCanvas.width = VISION_W;
+    visionCanvas.height = VISION_H;
+    const visionCtx = visionCanvas.getContext('2d');
+    const visionPixels = new Uint8Array(VISION_W * VISION_H * 4);
+
+    function mountShoulderCamera(rootMesh) {
+      const agentCam = new THREE.PerspectiveCamera(60, VISION_W / VISION_H, 0.1, 150);
+      // +z is the character's forward. Local -z is behind them.
+      // lookAt runs before parenting so the aim stays in the body's frame.
+      agentCam.position.set(0, 2.2, -3.5);
+      agentCam.lookAt(0, 1.2, 5);
+      rootMesh.add(agentCam);
+      return agentCam;
+    }
+
+    function captureShoulderView(agentCam) {
+      if (!agentCam) return '';
+      const prev = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(visionTarget);
+        renderer.render(scene, agentCam);
+        renderer.readRenderTargetPixels(visionTarget, 0, 0, VISION_W, VISION_H, visionPixels);
+      } finally {
+        renderer.setRenderTarget(prev);
+      }
+      const img = visionCtx.createImageData(VISION_W, VISION_H);
+      const row = VISION_W * 4;
+      for (let y = 0; y < VISION_H; y++) {
+        const src = (VISION_H - 1 - y) * row;
+        img.data.set(visionPixels.subarray(src, src + row), y * row);
+      }
+      visionCtx.putImageData(img, 0, 0);
+      return visionCanvas.toDataURL('image/jpeg', 0.6);
+    }
 
     // =========================================================================
     // 2. PROCEDURAL GRASS GROUND, TREES & OPTIONAL STAGE GLB
@@ -692,8 +733,9 @@
           prev.ui.anchor.remove();
         }
 
+        const agentCam = rootMesh ? mountShoulderCamera(rootMesh) : null;
         const ui = createCharacterOverlay(id, name);
-        characters.set(id, { id, name, controller, root: rootMesh, ui });
+        characters.set(id, { id, name, controller, root: rootMesh, ui, agentCam });
 
         statusEl.textContent = `Active on stage: ${Array.from(characters.values()).map((c) => c.name).join(', ')}`;
         return controller;
@@ -739,11 +781,20 @@
           });
         }
 
+        let vision_base64 = '';
+        try {
+          vision_base64 = captureShoulderView(entry.agentCam);
+        } catch (err) {
+          console.warn('[board] shoulder capture failed', err);
+          board._visionError = String(err && err.message || err);
+        }
+
         return {
           self: { id: entry.id, pos: selfState.pos, health: selfState.health, state: selfState.state },
           others,
           world: { time_of_day: worldState.time_of_day, events: [...worldState.events] },
-          chat: [...chatRingBuffer]
+          chat: [...chatRingBuffer],
+          vision_base64
         };
       },
 

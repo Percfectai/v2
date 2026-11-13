@@ -96,10 +96,27 @@ _RESPONSE_SCHEMA = {
 }
 
 
+def _vision_part(world_state: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """JPEG from the character's shoulder camera, if the board attached one."""
+    raw = (world_state or {}).get("vision_base64") if isinstance(world_state, dict) else None
+    if not isinstance(raw, str) or not raw.startswith("data:image/") or "," not in raw:
+        return None
+    header, b64 = raw.split(",", 1)
+    if not b64:
+        return None
+    mime = "image/png" if "png" in header else "image/jpeg"
+    return {"inline_data": {"mime_type": mime, "data": b64}}
+
+
 def _world_state_text(world_state: Dict[str, Any]) -> str:
-    """Flatten what the agent sees into a compact user turn."""
+    """Flatten what the agent sees into a compact user turn.
+    The shoulder JPEG is sent as an image part, never pasted into this text.
+    """
+    text_state = world_state
+    if isinstance(world_state, dict) and "vision_base64" in world_state:
+        text_state = {k: v for k, v in world_state.items() if k != "vision_base64"}
     try:
-        return "What you perceive right now, from your own eyes:\n" + json.dumps(world_state, ensure_ascii=False)[:6000]
+        return "What you perceive right now, from your own eyes:\n" + json.dumps(text_state, ensure_ascii=False)[:6000]
     except Exception:
         return "What you see right now: (unavailable)"
 
@@ -134,9 +151,13 @@ def _system_text(system_prompt: str) -> str:
 
 def _decide_gemini(system_prompt: str, world_state: Dict[str, Any], temperature: float) -> Dict[str, Any]:
     url = f"{_GEMINI_BASE}/{model_name()}:generateContent?key={_key()}"
+    parts: List[Dict[str, Any]] = [{"text": _world_state_text(world_state)}]
+    vision = _vision_part(world_state)
+    if vision:
+        parts.append(vision)
     payload = {
         "system_instruction": {"parts": [{"text": _system_text(system_prompt)}]},
-        "contents": [{"role": "user", "parts": [{"text": _world_state_text(world_state)}]}],
+        "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": _RESPONSE_SCHEMA,

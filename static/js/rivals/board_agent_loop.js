@@ -140,6 +140,10 @@ export function startAgentLoop(board, characterIds, options = {}) {
       facing: facingOf(board, id, snapshot),
       lineOfSight: typeof board.lineOfSight === 'function' ? board.lineOfSight.bind(board) : undefined,
     });
+    // Shoulder JPEG stays out of the text view until the brain splits it into an image part.
+    if (typeof snapshot.vision_base64 === 'string' && snapshot.vision_base64.startsWith('data:image/')) {
+      view.vision_base64 = snapshot.vision_base64;
+    }
 
     state.inFlight = true;
     let r;
