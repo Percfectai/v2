@@ -238,6 +238,16 @@ except Exception as _three_d_init_err:
     except Exception:
         pass
 
+# Per-character agent persona (the LLM brain for each 3D character) — /studios/3d/agent-setup + /api/3d/agent/*
+try:
+    import character_agents
+    character_agents.init_app(app)
+except Exception as _char_agents_init_err:
+    try:
+        app.logger.warning("character_agents init failed: %s", _char_agents_init_err)
+    except Exception:
+        pass
+
 _SHOP_FALLBACK = str(Path(__file__).resolve().parent / "static" / "data" / "premade_shop.json")
 
 # ── xAI ───────────────────────────────────────────────────
