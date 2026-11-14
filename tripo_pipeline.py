@@ -173,13 +173,25 @@ def _sniff_type(content: bytes) -> Tuple[str, str]:
 
 
 def upload_image(url: str) -> Dict[str, str]:
-    """Upload a site-hosted image URL to Tripo; return {file_token, type}."""
-    _check_image_url(url)
-    img = _req("GET", url, timeout=60)
-    if not img.ok:
-        raise TripoError(f"could not fetch view image {url[:80]} ({img.status_code})")
-    ftype, ctype = _sniff_type(img.content)
-    files = {"file": (f"{uuid.uuid4().hex}.{ftype}", img.content, ctype)}
+    """Upload a site-hosted image URL or local file path to Tripo; return {file_token, type}."""
+    # Check if it's a local file path (no http/https scheme)
+    p = urlparse(url or "")
+    if p.scheme in ("", "file") or (p.scheme == "" and os.path.isfile(url)):
+        # Local file path
+        if not os.path.isfile(url):
+            raise TripoError(f"local file not found: {url}")
+        with open(url, "rb") as f:
+            img_content = f.read()
+    else:
+        # URL — check and fetch
+        _check_image_url(url)
+        img = _req("GET", url, timeout=60)
+        if not img.ok:
+            raise TripoError(f"could not fetch view image {url[:80]} ({img.status_code})")
+        img_content = img.content
+
+    ftype, ctype = _sniff_type(img_content)
+    files = {"file": (f"{uuid.uuid4().hex}.{ftype}", img_content, ctype)}
     r = _req("POST", f"{TRIPO_BASE}/upload", headers=_headers(), files=files)
     if not r.ok:
         raise TripoError(f"upload failed ({r.status_code}): {r.text[:300]}")
@@ -337,6 +349,7 @@ def build_animated_character(
     rig_task_id = rig(model_task_id, out_format=out_format, rig_type=rig_type)
     rig_data = wait(rig_task_id, "animate_rig")
     result["rig_task_id"] = rig_task_id
+    log.info(f"TASK_IDS: model={result['model_task_id']} rig={rig_task_id}")
     result["rigged_url"] = _model_url(rig_data)
     if dest_dir and result["rigged_url"]:
         result["rigged_path"] = download(result["rigged_url"], dest_dir, f"{cid}_rigged")
