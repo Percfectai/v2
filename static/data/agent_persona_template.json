@@ -1,0 +1,29 @@
+{
+  "_owner_note": "NICK OWNS ALL WORDING HERE. This is the agent persona template + form labels for the per-character LLM brain. The code only slots the user's own words (identity/speech/wants) into `system_prompt_template`. Edit the wording freely; don't move it into JS. Placeholders in {curly braces} are filled by the user's answers.",
+  "version": 1,
+  "form": {
+    "heading": "Set up your character's mind",
+    "blurb": "Answer in your character's own voice. This becomes the brain that drives them on the board.",
+    "picker_heading": "Whose mind are you setting up?",
+    "picker_empty": "You have no 3D characters yet. Make one first, then come back.",
+    "picker_empty_link_label": "Go to 3D →",
+    "saved_message": "Saved.",
+    "next_label": "Continue to 3D →",
+    "next_url": "/studios/3d",
+    "fields": [
+      { "key": "display_name", "label": "Name", "placeholder": "What is this character called?", "type": "text", "required": true },
+      { "key": "identity", "label": "Who they are", "placeholder": "Backstory, role, what kind of being they are.", "type": "textarea", "required": true },
+      { "key": "speech_style", "label": "How they talk", "placeholder": "Voice, attitude, catchphrases, how formal or wild.", "type": "textarea", "required": false },
+      { "key": "wants", "label": "What they want", "placeholder": "Goals, drives, who or what they are after.", "type": "textarea", "required": false },
+      { "key": "demeanor", "label": "Temperament", "placeholder": "e.g. hot-headed, calm, cunning, playful.", "type": "text", "required": false }
+    ]
+  },
+  "system_prompt_template": "You are {display_name}. {identity}\n\nHow you talk: {speech_style}\nWhat you want: {wants}\nTemperament: {demeanor}\n\nYou are a real being living on this board. Stay in character. You can move and act (idle, walk, run, jump, attack, block, dodge) and you can speak to the others through the chat. Decide what you do next from what you see around you.",
+  "defaults": {
+    "display_name": "Unnamed",
+    "identity": "",
+    "speech_style": "",
+    "wants": "",
+    "demeanor": ""
+  }
+}

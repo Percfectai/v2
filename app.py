@@ -194,6 +194,7 @@ UNDER_CONSTRUCTION = {
     "/studios/3d/crew": "3D",
     "/studios/3d/field": "3D",
     "/studios/3d/rivals": "3D",
+    "/studios/3d/board": "3D",
     "/studios/play/3d": "3-D",
     "/play/3d": "3-D",
     "/re-up/tickets": "Hero Tickets",
@@ -235,6 +236,16 @@ try:
 except Exception as _three_d_init_err:
     try:
         app.logger.warning("three_d_character_gen init failed: %s", _three_d_init_err)
+    except Exception:
+        pass
+
+# Per-character agent persona (the LLM brain for each 3D character) — /studios/3d/agent-setup + /api/3d/agent/*
+try:
+    import character_agents
+    character_agents.init_app(app)
+except Exception as _char_agents_init_err:
+    try:
+        app.logger.warning("character_agents init failed: %s", _char_agents_init_err)
     except Exception:
         pass
 
@@ -5851,19 +5862,40 @@ def _rivals_require_admin():
     return True
 
 
-@app.route("/studios/3d/rivals")
-def rivals_3d_page():
-    """ETERNAL RIVALS — controllable fighter on 3D stage. ADMIN ONLY, not in nav."""
+def _rivals_board_filename():
+    """Prefer Gemini's three-board file when it is actually in the tree."""
+    root = os.path.join(app.root_path, "prototypes")
+    for name in ("truman-world.html", "eternal-rivals-board.html", "rivals-stage.html"):
+        if os.path.isfile(os.path.join(root, name)):
+            return name
+    return None
+
+
+def _serve_rivals_board():
     gate = _rivals_require_admin()
     if gate is None:
         return redirect(url_for("login", next=request.path))
     if gate is False:
-        # Hide existence from non-admin logged-in users
         return jsonify({"error": "Not found."}), 404
-    path = os.path.join(app.root_path, "prototypes", "rivals-stage.html")
-    if not os.path.isfile(path):
+    name = _rivals_board_filename()
+    if not name:
         abort(404)
-    return send_from_directory(os.path.join(app.root_path, "prototypes"), "rivals-stage.html")
+    return send_from_directory(os.path.join(app.root_path, "prototypes"), name)
+
+
+@app.route("/studios/3d/rivals")
+def rivals_3d_page():
+    """ETERNAL RIVALS board. ADMIN ONLY, not in nav.
+    The page owns requestAnimationFrame. board_agent_loop.js is imported only
+    with ?agents=1 and only posts think ticks. It does not run a second render loop.
+    """
+    return _serve_rivals_board()
+
+
+@app.route("/studios/3d/board")
+def eternal_rivals_board_page():
+    """Same board as /studios/3d/rivals. ADMIN ONLY, not in nav."""
+    return _serve_rivals_board()
 
 
 @app.route("/studios/3d/field")

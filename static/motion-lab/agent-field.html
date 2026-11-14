@@ -311,6 +311,7 @@
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const { CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js');
     const { CharacterController } = await import('rivals/character_controller.js');
+    const { isRetiredAssetUrl } = await import('/static/js/rivals/retired_assets.js');
 
     async function loadConfig() {
       for (const u of CONFIG_URLS) {
@@ -619,7 +620,28 @@
       const gltfCache = new Map();
       const loader = new GLTFLoader();
 
+      function proceduralGltf(tint) {
+        const group = new THREE.Group();
+        const color = new THREE.Color(tint || '#e11d48');
+        const body = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.28, 0.7, 6, 12),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.5 })
+        );
+        body.position.y = 0.95;
+        body.castShadow = true;
+        group.add(body);
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 12, 12),
+          new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.45 })
+        );
+        head.position.y = 1.62;
+        head.castShadow = true;
+        group.add(head);
+        return { scene: group, animations: [] };
+      }
+
       async function getGltf(url) {
+        if (!url || isRetiredAssetUrl(url)) return null;
         if (gltfCache.has(url)) return gltfCache.get(url);
         const gltf = await loader.loadAsync(url);
         gltfCache.set(url, gltf);
@@ -640,27 +662,36 @@
           tint: meta.tint || null,
         });
         let usedGlb = glb;
+        let gltf = null;
         try {
-          const gltf = await getGltf(glb);
-          c.attachGltf(gltf, meta.spawn || { x: 0, z: 0 });
-          bodySummary.push(`${meta.label}=ok`);
+          gltf = await getGltf(glb);
         } catch (err) {
           console.warn('load failed', meta.id, glb, err);
           gltfCache.delete(glb);
-          if (glb !== placeholder) {
-            try {
-              usedGlb = placeholder;
-              const gltf = await getGltf(placeholder);
-              c.attachGltf(gltf, meta.spawn || { x: 0, z: 0 });
-              bodySummary.push(`${meta.label}=placeholder`);
-            } catch (e2) {
-              showErr(`Failed to load body for ${meta.id}: ${e2.message || e2}`);
-              continue;
-            }
-          } else {
-            showErr(`Failed to load placeholder GLB: ${err.message || err}`);
-            continue;
+          gltf = null;
+        }
+        if (!gltf && glb !== placeholder) {
+          try {
+            usedGlb = placeholder;
+            gltf = await getGltf(placeholder);
+          } catch (err) {
+            console.warn('placeholder failed', meta.id, err);
+            gltfCache.delete(placeholder);
+            gltf = null;
           }
+        }
+        if (!gltf) {
+          usedGlb = 'procedural';
+          gltf = proceduralGltf(meta.tint);
+          bodySummary.push(`${meta.label}=procedural`);
+        } else {
+          bodySummary.push(`${meta.label}=${usedGlb === placeholder ? 'placeholder' : 'ok'}`);
+        }
+        try {
+          c.attachGltf(gltf, meta.spawn || { x: 0, z: 0 });
+        } catch (err) {
+          showErr(`Failed to attach body for ${meta.id}: ${err.message || err}`);
+          continue;
         }
         const label = makeLabel(meta);
         c.root.add(label);

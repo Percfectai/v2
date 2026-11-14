@@ -13,6 +13,7 @@ import {
   clone as skeletonClone,
   retargetClip as skeletonRetargetClip,
 } from 'three/addons/utils/SkeletonUtils.js';
+import { isRetiredAssetUrl } from './retired_assets.js';
 
 /**
  * Fuzzy bone-name map for Mixamo / Meshy / common humanoids.
@@ -359,6 +360,7 @@ export class CharacterController {
    */
   async load(url, GLTFLoader, spawn = { x: 0, z: 0 }) {
     if (!url || !GLTFLoader) throw new Error('load requires url + GLTFLoader');
+    if (isRetiredAssetUrl(url)) throw new Error('retired asset host');
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(url);
     return this.attachGltf(gltf, spawn);
@@ -560,6 +562,7 @@ export class CharacterController {
    */
   async attachMotionUrl(url, GLTFLoader) {
     if (!url || !GLTFLoader) throw new Error('attachMotionUrl needs url + GLTFLoader');
+    if (isRetiredAssetUrl(url)) throw new Error('retired asset host');
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(url);
     return this.attachMotionGltf(gltf);
@@ -584,6 +587,7 @@ export class CharacterController {
     const base = (opts.baseUrl || '').replace(/\/?$/, '/');
     const resolve = (u) => {
       if (!u) return '';
+      if (isRetiredAssetUrl(u)) return '';
       if (/^https?:\/\//i.test(u) || u.startsWith('/')) return u;
       return base + u;
     };
