@@ -41,3 +41,12 @@ Run the migration SQL in the V2 Supabase editor · create a Gemini key and set `
 
 ## Known loose ends
 157 hard-coded links in V2 data files point at the deleted Supabase (animations, shop previews); no local copies found. Gemini's `truman-world.html` never arrived. The shoulder-camera image makes each brain call cost more; watch free-tier usage.
+
+## Worker update (2026-11-14, Haiku session)
+**Tripo retarget error 1004 — all four request shapes failed:**
+- Attempt 1: `{"type":"animate_retarget","original_model_task_id":RIG_ID,"out_format":"glb","animation":"preset:idle"}` → HTTP 200, task status `failed`, error_code 1004
+- Attempt 2: same + `"bake_animation":true` → HTTP 200, task status `failed`, error_code 1004
+- Attempt 3: `{"type":"animate_retarget","original_model_task_id":RIG_ID,"out_format":"glb","animations":["preset:idle","preset:walk"]}` → HTTP 200, task status `failed`, error_code 1004
+- Attempt 4: `{"type":"animate_retarget","original_model_task_id":RIG_ID,"out_format":"glb","animation":"preset:biped:idle"}` → HTTP 200, task status `failed`, error_code 1004
+
+Rig tasks confirmed: both `010249af-a44a-4a0c-9e12-e05c34772d50` and `3d490fb9-4122-475e-aa89-c9ec558e4a5c` are animate_rig type, status success, model_version v2.5-20260210, spec "tripo". Tripo balance: 500 → 140 (360 credits spent on builds). Halting retarget tests per instructions.
