@@ -1,5 +1,29 @@
 # Percfectai/v2
 
+> ## ⚠️ WHERE EVERYTHING LIVES — READ THIS FIRST
+>
+> | | **USE THIS** | **NOT THIS (old / other)** |
+> |---|---|---|
+> | **Render** | Login **percfectai@gmail.com** → workspace **PercfectAi.com V2** (`tea-db9rs1jrjlhs73fusplg`) → service **`percfectai-v2`** (`srv-dbcilajrjlhs73dk9skg`) → https://percfectai-v2.onrender.com | `percfectstudios.onrender.com` / `srv-d8tpb5n7f7vs73fdvur0` (retired). Workspaces **perfectNDA** and **nda** on the same login are other projects. |
+> | **Supabase** | Project **`fyxofxprzffcdgbkdyax`** | `biofeygmxomcpaxqkgfe` — deleted, does not exist any more |
+> | **GitHub** | **`Percfectai/v2`**, branch `main` (Render auto-deploys every commit) | `nickpelectrical/percfectstudios` (retired) |
+> | **Stripe** | Account `acct_1TjTOiBERYAsj2fv` "PercfectAi", live mode | — |
+> | **Domain** | percfectai.com, www.percfectai.com | — |
+>
+> **ALL LIVE KEYS ARE IN RENDER**, service `percfectai-v2` → **Environment**. That is the only source of truth. Never put key values in this repo — it is public.
+>
+> | Key on Render | What it is |
+> |---|---|
+> | `XAI_API_KEYS` | **Image + video pool** (comma-separated, rotated by `xai_keys.next_key()`). The task handlers use ONLY this. Not `XAI_API_KEY`. |
+> | `XAI_API_KEY` | Single xAI key for non-image code. |
+> | `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | v2 database `fyxofx…` |
+> | `STRIPE_*` | Payments (live) |
+> | `GEMINI_API_KEY`, `GEMINI_MODEL` | Agent brain |
+> | `TRIPO_API_KEY` | 3D models |
+> | `FAL_KEY`, `GOOGLE_MAPS_API_KEY`, `SECRET_KEY`, `FLASK_SECRET_KEY`, `SITE_URL`, `STUDIO_*`, `PERCFECT_3D_PROVIDER` | Other settings |
+>
+> **xAI billing:** every xAI key on Render must come from the xAI team that holds the credits. As of 2026-11-14 all 25 image/video keys are in team `b0e02d24-99b9-4e13-9b82-2012ea30c0c4`, which is blocked (402: credits used up or monthly spending limit). If images/video fail, check that team's credits and spending limit at console.x.ai first.
+
 The original Percfect site, trimmed and live again.
 
 | | |
