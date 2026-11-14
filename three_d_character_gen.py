@@ -36,8 +36,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from flask import Blueprint, current_app, jsonify, request, session
 
-import poyo_client
-from poyo_client import PoyoError
+try:  # Poyo is not in use; keep the module loading without it.
+    import poyo_client
+    from poyo_client import PoyoError
+except ImportError:
+    poyo_client = None
+
+    class PoyoError(Exception):
+        pass
 
 bp = Blueprint("three_d_character_gen", __name__)
 

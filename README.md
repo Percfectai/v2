@@ -30,6 +30,9 @@ The original Percfect site, trimmed and live again.
 |---|---|
 | Site | https://percfectai.com and https://www.percfectai.com |
 | Render | `percfectai-v2` at https://percfectai-v2.onrender.com |
+| Render account | Login `percfectai@gmail.com` → workspace **PercfectAi.com V2** (`tea-db9rs1jrjlhs73fusplg`) → service `percfectai-v2` (`srv-dbcilajrjlhs73dk9skg`), Oregon, deploys `main` on every commit |
+| Not these | The `perfectNDA` and `nda` Render workspaces on the same login are other projects. Never put v2 keys or deploys there. |
+| Keys | All live keys are set on the `percfectai-v2` service (Dashboard → Environment). Image/video uses the `XAI_API_KEYS` pool (plural, comma-separated), not `XAI_API_KEY`. |
 | Repo | https://github.com/Percfectai/v2 |
 | Old host | `percfectstudios.onrender.com` is the previous service. Do not deploy this repo there. |
 
