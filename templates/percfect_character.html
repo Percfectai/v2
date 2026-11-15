@@ -29,6 +29,26 @@
       <label class="chars-label" for="desc">Description</label>
       <textarea class="form-control chars-prompt" id="desc" rows="5" placeholder="Face, outfit, vibe…" autocomplete="off"></textarea>
 
+      <!-- Engine / Provider Selector Options -->
+      <div class="engine-select-box" style="margin-bottom:12px; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted, #888); font-weight:700;">Generation Engine</span>
+          <span id="engine-badge" style="font-size:0.75rem; color:#7c5cfc; font-weight:600;">Gemini 2.5 Active</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="engine-pill active" id="pill-gemini" onclick="setEngineProvider('gemini')" style="flex:1; padding:7px 4px; border-radius:8px; border:1.5px solid #7c5cfc; background:#7c5cfc28; color:#fff; font-size:0.8rem; font-weight:600; cursor:pointer; transition:all .15s;">
+            Gemini 2.5
+          </button>
+          <button type="button" class="engine-pill" id="pill-xai" onclick="setEngineProvider('xai')" style="flex:1; padding:7px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#999; font-size:0.8rem; font-weight:600; cursor:pointer; transition:all .15s;">
+            Grok xAI
+          </button>
+          <button type="button" class="engine-pill" id="pill-fal" onclick="setEngineProvider('fal')" style="flex:1; padding:7px 4px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#999; font-size:0.8rem; font-weight:600; cursor:pointer; transition:all .15s;">
+            Uncensored
+          </button>
+        </div>
+        <input type="hidden" id="gen-engine-provider" name="provider" value="gemini" />
+      </div>
+
       <button class="generate-btn chars-start-btn" id="gen-btn" onclick="generateOne()">
         <span class="btn-text" id="gen-btn-label">Start building</span>
         <span class="btn-spinner" style="display:none">Building…</span>
@@ -838,6 +858,30 @@ function genCost(){
 }
 function sourceMode(){ return hasPhoto() ? 'upload' : 'describe'; }
 function descText(){ return (document.getElementById('desc')?.value || '').trim(); }
+
+function setEngineProvider(p) {
+  ['gemini', 'xai', 'fal'].forEach(name => {
+    const btn = document.getElementById('pill-' + name);
+    if (!btn) return;
+    if (name === p) {
+      btn.style.borderColor = '#7c5cfc';
+      btn.style.background = '#7c5cfc28';
+      btn.style.color = '#fff';
+    } else {
+      btn.style.borderColor = 'rgba(255,255,255,0.12)';
+      btn.style.background = 'rgba(255,255,255,0.04)';
+      btn.style.color = '#999';
+    }
+  });
+  const input = document.getElementById('gen-engine-provider');
+  if (input) input.value = p;
+  const badge = document.getElementById('engine-badge');
+  if (badge) {
+    if (p === 'gemini') badge.textContent = 'Gemini 2.5 Active';
+    else if (p === 'xai') badge.textContent = 'Grok Imagine';
+    else badge.textContent = 'Uncensored FLUX';
+  }
+}
 /** Single ref marker (legacy emoji strip still cleaned from user text). */
 const REF_PIC_MARKERS = ['1️⃣📸'];
 function refPicMarker(slot){
@@ -1513,6 +1557,8 @@ async function _generateOne(opts){
     const apiDesc = descriptionForApi(d);
     if(apiDesc) fd.append('description', apiDesc);
   }
+  const chosenProvider = document.getElementById('gen-engine-provider')?.value || 'gemini';
+  fd.append('provider', chosenProvider);
   state.mode = superAccuracy ? 'upload' : sourceMode();
   hide('gen-err'); hide('review-err'); hide('final-section');
   setBtn('gen-btn',true);

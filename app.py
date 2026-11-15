@@ -183,25 +183,12 @@ def _motion_cors_preflight():
 # Studios parked behind Under Construction (Nick, 2026-09-18). Delete a line to bring one back.
 # Admins can still open the real page with ?preview=1.
 UNDER_CONSTRUCTION = {
-    "/studios/the-dome": "THE DOME",
-    "/studios/dome": "THE DOME",
-    "/the-dome": "THE DOME",
     "/studios/percfectmotion": "Motion",
     "/studios/motion": "Motion",
-    "/3d": "3D",
-    "/studios/3d": "3D",
-    "/studios/3d-games": "3D",
-    "/studios/3d/crew": "3D",
-    "/studios/3d/field": "3D",
-    "/studios/3d/board": "3D",
-    "/studios/play/3d": "3-D",
-    "/play/3d": "3-D",
     "/re-up/tickets": "Hero Tickets",
     "/re-up/settings-hub": "Settings",
 }
-UNDER_CONSTRUCTION_PREFIXES = {
-    "/studios/play/3d/": "3-D",
-}
+UNDER_CONSTRUCTION_PREFIXES = {}
 
 
 @app.before_request
@@ -2816,6 +2803,55 @@ def _apply_split_screen_prompt(prompt: str, split_n: int) -> str:
     return tag
 
 
+def generate_image_gemini(
+    prompt: str,
+    image_url: str = None,
+    image_urls: list = None,
+    aspect_ratio: str = None,
+) -> dict:
+    """Generate image via Google Gemini 2.5 Flash Image with the exact unedited prompt."""
+    import base64
+    import urllib.request
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        raise Exception("GEMINI_API_KEY not configured on server")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={key}"
+    parts = []
+    refs = [u for u in (image_urls or ([image_url] if image_url else [])) if u]
+    for r in refs[:3]:
+        try:
+            if r.startswith("data:"):
+                hdr, b64data = r.split(",", 1)
+                mime = hdr.split(";")[0].replace("data:", "")
+                parts.append({"inline_data": {"mime_type": mime, "data": b64data}})
+            elif r.startswith("http"):
+                req = urllib.request.Request(r, headers={"User-Agent": "Percfect/1.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = resp.read()
+                    ctype = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+                    parts.append({"inline_data": {"mime_type": ctype, "data": base64.b64encode(data).decode("utf-8")}})
+        except Exception as e:
+            try:
+                app.logger.warning("Gemini ref load error: %s", e)
+            except Exception:
+                pass
+    parts.append({"text": prompt})
+    payload = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {"responseModalities": ["IMAGE"]}
+    }
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=35) as resp:
+        res = json.loads(resp.read())
+        cand = res.get("candidates", [{}])[0]
+        for p in cand.get("content", {}).get("parts", []):
+            if "inlineData" in p:
+                mime = p["inlineData"].get("mimeType", "image/png")
+                b64 = p["inlineData"]["data"]
+                return {"data": [{"url": f"data:{mime};base64,{b64}", "b64_json": b64}], "provider": "gemini"}
+    raise Exception("Gemini returned no image.")
+
+
 def generate_image_xai(
     prompt: str,
     image_url: str = None,
@@ -2825,26 +2861,23 @@ def generate_image_xai(
     api_key: str = None,
     force_aspect: bool = False,
     exact_prompt: bool = False,
+    provider: str = None,
 ) -> dict:
-    """Generate or edit via Grok Imagine (fast path first, fail fast).
+    """Generate or edit via Grok Imagine (fast path first, fail fast), with Gemini fallback."""
+    if provider == "gemini":
+        return generate_image_gemini(prompt, image_url=image_url, image_urls=image_urls, aspect_ratio=aspect_ratio)
+    if provider == "fal":
+        fal_urls = generate_image_fal(prompt, num_images=1)
+        if fal_urls:
+            return {"data": [{"url": fal_urls[0]}], "provider": "fal"}
 
-    exact_prompt: send the prompt word for word (no "preserve proportions" guard); Card Studio uses it.
-
-    api_key: optional explicit key (thread-safe for batch multi-key parallel).
-      If omitted, uses the job context / round-robin pool.
-
-    force_aspect: Characters lock 1:1. Photos send the size-chip aspect_ratio
-      on the Imagine JSON body (with or without refs). Never put the ratio in the prompt.
-
-    Speed rules:
-      - Default model ``grok-imagine-image`` only (not quality on every request).
-      - Content filter / hard errors → raise immediately (do not burn 2× timeouts).
-      - Next model only if this key clearly lacks that model id.
-    """
     from xai_keys import get_api_key, image_model_ids
-    key = (api_key or get_api_key() or "").strip()
+    try:
+        key = (api_key or get_api_key() or "").strip()
+    except Exception:
+        key = ""
     if not key:
-        raise Exception("No xAI API key available for image generation.")
+        return generate_image_gemini(prompt, image_url=image_url, image_urls=image_urls, aspect_ratio=aspect_ratio)
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
@@ -3048,10 +3081,20 @@ def generate_image_xai(
         # Only fall through to next model when this key can't use *this* model id
         if _is_model_unavailable(status_code or 0, body):
             continue
+        # Fallback to Gemini on 402 credits exhausted or moderation blocks
+        if (status_code == 402 or "credit" in body.lower() or "limit" in body.lower() or _is_content_block(body)):
+            try:
+                app.logger.info("xAI error (%s); falling back to Gemini image generation", status_code or body[:60])
+                return generate_image_gemini(prompt, image_url=image_url, image_urls=image_urls, aspect_ratio=aspect_ratio)
+            except Exception as e:
+                app.logger.warning("Gemini fallback failed: %s", e)
         # Real API error (bad request, rate limit after, etc.) — don't stack slow retries
         raise Exception(last_err)
 
-    raise Exception(last_err or "xAI image generation failed (no model worked).")
+    try:
+        return generate_image_gemini(prompt, image_url=image_url, image_urls=image_urls, aspect_ratio=aspect_ratio)
+    except Exception:
+        raise Exception(last_err or "Image generation failed.")
 
 
 def generate_image_fal(prompt: str, num_images: int = 10) -> list:
@@ -5727,21 +5770,16 @@ def battle_cards_generate():
 @app.route("/3d")
 @app.route("/studios/3d")
 @app.route("/studios/3d-games")
-@login_required
+@app.route("/studios/play/3d")
+@app.route("/play/3d")
+@app.route("/the-dome")
+@app.route("/studios/the-dome")
 def percfect_3d_page():
-    """Dedicated 3D stage page — heavy Three.js / GLB. Login required (Nick: 3D private). Motion stays light."""
-    user_data = None
-    if current_user.is_authenticated:
-        try:
-            reset_daily_if_needed(current_user.id)
-            res = supabase.table("users").select(
-                "picture_credits,video_credits,is_admin"
-            ).eq("id", current_user.id).single().execute()
-            user_data = dict(res.data or {})
-            user_data["has_purchased"] = bool(user_data.get("is_admin"))
-        except Exception:
-            user_data = None
-    return render_template("percfect_3d.html", user=user_data)
+    """Dedicated 3D stage page — serves the Three.js Dome Stage."""
+    board_path = os.path.join(app.root_path, "prototypes", "eternal-rivals-board.html")
+    if os.path.isfile(board_path):
+        return send_from_directory(os.path.join(app.root_path, "prototypes"), "eternal-rivals-board.html")
+    return render_template("percfect_3d.html")
 
 
 @app.route("/motion-lab/<path:filename>")
@@ -11344,6 +11382,7 @@ def character_generate_one():
     )
     description = request.form.get("description", "").strip()
     gender = request.form.get("gender", "").strip()
+    provider = (request.form.get("provider") or "gemini").strip().lower()
 
     # Characters product: max 1 reference photo
     ref_images = [] if super_accuracy else _get_form_reference_images(1)
@@ -11394,6 +11433,7 @@ def character_generate_one():
         "super_accuracy": super_accuracy,
         "cost": cost,
         "ref_count": n_refs,
+        "provider": provider,
         "seed_image_url": seed_image_url if super_accuracy else "",
         "search_query": search_query if super_accuracy else "",
         "source_page_image": source_page_image if super_accuracy else "",

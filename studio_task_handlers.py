@@ -47,14 +47,14 @@ def _fresh_media_key() -> str:
     return next_key()
 
 
-def _generate_character_xai(a, prompt: str, image_url=None, image_urls=None, api_key=None):
+def _generate_character_xai(a, prompt: str, image_url=None, image_urls=None, api_key=None, provider=None):
     refs = []
     if image_urls:
         refs = [u for u in image_urls if u]
     elif image_url:
         refs = [image_url]
     p = (prompt or "").rstrip()
-    kw = {"aspect_ratio": "1:1", "force_aspect": True, "exact_prompt": True, "api_key": api_key}
+    kw = {"aspect_ratio": "1:1", "force_aspect": True, "exact_prompt": True, "api_key": api_key, "provider": provider}
     if len(refs) > 1:
         return a.generate_image_xai(p, image_urls=refs, **kw)
     if refs:
@@ -1550,6 +1550,7 @@ def handle_character_one(user_id: int, payload: dict) -> dict:
         source_image = source_images[0]
     description = payload.get("description") or ""
     gender = payload.get("gender") or ""
+    provider = payload.get("provider") or "gemini"
     super_accuracy = bool(payload.get("super_accuracy"))
     n_refs = 0 if super_accuracy else len(source_images)
     # Server is source of truth — never trust client undercharge
@@ -1622,7 +1623,7 @@ def handle_character_one(user_id: int, payload: dict) -> dict:
                     )
                 except Exception:
                     pass
-                r = _generate_character_xai(a, prompt, image_url=ref.get("url"), api_key=mk)
+                r = _generate_character_xai(a, prompt, image_url=ref.get("url"), api_key=mk, provider=provider)
                 data = (r or {}).get("data") or []
                 if not data or not data[0].get("url"):
                     raise Exception("xAI returned no image for this reference.")
@@ -1660,6 +1661,7 @@ def handle_character_one(user_id: int, payload: dict) -> dict:
             prompt,
             image_url=source_image or (source_images[0] if source_images else None),
             api_key=mk,
+            provider=provider,
         )
         data = (r or {}).get("data") or []
         if not data or not data[0].get("url"):
