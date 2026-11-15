@@ -193,7 +193,6 @@ UNDER_CONSTRUCTION = {
     "/studios/3d-games": "3D",
     "/studios/3d/crew": "3D",
     "/studios/3d/field": "3D",
-    "/studios/3d/rivals": "3D",
     "/studios/3d/board": "3D",
     "/studios/play/3d": "3-D",
     "/play/3d": "3-D",
