@@ -3,17 +3,26 @@
 {% block content %}
 <style>
   .col-wrap { position: relative; width: 100%; height: calc(100vh - 70px); min-height: 480px; background: #0a090f; overflow: hidden; }
-  .col-canvas { display: block; width: 100%; height: 100%; }
-  .col-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: .5rem; z-index: 5; pointer-events: none; }
-  .col-top button { pointer-events: auto; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .4rem 1rem; font-size: .8rem; cursor: pointer; }
+  .col-canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+  .col-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: .5rem; z-index: 5; pointer-events: none; align-items: center; }
+  .col-top button { pointer-events: auto; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .4rem 1rem; font-size: .8rem; cursor: pointer; backdrop-filter: blur(6px); }
   .col-top button.active { background: #7c5cfc; border-color: #7c5cfc; }
+  .col-hint { margin-left: auto; color: rgba(255,255,255,.55); font-size: .72rem; pointer-events: none; text-align: right; }
+  .col-notice { position: absolute; top: 52px; left: 12px; z-index: 6; max-width: min(420px, 80vw); background: rgba(20,18,30,.88); color: #e8e0ff; border: 1px solid rgba(124,92,252,.5); border-radius: 10px; padding: .45rem .7rem; font-size: .75rem; line-height: 1.35; opacity: 0; transform: translateY(-6px); transition: opacity .3s, transform .3s; pointer-events: none; }
+  .col-notice.show { opacity: 1; transform: none; }
+  .col-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.7); font-size: .9rem; z-index: 4; pointer-events: none; transition: opacity .4s; }
   .col-ctrl { position: absolute; bottom: 16px; left: 16px; z-index: 5; display: flex; flex-direction: column; gap: .4rem; }
+  .col-ctrl-row { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
   .col-ctrl button { background: rgba(20,18,30,.85); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: .45rem .9rem; font-size: .8rem; cursor: pointer; }
   .col-ctrl button:hover { background: #7c5cfc; }
-  .col-stick { width: 110px; height: 110px; border-radius: 50%; background: rgba(20,18,30,.7); border: 1px solid rgba(255,255,255,.15); position: relative; margin-top: .5rem; touch-action: none; }
-  .col-stick-knob { width: 44px; height: 44px; border-radius: 50%; background: #7c5cfc; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
-  .col-phone { position: absolute; bottom: 16px; right: 16px; z-index: 5; width: min(320px, 85vw); height: 420px; background: rgba(15,14,22,.92); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
-  .col-phone-head { padding: .6rem .8rem; border-bottom: 1px solid rgba(255,255,255,.1); color: #fff; font-weight: 700; font-size: .85rem; }
+  .col-ctrl button.active { background: #7c5cfc; border-color: #7c5cfc; }
+  .col-stick { width: 110px; height: 110px; border-radius: 50%; background: rgba(20,18,30,.7); border: 1px solid rgba(255,255,255,.15); position: relative; margin-top: .5rem; touch-action: none; cursor: grab; user-select: none; }
+  .col-stick-knob { width: 44px; height: 44px; border-radius: 50%; background: #7c5cfc; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; box-shadow: 0 0 12px rgba(124,92,252,.6); }
+  .col-phone { position: absolute; bottom: 16px; right: 16px; z-index: 5; width: min(320px, 85vw); height: 420px; max-height: calc(100% - 80px); background: rgba(15,14,22,.92); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
+  .col-phone.min { height: auto; }
+  .col-phone.min .col-phone-body, .col-phone.min .col-phone-input { display: none; }
+  .col-phone-head { padding: .6rem .8rem; border-bottom: 1px solid rgba(255,255,255,.1); color: #fff; font-weight: 700; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+  .col-phone-head span { font-weight: 400; opacity: .6; font-size: .75rem; }
   .col-phone-body { flex: 1; overflow-y: auto; padding: .6rem .8rem; display: flex; flex-direction: column; gap: .4rem; }
   .col-phone-msg { max-width: 85%; padding: .4rem .6rem; border-radius: 10px; font-size: .78rem; line-height: 1.35; }
   .col-phone-msg.them { background: rgba(124,92,252,.25); color: #e8e0ff; align-self: flex-start; }
@@ -21,23 +30,32 @@
   .col-phone-input { display: flex; gap: .4rem; padding: .5rem .6rem; border-top: 1px solid rgba(255,255,255,.1); }
   .col-phone-input input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: #fff; padding: .35rem .6rem; font-size: .78rem; }
   .col-phone-input button { background: #7c5cfc; color: #fff; border: none; border-radius: 8px; padding: .35rem .7rem; font-size: .78rem; cursor: pointer; }
+  @media (max-width: 640px) {
+    .col-phone { width: 62vw; height: 260px; }
+    .col-hint { display: none; }
+  }
 </style>
 
-<div class="col-wrap">
-  <canvas class="col-canvas" id="col-canvas"></canvas>
+<div class="col-wrap" id="col-wrap">
+  <canvas class="col-canvas" id="col-canvas" tabindex="0"></canvas>
+  <div class="col-loading" id="col-loading">Loading stage…</div>
   <div class="col-top">
     <button class="active" id="btn-colosseum">Colosseum</button>
     <button id="btn-metro">Metro Tunnel</button>
+    <div class="col-hint">WASD / arrows or stick to move · Shift = run · Space = cast · drag to orbit · scroll to zoom</div>
   </div>
+  <div class="col-notice" id="col-notice"></div>
   <div class="col-ctrl">
-    <button id="btn-walk">Walk</button>
-    <button id="btn-run">Run</button>
-    <button id="btn-cast">Cast</button>
-    <button id="btn-idle">Idle</button>
+    <div class="col-ctrl-row">
+      <button id="btn-walk">Walk</button>
+      <button id="btn-run">Run</button>
+      <button id="btn-cast">Cast</button>
+      <button id="btn-idle" class="active">Idle</button>
+    </div>
     <div class="col-stick" id="stick"><div class="col-stick-knob" id="stick-knob"></div></div>
   </div>
-  <div class="col-phone">
-    <div class="col-phone-head">Messenger</div>
+  <div class="col-phone" id="col-phone">
+    <div class="col-phone-head" id="phone-head">Messenger <span>tap to minimize</span></div>
     <div class="col-phone-body" id="phone-body"></div>
     <div class="col-phone-input">
       <input id="phone-input" placeholder="Type a message…" autocomplete="off">
@@ -49,197 +67,856 @@
 {% block scripts %}
 <script type="importmap">
 { "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ------------------------------------------------------------------
+   Percfect 3D board — original code (MIT, same as repo).
+   Structure:  renderer/scene/camera  ->  stages (procedural)  ->
+               character (GLB via GLTFLoader, or placeholder robot)  ->
+               AnimationMixer state machine (idle/walk/run/cast)  ->
+               input (joystick + keyboard)  ->  follow camera.
+   Character sources, first one that loads wins:
+     ?model=/static/....glb   (query param, must start with /static/)
+     /static/models/character.glb  (+ optional idle/walk/run/cast.glb clips)
+     /static/RIGGED_poyo_walking.glb (+ running, cast clips)
+   ------------------------------------------------------------------ */
 
 const $ = (id) => document.getElementById(id);
+const wrap = $("col-wrap");
 const canvas = $("col-canvas");
-const loader = new GLTFLoader();
 
-let renderer, scene, camera, raf = 0;
-let character = null, mixer = null, clips = {}, curAction = null;
-let move = { x: 0, y: 0 };
-let sceneMode = "colosseum";
+/* ---------------- UI: notice + phone chat (unchanged behaviour) ---------------- */
+let noticeTimer = 0;
+function notice(text, ms = 5000) {
+  const el = $("col-notice");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => el.classList.remove("show"), ms);
+}
 
 const PHONE_REPLIES = [
   "Nice moves.", "Where are we going?", "It's getting dark out here.",
   "Did you hear that?", "I'm hungry.", "Turn left at the next arch."
 ];
-
 function addMsg(text, who) {
   const el = document.createElement("div");
   el.className = "col-phone-msg " + who;
   el.textContent = text;
-  $("phone-body").appendChild(el);
-  $("phone-body").scrollTop = $("phone-body").scrollHeight;
+  const body = $("phone-body");
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
 }
-
-$("phone-send").onclick = () => {
-  const v = $("phone-input").value.trim();
+function sendMsg() {
+  const input = $("phone-input");
+  const v = input.value.trim();
   if (!v) return;
   addMsg(v, "me");
-  $("phone-input").value = "";
-  setTimeout(() => addMsg(PHONE_REPLIES[Math.floor(Math.random()*PHONE_REPLIES.length)], "them"), 900 + Math.random()*1400);
+  input.value = "";
+  setTimeout(() => addMsg(PHONE_REPLIES[Math.floor(Math.random() * PHONE_REPLIES.length)], "them"), 900 + Math.random() * 1400);
+}
+$("phone-send").addEventListener("click", sendMsg);
+$("phone-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendMsg(); });
+$("phone-head").addEventListener("click", () => $("col-phone").classList.toggle("min"));
+
+/* ---------------- Renderer / scene / camera ---------------- */
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+camera.position.set(0, 4.5, 9);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 1.1, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.minDistance = 2.5;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.update();
+
+// Lights shared by both stages
+const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x2a2018, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
+sun.position.set(8, 16, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14;
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 60;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+scene.add(sun.target);
+
+// Gradient sky dome (per-stage colours)
+const skyUniforms = {
+  topColor: { value: new THREE.Color(0x3a6fd8) },
+  bottomColor: { value: new THREE.Color(0xf3c98b) },
+  offset: { value: 10 },
+  exponent: { value: 0.6 }
 };
-$("phone-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("phone-send").click(); });
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(180, 32, 16),
+  new THREE.ShaderMaterial({
+    uniforms: skyUniforms,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    vertexShader: [
+      "varying vec3 vWorld;",
+      "void main() {",
+      "  vec4 wp = modelMatrix * vec4(position, 1.0);",
+      "  vWorld = wp.xyz;",
+      "  gl_Position = projectionMatrix * viewMatrix * wp;",
+      "}"
+    ].join("\n"),
+    fragmentShader: [
+      "uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent;",
+      "varying vec3 vWorld;",
+      "void main() {",
+      "  float h = normalize(vWorld + vec3(0.0, offset, 0.0)).y;",
+      "  gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);",
+      "}"
+    ].join("\n")
+  })
+);
+scene.add(sky);
 
-function build() {
-  if (renderer) return;
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / Math.max(1, canvas.clientHeight), 0.1, 200);
-  camera.position.set(6, 5, 8);
-  scene.add(new THREE.HemisphereLight(0xc9b8ff, 0x1a1426, 1));
-  const key = new THREE.SpotLight(0xfff2d0, 80, 40, Math.PI/5, 0.35);
-  key.position.set(4, 12, 6); key.castShadow = true; scene.add(key);
-  const rim = new THREE.DirectionalLight(0xb48cff, 0.8);
-  rim.position.set(-6, 4, -4); scene.add(rim);
-  buildColosseum();
-  buildMetro();
-  window.addEventListener("resize", resize);
-  resize();
+/* ---------------- Shared materials / helpers ---------------- */
+function stdMat(color, opts = {}) {
+  return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.85, metalness: 0.05 }, opts));
 }
-
-function resize() {
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || (window.innerHeight - 70);
-  renderer.setSize(w, h, false);
-  camera.aspect = w / Math.max(1, h);
-  camera.updateProjectionMatrix();
+function shadowed(mesh, cast = true, receive = true) {
+  mesh.castShadow = cast;
+  mesh.receiveShadow = receive;
+  return mesh;
 }
-
-const colosseum = new THREE.Group();
-function buildColosseum() {
-  const sand = new THREE.Mesh(new THREE.CircleGeometry(7, 64), new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.9 }));
-  sand.rotation.x = -Math.PI/2; sand.receiveShadow = true; colosseum.add(sand);
-  const plat = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.15, 64), new THREE.MeshStandardMaterial({ color: 0x2a2438, metalness: 0.5 }));
-  plat.position.y = 0.075; colosseum.add(plat);
-  for (let t = 0; t < 5; t++) {
-    const tier = new THREE.Mesh(new THREE.TorusGeometry(3.5 + t*1.1, 0.35, 8, 64), new THREE.MeshStandardMaterial({ color: 0x3a3448, roughness: 0.7 }));
-    tier.rotation.x = Math.PI/2; tier.position.y = 0.6 + t*0.7; colosseum.add(tier);
+// Tiny procedural canvas texture (no external image files needed)
+function makeTexture(draw, size = 256, repeat = [1, 1]) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  draw(c.getContext("2d"), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat[0], repeat[1]);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function noiseFill(ctx, size, base, spread, count) {
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < count; i++) {
+    const v = Math.floor(Math.random() * spread);
+    ctx.fillStyle = "rgba(" + v + "," + v + "," + v + ",0.08)";
+    ctx.fillRect(Math.random() * size, Math.random() * size, 2 + Math.random() * 3, 2 + Math.random() * 3);
   }
+}
+
+/* ---------------- Stage 1: Colosseum ---------------- */
+const ARENA_R = 14;
+const colosseum = new THREE.Group();
+colosseum.name = "colosseum";
+const flames = [];
+
+function buildColosseum() {
+  // Outer ground plane
+  const groundTex = makeTexture((ctx, s) => noiseFill(ctx, s, "#6f6a52", 255, 2500), 256, [30, 30]);
+  const ground = shadowed(new THREE.Mesh(new THREE.PlaneGeometry(400, 400), stdMat(0xffffff, { map: groundTex })), false, true);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.02;
+  colosseum.add(ground);
+
+  // Sand arena floor
+  const sandTex = makeTexture((ctx, s) => noiseFill(ctx, s, "#c9a46a", 255, 4000), 256, [8, 8]);
+  const sand = shadowed(new THREE.Mesh(new THREE.CircleGeometry(ARENA_R + 0.5, 96), stdMat(0xffffff, { map: sandTex, roughness: 1 })), false, true);
+  sand.rotation.x = -Math.PI / 2;
+  colosseum.add(sand);
+
+  // Centre dais (where the character spawns)
+  const dais = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.12, 64), stdMat(0x2a2438, { metalness: 0.4, roughness: 0.5 })));
+  dais.position.y = 0.06;
+  colosseum.add(dais);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.035, 8, 96), new THREE.MeshBasicMaterial({ color: 0x9b7dff }));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.125;
+  colosseum.add(ring);
+
+  // Inner podium wall
+  const stone = makeTexture((ctx, s) => {
+    noiseFill(ctx, s, "#b9aa8c", 255, 3000);
+    ctx.strokeStyle = "rgba(60,50,35,0.35)";
+    ctx.lineWidth = 2;
+    for (let y = 0; y <= s; y += s / 4) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(s, y); ctx.stroke();
+      const off = (y / (s / 4)) % 2 ? s / 4 : 0;
+      for (let x = off; x <= s; x += s / 2) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + s / 4); ctx.stroke(); }
+    }
+  }, 256, [24, 1]);
+  const wallMat = stdMat(0xffffff, { map: stone, side: THREE.DoubleSide });
+  const podium = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(ARENA_R + 0.6, ARENA_R + 0.6, 2.2, 96, 1, true), wallMat));
+  podium.position.y = 1.1;
+  colosseum.add(podium);
+
+  // Tiered seating: stacked stepped rings
+  const tierMat = stdMat(0xa89a7e, { roughness: 0.95 });
+  for (let t = 0; t < 7; t++) {
+    const inner = ARENA_R + 0.6 + t * 1.3;
+    const outer = inner + 1.3;
+    const shape = new THREE.Shape();
+    shape.absarc(0, 0, outer, 0, Math.PI * 2, false);
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+    const h = 2.2 + (t + 1) * 0.9;
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 72 });
+    geo.rotateX(-Math.PI / 2);
+    const tier = shadowed(new THREE.Mesh(geo, tierMat));
+    colosseum.add(tier);
+  }
+
+  // Outer façade: ring of columns with a lintel
+  const outerR = ARENA_R + 0.6 + 7 * 1.3 + 0.8;
+  const colGeo = new THREE.CylinderGeometry(0.45, 0.55, 9.5, 14);
+  const capGeo = new THREE.BoxGeometry(1.4, 0.4, 1.4);
+  const colMat = stdMat(0xd8cbb0, { roughness: 0.8 });
+  const N = 40;
+  const cols = new THREE.InstancedMesh(colGeo, colMat, N);
+  const caps = new THREE.InstancedMesh(capGeo, colMat, N * 2);
+  cols.castShadow = cols.receiveShadow = true;
+  caps.castShadow = caps.receiveShadow = true;
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const one = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const x = Math.cos(a) * outerR, z = Math.sin(a) * outerR;
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -a);
+    m.compose(new THREE.Vector3(x, 4.75, z), q, one);
+    cols.setMatrixAt(i, m);
+    m.compose(new THREE.Vector3(x, 0.2, z), q, one);
+    caps.setMatrixAt(i * 2, m);
+    m.compose(new THREE.Vector3(x, 9.6, z), q, one);
+    caps.setMatrixAt(i * 2 + 1, m);
+  }
+  colosseum.add(cols, caps);
+  const lintel = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(outerR + 0.8, outerR + 0.8, 1.2, 96, 1, true), wallMat));
+  lintel.position.y = 10.4;
+  colosseum.add(lintel);
+
+  // Torches around the arena (emissive flames + a few real lights)
+  const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.4, 8);
+  const poleMat = stdMat(0x3b3124, { metalness: 0.6, roughness: 0.4 });
+  const flameGeo = new THREE.ConeGeometry(0.16, 0.45, 10);
   for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2;
-    const torch = new THREE.PointLight(0xff9a3c, 2, 10);
-    torch.position.set(Math.cos(a)*5.5, 2.2, Math.sin(a)*5.5);
-    colosseum.add(torch);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2), new THREE.MeshBasicMaterial({ color: 0x4a4030 }));
-    pole.position.copy(torch.position); pole.position.y = 1.1; colosseum.add(pole);
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    const x = Math.cos(a) * (ARENA_R - 0.6), z = Math.sin(a) * (ARENA_R - 0.6);
+    const pole = shadowed(new THREE.Mesh(poleGeo, poleMat));
+    pole.position.set(x, 1.2, z);
+    colosseum.add(pole);
+    const flame = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: 0xffa040 }));
+    flame.position.set(x, 2.65, z);
+    colosseum.add(flame);
+    flames.push(flame);
+    if (i % 2 === 0) {
+      const light = new THREE.PointLight(0xff9a3c, 6, 12, 2);
+      light.position.set(x, 2.9, z);
+      colosseum.add(light);
+      flame.userData.light = light;
+    }
   }
   scene.add(colosseum);
 }
 
-const metro = new THREE.Group(); metro.visible = false;
+/* ---------------- Stage 2: Metro Tunnel ---------------- */
+const TUNNEL_LEN = 80;
+const PLATFORM_W = 5;     // platform spans z in [-PLATFORM_W, 0]
+const metro = new THREE.Group();
+metro.name = "metro";
+metro.visible = false;
+const metroLamps = [];
+
 function buildMetro() {
-  const tube = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 40, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x1c1a22, side: THREE.BackSide, roughness: 0.8 }));
-  tube.rotation.z = Math.PI/2; metro.add(tube);
-  const railL = new THREE.Mesh(new THREE.BoxGeometry(40, 0.08, 0.15), new THREE.MeshStandardMaterial({ color: 0x555555 }));
-  railL.position.set(0, -1.6, -1.2); metro.add(railL);
-  const railR = railL.clone(); railR.position.z = 1.2; metro.add(railR);
-  for (let i = 0; i < 12; i++) {
-    const lamp = new THREE.PointLight(0xffd27a, 1.5, 12);
-    lamp.position.set(-18 + i*3.2, 2.5, 0); metro.add(lamp);
+  const R = 6.5;           // tunnel radius (arched vault)
+  const trackY = -1.1;     // track bed height (platform floor is y = 0)
+
+  // Arched vault: half cylinder lying along X, inside faces visible
+  const tileTex = makeTexture((ctx, s) => {
+    ctx.fillStyle = "#d9d6cc"; ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = "#8d8a80"; ctx.lineWidth = 3;
+    for (let i = 0; i <= s; i += s / 8) {
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(s, i); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, s); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.06)";
+    for (let i = 0; i < 800; i++) ctx.fillRect(Math.random() * s, Math.random() * s, 3, 3);
+  }, 256, [TUNNEL_LEN / 4, 6]);
+  const vaultGeo = new THREE.CylinderGeometry(R, R, TUNNEL_LEN, 48, 1, true, 0, Math.PI);
+  vaultGeo.rotateZ(Math.PI / 2);   // lay along X, opening downward
+  vaultGeo.rotateX(-Math.PI / 2);  // arch over the top
+  const vault = shadowed(new THREE.Mesh(vaultGeo, stdMat(0xffffff, { map: tileTex, side: THREE.BackSide, roughness: 0.6 })), false, true);
+  vault.position.set(0, trackY, -PLATFORM_W / 2 + 1.2);
+  metro.add(vault);
+
+  // Colour band along the wall
+  const bandGeo = new THREE.CylinderGeometry(R - 0.02, R - 0.02, TUNNEL_LEN, 48, 1, true, Math.PI * 0.08, Math.PI * 0.07);
+  bandGeo.rotateZ(Math.PI / 2);
+  bandGeo.rotateX(-Math.PI / 2);
+  const band = new THREE.Mesh(bandGeo, stdMat(0x7c5cfc, { side: THREE.BackSide, roughness: 0.4 }));
+  band.position.copy(vault.position);
+  metro.add(band);
+
+  // End walls (dark portals)
+  for (const sx of [-1, 1]) {
+    const cap = new THREE.Mesh(new THREE.CircleGeometry(R, 48, 0, Math.PI), stdMat(0x07060a, { roughness: 1 }));
+    cap.position.set(sx * TUNNEL_LEN / 2, trackY, vault.position.z);
+    cap.rotation.y = -sx * Math.PI / 2;
+    metro.add(cap);
+  }
+
+  // Platform (ground plane for the character)
+  const platTex = makeTexture((ctx, s) => {
+    noiseFill(ctx, s, "#4a4752", 255, 3000);
+    ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 2;
+    for (let i = 0; i <= s; i += s / 4) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(s, i); ctx.stroke();
+    }
+  }, 256, [TUNNEL_LEN / 2, 2.5]);
+  const platform = shadowed(new THREE.Mesh(new THREE.BoxGeometry(TUNNEL_LEN, Math.abs(trackY), PLATFORM_W), stdMat(0xffffff, { map: platTex })), false, true);
+  platform.position.set(0, trackY / 2, -PLATFORM_W / 2);
+  metro.add(platform);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(TUNNEL_LEN, 0.02, 0.35), stdMat(0xf4c430, { roughness: 0.5 }));
+  edge.position.set(0, 0.011, -0.2);
+  metro.add(edge);
+
+  // Track bed, sleepers, rails
+  const bed = shadowed(new THREE.Mesh(new THREE.PlaneGeometry(TUNNEL_LEN, 7), stdMat(0x2b2722, { roughness: 1 })), false, true);
+  bed.rotation.x = -Math.PI / 2;
+  bed.position.set(0, trackY, 3.3);
+  metro.add(bed);
+  const sleeperCount = Math.floor(TUNNEL_LEN / 0.7);
+  const sleepers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.25, 0.12, 2.6), stdMat(0x3d3329), sleeperCount);
+  sleepers.receiveShadow = true;
+  const mm = new THREE.Matrix4();
+  for (let i = 0; i < sleeperCount; i++) {
+    mm.makeTranslation(-TUNNEL_LEN / 2 + 0.35 + i * 0.7, trackY + 0.06, 2.6);
+    sleepers.setMatrixAt(i, mm);
+  }
+  metro.add(sleepers);
+  const railMat = stdMat(0x9a9aa2, { metalness: 0.9, roughness: 0.3 });
+  const railL = shadowed(new THREE.Mesh(new THREE.BoxGeometry(TUNNEL_LEN, 0.14, 0.09), railMat));
+  railL.position.set(0, trackY + 0.19, 1.9);
+  metro.add(railL);
+  const railR = railL.clone();
+  railR.position.z = 3.3;
+  metro.add(railR);
+
+  // Pillars on the platform
+  const pillarGeo = new THREE.BoxGeometry(0.5, 4.6, 0.5);
+  const pillarMat = stdMat(0x5a5566, { roughness: 0.6 });
+  for (let x = -TUNNEL_LEN / 2 + 6; x < TUNNEL_LEN / 2 - 4; x += 10) {
+    const p = shadowed(new THREE.Mesh(pillarGeo, pillarMat));
+    p.position.set(x, 2.3, -PLATFORM_W + 0.9);
+    metro.add(p);
+  }
+
+  // Ceiling lamps: emissive strips every 5 m, real lights every 15 m
+  const lampGeo = new THREE.BoxGeometry(1.6, 0.08, 0.3);
+  for (let x = -TUNNEL_LEN / 2 + 2.5; x < TUNNEL_LEN / 2; x += 5) {
+    const lamp = new THREE.Mesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xfff1c8 }));
+    lamp.position.set(x, 4.6, -1.3);
+    metro.add(lamp);
+    metroLamps.push(lamp);
+  }
+  for (let x = -TUNNEL_LEN / 2 + 7.5; x < TUNNEL_LEN / 2; x += 15) {
+    const l = new THREE.PointLight(0xffe2a8, 14, 16, 2);
+    l.position.set(x, 4.2, -1.3);
+    metro.add(l);
+  }
+  // Signal lights at both ends
+  for (const sx of [-1, 1]) {
+    const sig = new THREE.PointLight(sx < 0 ? 0xff3030 : 0x30ff70, 4, 8, 2);
+    sig.position.set(sx * (TUNNEL_LEN / 2 - 1), 1.2, 3.2);
+    metro.add(sig);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), new THREE.MeshBasicMaterial({ color: sig.color }));
+    bulb.position.copy(sig.position);
+    metro.add(bulb);
   }
   scene.add(metro);
 }
 
-$("btn-colosseum").onclick = () => { sceneMode = "colosseum"; colosseum.visible = true; metro.visible = false; camera.position.set(6,5,8); };
-$("btn-metro").onclick = () => { sceneMode = "metro"; colosseum.visible = false; metro.visible = true; camera.position.set(0, 1.2, 10); };
+/* ---------------- Stage switching ---------------- */
+const STAGES = {
+  colosseum: {
+    group: colosseum, fog: [0xe8cfa0, 40, 160], top: 0x3a6fd8, bottom: 0xf3c98b,
+    hemi: 0.9, sun: 2.2, spawn: new THREE.Vector3(0, 0, 0), camOffset: new THREE.Vector3(0, 4.5, 9)
+  },
+  metro: {
+    group: metro, fog: [0x0c0b10, 10, 55], top: 0x050407, bottom: 0x15131b,
+    hemi: 0.35, sun: 0.35, spawn: new THREE.Vector3(0, 0, -2.4), camOffset: new THREE.Vector3(0, 2.8, 6.5)
+  }
+};
+let stageName = "colosseum";
 
-loader.load("/static/RIGGED_poyo_walking.glb", (g) => {
-  character = g.scene;
-  character.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  const box = new THREE.Box3().setFromObject(character, true);
-  const s = 1.8 / Math.max(box.getSize(new THREE.Vector3()).y, 1e-3);
-  character.scale.setScalar(s);
-  character.updateMatrixWorld(true);
-  const b2 = new THREE.Box3().setFromObject(character, true);
-  const c = b2.getCenter(new THREE.Vector3());
-  character.position.x -= c.x; character.position.z -= c.z; character.position.y -= b2.min.y;
-  scene.add(character);
-  mixer = new THREE.AnimationMixer(character);
-  g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); });
-  playClip(Object.keys(clips)[0]);
-}, undefined, (err) => console.error("GLB load error:", err));
-
-loader.load("/static/RIGGED_poyo_running.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
-loader.load("/static/poyo_X_cast.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
-
-function playClip(name) {
-  const act = clips[name];
-  if (!act || act === curAction) return;
-  if (curAction) curAction.fadeOut(0.25);
-  act.reset().fadeIn(0.25).play();
-  curAction = act;
+function setStage(name) {
+  const st = STAGES[name];
+  if (!st) return;
+  stageName = name;
+  for (const k of Object.keys(STAGES)) STAGES[k].group.visible = (k === name);
+  scene.fog = new THREE.Fog(st.fog[0], st.fog[1], st.fog[2]);
+  skyUniforms.topColor.value.setHex(st.top);
+  skyUniforms.bottomColor.value.setHex(st.bottom);
+  hemi.intensity = st.hemi;
+  sun.intensity = st.sun;
+  $("btn-colosseum").classList.toggle("active", name === "colosseum");
+  $("btn-metro").classList.toggle("active", name === "metro");
+  player.position.copy(st.spawn);
+  player.rotation.y = 0;
+  controls.target.set(st.spawn.x, st.spawn.y + 1.1, st.spawn.z);
+  camera.position.copy(controls.target).add(st.camOffset);
+  controls.maxDistance = name === "metro" ? 9 : 30;
+  controls.update();
 }
-$("btn-walk").onclick = () => playClip(Object.keys(clips).find(k => /walk/i.test(k)) || Object.keys(clips)[0]);
-$("btn-run").onclick = () => playClip(Object.keys(clips).find(k => /run/i.test(k)) || Object.keys(clips)[0]);
-$("btn-cast").onclick = () => playClip(Object.keys(clips).find(k => /cast|spell|charg/i.test(k)) || Object.keys(clips)[0]);
-$("btn-idle").onclick = () => playClip(Object.keys(clips).find(k => /idle/i.test(k)) || Object.keys(clips)[0]);
+$("btn-colosseum").addEventListener("click", () => setStage("colosseum"));
+$("btn-metro").addEventListener("click", () => setStage("metro"));
 
-const stick = $("stick"), knob = $("stick-knob");
-let dragging = false;
-function setStick(cx, cy) {
-  const r = stick.clientWidth/2 - 22;
-  let dx = cx - stick.clientWidth/2, dy = cy - stick.clientHeight/2;
-  const len = Math.hypot(dx, dy);
-  if (len > r) { dx *= r/len; dy *= r/len; }
-  knob.style.left = (stick.clientWidth/2 + dx) + "px";
-  knob.style.top = (stick.clientHeight/2 + dy) + "px";
-  move.x = dx/r; move.y = -dy/r;
+function clampToStage(p) {
+  if (stageName === "colosseum") {
+    const max = ARENA_R - 1.2;
+    const d = Math.hypot(p.x, p.z);
+    if (d > max) { p.x *= max / d; p.z *= max / d; }
+  } else {
+    p.x = THREE.MathUtils.clamp(p.x, -TUNNEL_LEN / 2 + 1, TUNNEL_LEN / 2 - 1);
+    p.z = THREE.MathUtils.clamp(p.z, -PLATFORM_W + 1.4, -0.5);
+  }
+  p.y = 0;
 }
-function onDown(e) { dragging = true; const t = e.touches ? e.touches[0] : e; const rect = stick.getBoundingClientRect(); setStick(t.clientX - rect.left, t.clientY - rect.top); }
-function onMove(e) { if (!dragging) return; const t = e.touches ? e.touches[0] : e; const rect = stick.getBoundingClientRect(); setStick(t.clientX - rect.left, t.clientY - rect.top); }
-function onUp() { dragging = false; knob.style.left = "50%"; knob.style.top = "50%"; move.x = 0; move.y = 0; }
-stick.addEventListener("pointerdown", onDown);
-window.addEventListener("pointermove", onMove);
-window.addEventListener("pointerup", onUp);
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp" || e.key === "w") move.y = 1;
-  if (e.key === "ArrowDown" || e.key === "s") move.y = -1;
-  if (e.key === "ArrowLeft" || e.key === "a") move.x = -1;
-  if (e.key === "ArrowRight" || e.key === "d") move.x = 1;
-});
-document.addEventListener("keyup", (e) => {
-  if (["ArrowUp","w","ArrowDown","s"].includes(e.key)) move.y = 0;
-  if (["ArrowLeft","a","ArrowRight","d"].includes(e.key)) move.x = 0;
-});
+/* ---------------- Character + AnimationMixer ---------------- */
+// `player` is the drop-in anchor: any GLB is normalised to ~1.8 m tall, feet at y=0, centred.
+const player = new THREE.Group();
+player.name = "player";
+scene.add(player);
 
-const clock = new THREE.Clock();
-function loop() {
-  raf = requestAnimationFrame(loop);
-  const dt = clock.getDelta();
-  if (mixer) mixer.update(dt);
-  if (character) {
-    character.position.x += move.x * dt * (move.y < -0.3 ? 4 : 2.2);
-    character.position.z += move.y * dt * (move.y < -0.3 ? 4 : 2.2);
-    if (move.x !== 0 || move.y !== 0) {
-      character.rotation.y = Math.atan2(move.x, move.y);
-      const run = Math.hypot(move.x, move.y) > 0.6;
-      playClip(Object.keys(clips).find(k => run ? /run/i.test(k) : /walk/i.test(k)) || Object.keys(clips)[0]);
+let model = null;
+let mixer = null;
+const actions = { idle: null, walk: null, run: null, cast: null };
+let current = null;          // current state name
+let manualState = "idle";    // state chosen by buttons when there is no movement input
+let casting = false;
+
+function classifyClip(name, hint) {
+  const n = String(name || "").toLowerCase().replace(/armature\|/g, "").replace(/mixamo\.com/g, "");
+  if (/idle|breath|stand/.test(n)) return "idle";
+  if (/run|sprint|jog/.test(n)) return "run";
+  if (/walk/.test(n)) return "walk";
+  if (/cast|spell|magic|charg|attack|punch/.test(n)) return "cast";
+  return hint || null;
+}
+
+// Remove horizontal root motion (Mixamo clips exported without "In Place")
+function stripRootMotion(clip) {
+  for (const track of clip.tracks) {
+    if (!/\.position$/.test(track.name)) continue;
+    const node = track.name.split(".")[0];
+    if (!/hips|root|pelvis/i.test(node)) continue;
+    const v = track.values;
+    const x0 = v[0], z0 = v[2];
+    for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
+  }
+  return clip;
+}
+
+function registerClip(clip, hint) {
+  const state = classifyClip(clip.name, hint);
+  if (!state || actions[state]) return null;
+  if (state === "walk" || state === "run") stripRootMotion(clip);
+  const action = mixer.clipAction(clip);
+  if (state === "cast") {
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+  }
+  actions[state] = action;
+  return state;
+}
+
+function finishClipSetup() {
+  // Character without an idle clip: hold the first frame of walk as a neutral pose
+  if (!actions.idle) {
+    const src = (actions.walk || actions.run || actions.cast);
+    if (src) {
+      const still = THREE.AnimationUtils.subclip(src.getClip(), "idle_still", 0, 1, 30);
+      actions.idle = mixer.clipAction(still);
     }
   }
-  if (sceneMode === "colosseum") {
-    camera.position.x = 6 + (character ? character.position.x*0.15 : 0);
-    camera.position.z = 8 + (character ? character.position.z*0.15 : 0);
-    camera.lookAt(character ? character.position.x : 0, 1, character ? character.position.z : 0);
-  } else {
-    camera.position.x = character ? character.position.x : 0;
-    camera.lookAt(character ? character.position.x : 0, 1.2, (character ? character.position.z : 0) + 4);
+  if (!actions.walk && actions.run) actions.walk = actions.run;
+  if (!actions.run && actions.walk) {
+    actions.run = actions.walk;
   }
+  current = null;
+  setState("idle", 0);
+}
+
+function setState(name, fade = 0.25) {
+  const next = actions[name];
+  if (!next || name === current) return;
+  const prev = current ? actions[current] : null;
+  next.enabled = true;
+  next.setEffectiveTimeScale(1);
+  next.setEffectiveWeight(1);
+  next.reset();
+  if (prev && prev !== next) {
+    next.play();
+    prev.crossFadeTo(next, fade, false);
+  } else {
+    next.fadeIn(fade).play();
+  }
+  current = name;
+  document.querySelectorAll(".col-ctrl button").forEach((b) => b.classList.toggle("active", b.id === "btn-" + name));
+}
+
+function startCast() {
+  if (!actions.cast || casting) return;
+  casting = true;
+  setState("cast", 0.15);
+}
+
+function onMixerFinished(e) {
+  if (actions.cast && e.action === actions.cast) {
+    casting = false;
+    manualState = "idle";
+    setState("idle", 0.3);
+  }
+}
+
+function normaliseModel(root) {
+  root.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      if (o.isSkinnedMesh) o.frustumCulled = false;
+    }
+  });
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root, true);
+  const size = box.getSize(new THREE.Vector3());
+  const s = 1.8 / Math.max(size.y, 1e-3);
+  root.scale.multiplyScalar(s);
+  root.updateMatrixWorld(true);
+  const b2 = new THREE.Box3().setFromObject(root, true);
+  const c = b2.getCenter(new THREE.Vector3());
+  root.position.x -= c.x;
+  root.position.z -= c.z;
+  root.position.y -= b2.min.y;
+}
+
+function attachModel(root, clips, hint) {
+  if (model) {
+    player.remove(model);
+    if (mixer) mixer.stopAllAction();
+  }
+  for (const k of Object.keys(actions)) actions[k] = null;
+  model = root;
+  normaliseModel(model);
+  player.add(model);
+  mixer = new THREE.AnimationMixer(model);
+  mixer.addEventListener("finished", onMixerFinished);
+  for (const clip of clips) registerClip(clip, hint);
+}
+
+const loader = new GLTFLoader();
+function loadGLB(url) {
+  return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+}
+function hintFromUrl(url) {
+  return classifyClip(url.split("/").pop().replace(/\.glb$/i, ""), null);
+}
+
+// Extra animation-only GLBs that share the base character's skeleton
+async function loadExtraClips(urls) {
+  const results = await Promise.allSettled(urls.map((u) => loadGLB(u)));
+  results.forEach((r, i) => {
+    if (r.status !== "fulfilled") return;
+    for (const clip of r.value.animations) registerClip(clip, hintFromUrl(urls[i]));
+  });
+}
+
+const CHARACTER_SETS = [
+  { base: "/static/models/character.glb",
+    extras: ["/static/models/idle.glb", "/static/models/walk.glb", "/static/models/run.glb", "/static/models/cast.glb"] },
+  { base: "/static/RIGGED_poyo_walking.glb",
+    extras: ["/static/RIGGED_poyo_running.glb", "/static/poyo_X_cast.glb"] }
+];
+
+async function loadCharacter(set) {
+  const gltf = await loadGLB(set.base);
+  attachModel(gltf.scene, gltf.animations, hintFromUrl(set.base));
+  if (set.extras && set.extras.length) await loadExtraClips(set.extras);
+  finishClipSetup();
+  return set.base;
+}
+
+async function loadFirstCharacter() {
+  const sets = CHARACTER_SETS.slice();
+  const q = new URLSearchParams(location.search).get("model");
+  if (q && /^\/static\/[\w\-\/.]+\.glb$/i.test(q) && !q.includes("..")) sets.unshift({ base: q, extras: [] });
+  for (const set of sets) {
+    try {
+      const used = await loadCharacter(set);
+      const missing = ["idle", "walk", "run", "cast"].filter((k) => !actions[k]);
+      if (missing.length) notice("Loaded " + used.split("/").pop() + " — no clip for: " + missing.join(", ") + ".");
+      return;
+    } catch (err) {
+      console.warn("[percfect3d] could not load", set.base, err && err.message ? err.message : err);
+    }
+  }
+  buildPlaceholder();
+  notice("No character GLB found in /static — showing a placeholder robot. See docs/mixamo-guide.md.", 7000);
+}
+
+/* Placeholder robot with procedural AnimationClips, so the mixer pipeline is exercised */
+function buildPlaceholder() {
+  const root = new THREE.Group();
+  root.name = "placeholder";
+  const body = new THREE.Group(); body.name = "pBody"; root.add(body);
+  const mat = stdMat(0x7c5cfc, { metalness: 0.3, roughness: 0.4 });
+  const dark = stdMat(0x222033, { metalness: 0.5, roughness: 0.5 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.55, 6, 16), mat);
+  torso.position.y = 1.15; body.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 14), mat);
+  head.position.y = 1.72; body.add(head);
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.05), new THREE.MeshBasicMaterial({ color: 0x9bf6ff }));
+  visor.position.set(0, 1.74, 0.2); body.add(visor);
+  function limb(name, x, y, len, r) {
+    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(x, y, 0);
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), dark);
+    m.position.y = -len / 2 - r; pivot.add(m);
+    body.add(pivot);
+    return pivot;
+  }
+  limb("pArmL", -0.45, 1.45, 0.45, 0.09);
+  limb("pArmR", 0.45, 1.45, 0.45, 0.09);
+  limb("pLegL", -0.17, 0.82, 0.5, 0.11);
+  limb("pLegR", 0.17, 0.82, 0.5, 0.11);
+
+  const X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1);
+  function rotTrack(node, axis, times, angles) {
+    const vals = [];
+    const qq = new THREE.Quaternion();
+    for (const a of angles) { qq.setFromAxisAngle(axis, a); vals.push(qq.x, qq.y, qq.z, qq.w); }
+    return new THREE.QuaternionKeyframeTrack(node + ".quaternion", times, vals);
+  }
+  function swing(name, period, amp, bob) {
+    const t = [0, period / 4, period / 2, (3 * period) / 4, period];
+    return new THREE.AnimationClip(name, period, [
+      rotTrack("pLegL", X, t, [0, amp, 0, -amp, 0]),
+      rotTrack("pLegR", X, t, [0, -amp, 0, amp, 0]),
+      rotTrack("pArmL", X, t, [0, -amp * 0.8, 0, amp * 0.8, 0]),
+      rotTrack("pArmR", X, t, [0, amp * 0.8, 0, -amp * 0.8, 0]),
+      new THREE.VectorKeyframeTrack("pBody.position", t, [0, 0, 0, 0, bob, 0, 0, 0, 0, 0, bob, 0, 0, 0, 0])
+    ]);
+  }
+  const idle = new THREE.AnimationClip("Idle", 2, [
+    new THREE.VectorKeyframeTrack("pBody.position", [0, 1, 2], [0, 0, 0, 0, 0.03, 0, 0, 0, 0]),
+    rotTrack("pArmL", Z, [0, 1, 2], [-0.08, -0.14, -0.08]),
+    rotTrack("pArmR", Z, [0, 1, 2], [0.08, 0.14, 0.08])
+  ]);
+  const cast = new THREE.AnimationClip("Cast", 1.2, [
+    rotTrack("pArmR", X, [0, 0.35, 0.8, 1.2], [0, -2.6, -2.6, 0]),
+    rotTrack("pArmL", X, [0, 0.35, 0.8, 1.2], [0, -2.6, -2.6, 0]),
+    new THREE.VectorKeyframeTrack("pBody.position", [0, 0.35, 0.8, 1.2], [0, 0, 0, 0, 0.12, 0, 0, 0.12, 0, 0, 0, 0])
+  ]);
+  attachModel(root, [idle, swing("Walk", 1.0, 0.55, 0.04), swing("Run", 0.6, 0.95, 0.09), cast], null);
+  finishClipSetup();
+}
+
+/* ---------------- Buttons ---------------- */
+$("btn-idle").addEventListener("click", () => { manualState = "idle"; casting = false; setState("idle"); });
+$("btn-walk").addEventListener("click", () => { manualState = "walk"; casting = false; setState("walk"); });
+$("btn-run").addEventListener("click", () => { manualState = "run"; casting = false; setState("run"); });
+$("btn-cast").addEventListener("click", () => startCast());
+
+/* ---------------- Input: joystick + keyboard ---------------- */
+const stickInput = new THREE.Vector2();   // x = right, y = forward, length 0..1
+const keys = new Set();
+const stick = $("stick");
+const knob = $("stick-knob");
+let stickPointer = null;
+
+function updateStick(clientX, clientY) {
+  const rect = stick.getBoundingClientRect();
+  const r = rect.width / 2 - 22;
+  let dx = clientX - (rect.left + rect.width / 2);
+  let dy = clientY - (rect.top + rect.height / 2);
+  const len = Math.hypot(dx, dy);
+  if (len > r) { dx *= r / len; dy *= r / len; }
+  knob.style.left = (rect.width / 2 + dx) + "px";
+  knob.style.top = (rect.height / 2 + dy) + "px";
+  stickInput.set(dx / r, -dy / r);
+}
+function releaseStick() {
+  stickPointer = null;
+  knob.style.left = "50%";
+  knob.style.top = "50%";
+  stickInput.set(0, 0);
+}
+stick.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  stickPointer = e.pointerId;
+  stick.setPointerCapture(e.pointerId);
+  updateStick(e.clientX, e.clientY);
+});
+stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickPointer) updateStick(e.clientX, e.clientY); });
+stick.addEventListener("pointerup", (e) => { if (e.pointerId === stickPointer) releaseStick(); });
+stick.addEventListener("pointercancel", releaseStick);
+
+function typingInField(e) {
+  const t = e.target;
+  return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+}
+window.addEventListener("keydown", (e) => {
+  if (typingInField(e)) return;
+  const k = e.key.toLowerCase();
+  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", " "].includes(k)) {
+    if (k.startsWith("arrow") || k === " ") e.preventDefault();
+    keys.add(k);
+    if (k === " ") startCast();
+  }
+});
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+window.addEventListener("blur", () => keys.clear());
+
+function readInput(out) {
+  out.copy(stickInput);
+  let kx = 0, ky = 0;
+  if (keys.has("w") || keys.has("arrowup")) ky += 1;
+  if (keys.has("s") || keys.has("arrowdown")) ky -= 1;
+  if (keys.has("a") || keys.has("arrowleft")) kx -= 1;
+  if (keys.has("d") || keys.has("arrowright")) kx += 1;
+  if (kx || ky) {
+    const mag = keys.has("shift") ? 1 : 0.55;
+    out.set(kx, ky).normalize().multiplyScalar(mag);
+  }
+  if (out.lengthSq() > 1) out.normalize();
+  return out;
+}
+
+/* ---------------- Resize ---------------- */
+function resize() {
+  const w = wrap.clientWidth || window.innerWidth;
+  const h = wrap.clientHeight || window.innerHeight;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(wrap);
+
+/* ---------------- Main loop ---------------- */
+const clock = new THREE.Clock();
+const input = new THREE.Vector2();
+const camForward = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+const moveDir = new THREE.Vector3();
+const prevPos = new THREE.Vector3();
+const delta = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const WALK_SPEED = 1.9, RUN_SPEED = 5.2;
+let elapsed = 0;
+
+function angleLerp(a, b, t) {
+  let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+  readInput(input);
+  const mag = input.length();
+
+  prevPos.copy(player.position);
+  if (mag > 0.08 && !casting) {
+    camera.getWorldDirection(camForward);
+    camForward.y = 0;
+    camForward.normalize();
+    camRight.crossVectors(camForward, UP).normalize();
+    moveDir.copy(camForward).multiplyScalar(input.y).addScaledVector(camRight, input.x).normalize();
+    const running = mag > 0.65;
+    const speed = running ? RUN_SPEED * mag : WALK_SPEED * Math.max(mag / 0.65, 0.4);
+    player.position.addScaledVector(moveDir, speed * dt);
+    clampToStage(player.position);
+    const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+    player.rotation.y = angleLerp(player.rotation.y, targetYaw, 1 - Math.exp(-12 * dt));
+    setState(running ? "run" : "walk");
+    if (current && actions[current]) actions[current].setEffectiveTimeScale(running ? Math.max(0.8, mag) : Math.max(0.6, mag / 0.65));
+  } else if (!casting && mixer) {
+    setState(manualState);
+    if (current && actions[current]) actions[current].setEffectiveTimeScale(1);
+  }
+
+  if (mixer) mixer.update(dt);
+
+  // Camera follows: shift camera + orbit target by the player's displacement
+  delta.subVectors(player.position, prevPos);
+  camera.position.add(delta);
+  controls.target.add(delta);
+  controls.target.y = THREE.MathUtils.lerp(controls.target.y, player.position.y + 1.1, 0.1);
+  controls.update();
+
+  // Shadow camera tracks the player for crisp shadows
+  sun.position.set(player.position.x + 8, 16, player.position.z + 6);
+  sun.target.position.copy(player.position);
+
+  // Ambient life
+  if (stageName === "colosseum") {
+    for (let i = 0; i < flames.length; i++) {
+      const f = flames[i];
+      const flick = 0.85 + Math.sin(elapsed * 13 + i * 1.7) * 0.08 + Math.sin(elapsed * 7.3 + i) * 0.07;
+      f.scale.set(1, flick, 1);
+      if (f.userData.light) f.userData.light.intensity = 6 * flick;
+    }
+  }
+  sky.position.copy(camera.position);
   renderer.render(scene, camera);
 }
-build();
-loop();
+
+/* ---------------- Boot ---------------- */
+buildColosseum();
+buildMetro();
+setStage("colosseum");
+resize();
+renderer.setAnimationLoop(tick);
+$("col-loading").style.opacity = "0";
 addMsg("Hey, you made it.", "them");
+loadFirstCharacter();
+
+// Small public API for other scripts / future roster picker
+window.percfect3D = {
+  scene, camera, renderer, player,
+  setStage,
+  play: (name) => { manualState = name; setState(name); },
+  cast: startCast,
+  loadCharacter: (base, extras = []) => loadCharacter({ base, extras }).catch((e) => notice("Could not load " + base))
+};
 </script>
 {% endblock %}
