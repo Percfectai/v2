@@ -2,7 +2,7 @@
 {% block title %}3D Colosseum — Percfect Studios{% endblock %}
 {% block content %}
 <style>
-  .col-wrap { position: relative; width: 100%; height: calc(100vh - 70px); background: #0a090f; overflow: hidden; }
+  .col-wrap { position: relative; width: 100%; height: calc(100vh - 70px); min-height: 480px; background: #0a090f; overflow: hidden; }
   .col-canvas { display: block; width: 100%; height: 100%; }
   .col-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: .5rem; z-index: 5; pointer-events: none; }
   .col-top button { pointer-events: auto; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .4rem 1rem; font-size: .8rem; cursor: pointer; }
@@ -109,7 +109,8 @@ function build() {
 }
 
 function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || (window.innerHeight - 70);
   renderer.setSize(w, h, false);
   camera.aspect = w / Math.max(1, h);
   camera.updateProjectionMatrix();
@@ -142,7 +143,7 @@ function buildMetro() {
   tube.rotation.z = Math.PI/2; metro.add(tube);
   const railL = new THREE.Mesh(new THREE.BoxGeometry(40, 0.08, 0.15), new THREE.MeshStandardMaterial({ color: 0x555555 }));
   railL.position.set(0, -1.6, -1.2); metro.add(railL);
-  const railR = railL clone(); railR.position.z = 1.2; metro.add(railR);
+  const railR = railL.clone(); railR.position.z = 1.2; metro.add(railR);
   for (let i = 0; i < 12; i++) {
     const lamp = new THREE.PointLight(0xffd27a, 1.5, 12);
     lamp.position.set(-18 + i*3.2, 2.5, 0); metro.add(lamp);
@@ -167,7 +168,7 @@ loader.load("/static/RIGGED_poyo_walking.glb", (g) => {
   mixer = new THREE.AnimationMixer(character);
   g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); });
   playClip(Object.keys(clips)[0]);
-});
+}, undefined, (err) => console.error("GLB load error:", err));
 
 loader.load("/static/RIGGED_poyo_running.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
 loader.load("/static/poyo_X_cast.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
@@ -208,7 +209,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft" || e.key === "a") move.x = -1;
   if (e.key === "ArrowRight" || e.key === "d") move.x = 1;
 });
-document.addEventListener("keydown", (e) => {});
 document.addEventListener("keyup", (e) => {
   if (["ArrowUp","w","ArrowDown","s"].includes(e.key)) move.y = 0;
   if (["ArrowLeft","a","ArrowRight","d"].includes(e.key)) move.x = 0;
@@ -229,12 +229,12 @@ function loop() {
     }
   }
   if (sceneMode === "colosseum") {
-    camera.position.x = 6 + character.position.x*0.15;
-    camera.position.z = 8 + character.position.z*0.15;
-    camera.lookAt(character.position.x, 1, character.position.z);
+    camera.position.x = 6 + (character ? character.position.x*0.15 : 0);
+    camera.position.z = 8 + (character ? character.position.z*0.15 : 0);
+    camera.lookAt(character ? character.position.x : 0, 1, character ? character.position.z : 0);
   } else {
-    camera.position.x = character.position.x;
-    camera.lookAt(character.position.x, 1.2, character.position.z + 4);
+    camera.position.x = character ? character.position.x : 0;
+    camera.lookAt(character ? character.position.x : 0, 1.2, (character ? character.position.z : 0) + 4);
   }
   renderer.render(scene, camera);
 }
