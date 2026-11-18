@@ -85,7 +85,7 @@ $("phone-send").onclick = () => {
   addMsg(v, "me");
   $("phone-input").value = "";
   setTimeout(() => addMsg(PHONE_REPLIES[Math.floor(Math.random()*PHONE_REPLIES.length)], "them"), 900 + Math.random()*1400);
-);
+};
 $("phone-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("phone-send").click(); });
 
 function build() {
