@@ -26,10 +26,12 @@
   .col-phone-input { display: flex; gap: .35rem; padding: .45rem .55rem; border-top: 1px solid rgba(255,255,255,.1); }
   .col-phone-input input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: #fff; padding: .3rem .5rem; font-size: .76rem; }
   .col-phone-input button { background: #7c5cfc; color: #fff; border: none; border-radius: 8px; padding: .3rem .65rem; font-size: .76rem; cursor: pointer; }
+  .col-status { position: absolute; top: 90px; left: 12px; color: #aaa; font-size: .7rem; z-index: 5; }
 </style>
 
 <div class="col-wrap">
   <canvas class="col-canvas" id="col-canvas"></canvas>
+  <div class="col-status" id="status">Loading racer…</div>
   <div class="col-top">
     <button class="active" id="btn-colosseum">Colosseum</button>
     <button id="btn-metro">Metro Tunnel</button>
@@ -69,17 +71,29 @@
 </script>
 <script type="module">
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 const $ = id => document.getElementById(id);
 const canvas = $("col-canvas");
-const loader = new GLTFLoader();
+const statusEl = $("status");
+const loader = new FBXLoader();
 
 let renderer, scene, camera, clock = new THREE.Clock();
-let you = null, agent = null, mixerYou = null, mixerAgent = null;
-let clipsYou = {}, clipsAgent = {}, curYou = null, curAgent = null;
-let move = {x:0, y:0}, sceneMode = "colosseum", agentCam = false;
+let you = null, mixerYou = null, clips = {};
+let curAction = null;
+let move = {x:0, y:0};
 let hpYou = 100, hpAgent = 100;
+
+const ANIM_MAP = {
+  idle: "Idle.fbx",
+  walk: "Start Walking.fbx",
+  run: "Slow Run.fbx",
+  jump: "Jump.fbx",
+  punch: "punch.fbx",
+  kick: "Mma Kick.fbx"
+};
+
+function setStatus(msg) { statusEl.textContent = msg; }
 
 function buildScene() {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -92,7 +106,6 @@ function buildScene() {
   const key = new THREE.DirectionalLight(0xfff2d0, 1.4);
   key.position.set(6, 12, 8); key.castShadow = true; scene.add(key);
   buildColosseum();
-  buildMetro();
   window.addEventListener("resize", onResize);
   onResize();
 }
@@ -112,73 +125,64 @@ function buildColosseum() {
     const tier = new THREE.Mesh(new THREE.TorusGeometry(4.2 + t*1.15, 0.38, 8, 64), new THREE.MeshStandardMaterial({color:0x3a3448, roughness:0.75}));
     tier.rotation.x = Math.PI/2; tier.position.y = 0.7 + t*0.75; colGroup.add(tier);
   }
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2;
-    const light = new THREE.PointLight(0xff9a3c, 3, 12);
-    light.position.set(Math.cos(a)*6.2, 2.4, Math.sin(a)*6.2);
-    colGroup.add(light);
-  }
   scene.add(colGroup);
 }
 
-const metroGroup = new THREE.Group(); metroGroup.visible = false;
-function buildMetro() {
-  const tube = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 50, 32, 1, true), new THREE.MeshStandardMaterial({color:0x1c1a22, side:THREE.BackSide}));
-  tube.rotation.z = Math.PI/2; metroGroup.add(tube);
-  scene.add(metroGroup);
+async function loadAllAnims() {
+  setStatus("Loading Idle…");
+  const base = await loadFBX("/static/Idle.fbx");
+  you = base;
+  you.scale.setScalar(0.01);
+  scene.add(you);
+  mixerYou = new THREE.AnimationMixer(you);
+  if (base.animations && base.animations.length) {
+    clips.idle = mixerYou.clipAction(base.animations[0]);
+  }
+
+  for (const [key, file] of Object.entries(ANIM_MAP)) {
+    if (key === "idle") continue;
+    setStatus("Loading " + key + "…");
+    try {
+      const animFbx = await loadFBX("/static/" + encodeURIComponent(file));
+      if (animFbx.animations && animFbx.animations.length) {
+        clips[key] = mixerYou.clipAction(animFbx.animations[0]);
+      }
+    } catch (e) {
+      console.warn("Failed to load", file, e);
+    }
+  }
+
+  play("idle");
+  setStatus("Racer ready");
+  setTimeout(() => statusEl.style.display = "none", 2000);
 }
 
-function loadChar(url, isYou) {
-  loader.load(url, g => {
-    const ch = g.scene;
-    ch.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    const box = new THREE.Box3().setFromObject(ch);
-    const s = 1.7 / Math.max(box.getSize(new THREE.Vector3()).y, 0.01);
-    ch.scale.setScalar(s);
-    ch.position.y = -box.min.y * s;
-    if (isYou) { ch.position.x = -1.5; you = ch; mixerYou = new THREE.AnimationMixer(ch); }
-    else { ch.position.x = 1.5; agent = ch; mixerAgent = new THREE.AnimationMixer(ch); }
-    scene.add(ch);
-    g.animations.forEach(a => {
-      const act = (isYou ? mixerYou : mixerAgent).clipAction(a);
-      if (isYou) clipsYou[a.name] = act; else clipsAgent[a.name] = act;
-    });
-    if (isYou) play(clipsYou, Object.keys(clipsYou)[0], true);
-    else play(clipsAgent, Object.keys(clipsAgent)[0], false);
+function loadFBX(url) {
+  return new Promise((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject);
   });
 }
 
-function play(clips, name, isYou) {
+function play(name) {
   const act = clips[name];
-  if (!act) return;
-  const cur = isYou ? curYou : curAgent;
-  if (cur === act) return;
-  if (cur) cur.fadeOut(0.2);
+  if (!act || act === curAction) return;
+  if (curAction) curAction.fadeOut(0.2);
   act.reset().fadeIn(0.2).play();
-  if (isYou) curYou = act; else curAgent = act;
+  curAction = act;
 }
 
-function findClip(clips, re) {
-  return Object.keys(clips).find(k => re.test(k)) || Object.keys(clips)[0];
-}
-
-$("btn-idle").onclick = () => play(clipsYou, findClip(clipsYou, /idle/i), true);
-$("btn-walk").onclick = () => play(clipsYou, findClip(clipsYou, /walk/i), true);
-$("btn-run").onclick = () => play(clipsYou, findClip(clipsYou, /run/i), true);
-$("btn-jump").onclick = () => play(clipsYou, findClip(clipsYou, /jump/i), true);
-$("btn-punch").onclick = () => { play(clipsYou, findClip(clipsYou, /punch|hit|attack/i), true); damage("agent"); };
-$("btn-kick").onclick = () => { play(clipsYou, findClip(clipsYou, /kick/i), true); damage("agent"); };
+$("btn-idle").onclick = () => play("idle");
+$("btn-walk").onclick = () => play("walk");
+$("btn-run").onclick = () => play("run");
+$("btn-jump").onclick = () => play("jump");
+$("btn-punch").onclick = () => { play("punch"); damage("agent"); };
+$("btn-kick").onclick = () => { play("kick"); damage("agent"); };
 
 function damage(who) {
   if (who === "agent") { hpAgent = Math.max(0, hpAgent - 12); $("hp-agent").style.width = hpAgent + "%"; }
   else { hpYou = Math.max(0, hpYou - 10); $("hp-you").style.width = hpYou + "%"; }
-  if (hpYou <= 0 || hpAgent <= 0) setTimeout(reset, 1200);
+  if (hpYou <= 0 || hpAgent <= 0) setTimeout(() => { hpYou = hpAgent = 100; $("hp-you").style.width = $("hp-agent").style.width = "100%"; }, 1200);
 }
-function reset() { hpYou = hpAgent = 100; $("hp-you").style.width = $("hp-agent").style.width = "100%"; }
-
-$("btn-colosseum").onclick = () => { sceneMode = "colosseum"; colGroup.visible = true; metroGroup.visible = false; };
-$("btn-metro").onclick = () => { sceneMode = "metro"; colGroup.visible = false; metroGroup.visible = true; };
-$("btn-cam").onclick = () => { agentCam = !agentCam; $("btn-cam").textContent = agentCam ? "Your Cam" : "Agent Cam"; };
 
 const stick = $("stick"), knob = $("stick-knob");
 let drag = false;
@@ -200,7 +204,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "s" || e.key === "ArrowDown") move.y = -1;
   if (e.key === "a" || e.key === "ArrowLeft") move.x = -1;
   if (e.key === "d" || e.key === "ArrowRight") move.x = 1;
-  if (e.key === " ") { play(clipsYou, findClip(clipsYou, /jump/i), true); e.preventDefault(); }
+  if (e.key === " ") { play("jump"); e.preventDefault(); }
 });
 document.addEventListener("keyup", e => {
   if (["w","s","ArrowUp","ArrowDown"].includes(e.key)) move.y = 0;
@@ -226,34 +230,17 @@ function loop() {
   requestAnimationFrame(loop);
   const dt = clock.getDelta();
   if (mixerYou) mixerYou.update(dt);
-  if (mixerAgent) mixerAgent.update(dt);
 
   if (you && (move.x || move.y)) {
-    you.position.x += move.x * dt * 3.2;
-    you.position.z += move.y * dt * 3.2;
+    you.position.x += move.x * dt * 2.5;
+    you.position.z += move.y * dt * 2.5;
     you.rotation.y = Math.atan2(move.x, move.y);
-    play(clipsYou, findClip(clipsYou, Math.hypot(move.x,move.y) > 0.55 ? /run/i : /walk/i), true);
+    const speed = Math.hypot(move.x, move.y);
+    if (speed > 0.5) play("run");
+    else play("walk");
   }
 
-  if (agent && you) {
-    const dx = you.position.x - agent.position.x;
-    const dz = you.position.z - agent.position.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist > 1.8) {
-      agent.position.x += (dx / dist) * dt * 1.6;
-      agent.position.z += (dz / dist) * dt * 1.6;
-      agent.rotation.y = Math.atan2(dx, dz);
-      play(clipsAgent, findClip(clipsAgent, /walk|run/i), false);
-    } else {
-      play(clipsAgent, findClip(clipsAgent, /punch|kick|attack|idle/i), false);
-      if (Math.random() < 0.015) damage("you");
-    }
-  }
-
-  if (agentCam && agent) {
-    camera.position.lerp(new THREE.Vector3(agent.position.x - 2, 2.2, agent.position.z + 4), 0.08);
-    camera.lookAt(agent.position.x, 1.2, agent.position.z);
-  } else if (you) {
+  if (you) {
     camera.position.lerp(new THREE.Vector3(you.position.x + 6, 4.5, you.position.z + 8), 0.06);
     camera.lookAt(you.position.x, 1, you.position.z);
   }
@@ -261,9 +248,8 @@ function loop() {
 }
 
 buildScene();
-loadChar("/static/RIGGED_poyo_walking.glb", true);
-loadChar("/static/RIGGED_poyo_running.glb", false);
-addMsg("Agent online. Try me.", "them");
+loadAllAnims();
+addMsg("Racer loaded. Try the buttons.", "them");
 loop();
 </script>
 {% endblock %}
