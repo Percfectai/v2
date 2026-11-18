@@ -75,6 +75,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 
 /* ------------------------------------------------------------------
    Percfect 3D board — original code (MIT, same as repo).
@@ -642,6 +644,11 @@ function attachModel(root, clips, hint) {
 }
 
 const loader = new GLTFLoader();
+// Accept compressed GLBs (gltf-transform optimize --compress draco|meshopt)
+const draco = new DRACOLoader();
+draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+loader.setDRACOLoader(draco);
+loader.setMeshoptDecoder(MeshoptDecoder);
 function loadGLB(url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
 }
