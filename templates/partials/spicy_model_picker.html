@@ -1,0 +1,89 @@
+<!-- SpicyAPI model picker — drop-in dropdown for the image/video gen UI.
+     Fetches /api/spicy/models (public) and renders a <select> grouped into Standard vs Spicy,
+     with the list price shown. Reads the chosen model id from #spicy-model.value, and fires a
+     `spicy:model` CustomEvent on change with {id, spicy, price, tasks}.
+     Include anywhere: {% include "partials/spicy_model_picker.html" %}  (or paste this block). -->
+<div class="spicy-picker" data-modality="image">
+  <style>
+    .spicy-picker { display:flex; flex-direction:column; gap:.4rem; max-width:420px; font:inherit; }
+    .spicy-picker label { font-size:.85rem; font-weight:600; color:var(--muted,#9fb0c0); }
+    .spicy-picker .row { display:flex; gap:.5rem; align-items:center; }
+    .spicy-picker select { flex:1; padding:.55rem .6rem; border-radius:10px;
+      background:rgba(255,255,255,.06); color:var(--ink,#eef4f9); border:1px solid var(--line,#263d52); font:inherit; }
+    .spicy-picker select:focus { outline:2px solid var(--gold,#e0a94e); outline-offset:2px; }
+    .spicy-picker .seg { display:flex; border:1px solid var(--line,#263d52); border-radius:8px; overflow:hidden; }
+    .spicy-picker .seg button { background:transparent; color:var(--muted,#9fb0c0); border:0; padding:.4rem .7rem; cursor:pointer; font:inherit; }
+    .spicy-picker .seg button[aria-pressed="true"] { background:var(--gold,#e0a94e); color:#1b1230; font-weight:700; }
+    .spicy-picker .price { font-size:.82rem; color:var(--gold-hi,#ffeaa5); min-height:1.1em; }
+    .spicy-picker .spicy-tag { font-size:.72rem; color:#ff8ac6; }
+  </style>
+
+  <div class="row">
+    <div class="seg" role="group" aria-label="Media type">
+      <button type="button" data-mod="image" aria-pressed="true">Image</button>
+      <button type="button" data-mod="video" aria-pressed="false">Video</button>
+    </div>
+    <label style="margin-left:auto"><input type="checkbox" id="spicy-allow" checked> Show spicy</label>
+  </div>
+
+  <label for="spicy-model">Model</label>
+  <select id="spicy-model" aria-describedby="spicy-price"><option>Loading models…</option></select>
+  <div class="price" id="spicy-price" aria-live="polite"></div>
+</div>
+
+<script>
+(function () {
+  var root = document.currentScript.previousElementSibling;
+  var sel = root.querySelector('#spicy-model');
+  var priceEl = root.querySelector('#spicy-price');
+  var allow = root.querySelector('#spicy-allow');
+  var segBtns = root.querySelectorAll('.seg button');
+  var modality = root.dataset.modality || 'image';
+  var cache = {};
+
+  function priceText(m) { return m.price ? (m.spicy ? '🌶 ' : '') + m.price + ' (list)' : ''; }
+
+  function emit() {
+    var opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) return;
+    priceEl.textContent = opt.dataset.price ? priceText({price: opt.dataset.price, spicy: opt.dataset.spicy === '1'}) : '';
+    root.dispatchEvent(new CustomEvent('spicy:model', { bubbles: true, detail: {
+      id: opt.value, spicy: opt.dataset.spicy === '1', price: opt.dataset.price, tasks: (opt.dataset.tasks||'').split(',')
+    }}));
+  }
+
+  async function load() {
+    var key = modality + ':' + (allow.checked ? 1 : 0);
+    sel.innerHTML = '<option>Loading…</option>';
+    try {
+      if (!cache[key]) {
+        var res = await fetch('/api/spicy/models?modality=' + modality + '&spicy=' + (allow.checked ? 1 : 0));
+        cache[key] = (await res.json()).models || [];
+      }
+      var models = cache[key];
+      if (!models.length) { sel.innerHTML = '<option value="">No models</option>'; priceEl.textContent=''; return; }
+      var std = models.filter(function (m) { return !m.spicy; });
+      var spi = models.filter(function (m) { return m.spicy; });
+      function group(label, arr) {
+        if (!arr.length) return '';
+        return '<optgroup label="' + label + '">' + arr.map(function (m) {
+          return '<option value="' + m.id + '" data-price="' + (m.price||'') + '" data-spicy="' + (m.spicy?1:0)
+            + '" data-tasks="' + (m.tasks||[]).join(',') + '">' + m.label + (m.price ? '  —  ' + m.price : '') + '</option>';
+        }).join('') + '</optgroup>';
+      }
+      sel.innerHTML = group('Standard', std) + group('Spicy 🌶', spi);
+      emit();
+    } catch (e) { sel.innerHTML = '<option value="">Failed to load</option>'; }
+  }
+
+  segBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      segBtns.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      modality = b.dataset.mod; root.dataset.modality = modality; load();
+    });
+  });
+  allow.addEventListener('change', load);
+  sel.addEventListener('change', emit);
+  load();
+})();
+</script>

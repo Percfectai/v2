@@ -235,6 +235,16 @@ except Exception as _char_agents_init_err:
     except Exception:
         pass
 
+# SpicyAPI media provider (image/video, standard + spicy) — /api/spicy/{models,quote,generate}
+try:
+    import spicy_routes
+    spicy_routes.init_app(app)
+except Exception as _spicy_init_err:
+    try:
+        app.logger.warning("spicy_routes init failed: %s", _spicy_init_err)
+    except Exception:
+        pass
+
 _SHOP_FALLBACK = str(Path(__file__).resolve().parent / "static" / "data" / "premade_shop.json")
 
 # ── xAI ───────────────────────────────────────────────────
