@@ -1,11 +1,245 @@
 {% extends "base.html" %}
-{% block title %}3D Build — Percfect Studios{% endblock %}
+{% block title %}3D Colosseum — Percfect Studios{% endblock %}
 {% block content %}
-<div id="3d-app">
-    <!-- STUB: Restore from HANDOFFS/11_3D_GAME_WORKSTREAM.md -->
-    <h1>3D Character Builder</h1>
+<style>
+  .col-wrap { position: relative; width: 100%; height: calc(100vh - 70px); background: #0a090f; overflow: hidden; }
+  .col-canvas { display: block; width: 100%; height: 100%; }
+  .col-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: .5rem; z-index: 5; pointer-events: none; }
+  .col-top button { pointer-events: auto; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .4rem 1rem; font-size: .8rem; cursor: pointer; }
+  .col-top button.active { background: #7c5cfc; border-color: #7c5cfc; }
+  .col-ctrl { position: absolute; bottom: 16px; left: 16px; z-index: 5; display: flex; flex-direction: column; gap: .4rem; }
+  .col-ctrl button { background: rgba(20,18,30,.85); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: .45rem .9rem; font-size: .8rem; cursor: pointer; }
+  .col-ctrl button:hover { background: #7c5cfc; }
+  .col-stick { width: 110px; height: 110px; border-radius: 50%; background: rgba(20,18,30,.7); border: 1px solid rgba(255,255,255,.15); position: relative; margin-top: .5rem; touch-action: none; }
+  .col-stick-knob { width: 44px; height: 44px; border-radius: 50%; background: #7c5cfc; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+  .col-phone { position: absolute; bottom: 16px; right: 16px; z-index: 5; width: min(320px, 85vw); height: 420px; background: rgba(15,14,22,.92); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
+  .col-phone-head { padding: .6rem .8rem; border-bottom: 1px solid rgba(255,255,255,.1); color: #fff; font-weight: 700; font-size: .85rem; }
+  .col-phone-body { flex: 1; overflow-y: auto; padding: .6rem .8rem; display: flex; flex-direction: column; gap: .4rem; }
+  .col-phone-msg { max-width: 85%; padding: .4rem .6rem; border-radius: 10px; font-size: .78rem; line-height: 1.35; }
+  .col-phone-msg.them { background: rgba(124,92,252,.25); color: #e8e0ff; align-self: flex-start; }
+  .col-phone-msg.me { background: rgba(255,255,255,.08); color: #ddd; align-self: flex-end; }
+  .col-phone-input { display: flex; gap: .4rem; padding: .5rem .6rem; border-top: 1px solid rgba(255,255,255,.1); }
+  .col-phone-input input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: #fff; padding: .35rem .6rem; font-size: .78rem; }
+  .col-phone-input button { background: #7c5cfc; color: #fff; border: none; border-radius: 8px; padding: .35rem .7rem; font-size: .78rem; cursor: pointer; }
+</style>
+
+<div class="col-wrap">
+  <canvas class="col-canvas" id="col-canvas"></canvas>
+  <div class="col-top">
+    <button class="active" id="btn-colosseum">Colosseum</button>
+    <button id="btn-metro">Metro Tunnel</button>
+  </div>
+  <div class="col-ctrl">
+    <button id="btn-walk">Walk</button>
+    <button id="btn-run">Run</button>
+    <button id="btn-cast">Cast</button>
+    <button id="btn-idle">Idle</button>
+    <div class="col-stick" id="stick"><div class="col-stick-knob" id="stick-knob"></div></div>
+  </div>
+  <div class="col-phone">
+    <div class="col-phone-head">Messenger</div>
+    <div class="col-phone-body" id="phone-body"></div>
+    <div class="col-phone-input">
+      <input id="phone-input" placeholder="Type a message…" autocomplete="off">
+      <button id="phone-send">Send</button>
+    </div>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/percfect_stage_3d.js"></script>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("col-canvas");
+const loader = new GLTFLoader();
+
+let renderer, scene, camera, raf = 0;
+let character = null, mixer = null, clips = {}, curAction = null;
+let move = { x: 0, y: 0 };
+let sceneMode = "colosseum";
+
+const PHONE_REPLIES = [
+  "Nice moves.", "Where are we going?", "It's getting dark out here.",
+  "Did you hear that?", "I'm hungry.", "Turn left at the next arch."
+];
+
+function addMsg(text, who) {
+  const el = document.createElement("div");
+  el.className = "col-phone-msg " + who;
+  el.textContent = text;
+  $("phone-body").appendChild(el);
+  $("phone-body").scrollTop = $("phone-body").scrollHeight;
+}
+
+$("phone-send").onclick = () => {
+  const v = $("phone-input").value.trim();
+  if (!v) return;
+  addMsg(v, "me");
+  $("phone-input").value = "";
+  setTimeout(() => addMsg(PHONE_REPLIES[Math.floor(Math.random()*PHONE_REPLIES.length)], "them"), 900 + Math.random()*1400);
+);
+$("phone-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("phone-send").click(); });
+
+function build() {
+  if (renderer) return;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / Math.max(1, canvas.clientHeight), 0.1, 200);
+  camera.position.set(6, 5, 8);
+  scene.add(new THREE.HemisphereLight(0xc9b8ff, 0x1a1426, 1));
+  const key = new THREE.SpotLight(0xfff2d0, 80, 40, Math.PI/5, 0.35);
+  key.position.set(4, 12, 6); key.castShadow = true; scene.add(key);
+  const rim = new THREE.DirectionalLight(0xb48cff, 0.8);
+  rim.position.set(-6, 4, -4); scene.add(rim);
+  buildColosseum();
+  buildMetro();
+  window.addEventListener("resize", resize);
+  resize();
+}
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+}
+
+const colosseum = new THREE.Group();
+function buildColosseum() {
+  const sand = new THREE.Mesh(new THREE.CircleGeometry(7, 64), new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.9 }));
+  sand.rotation.x = -Math.PI/2; sand.receiveShadow = true; colosseum.add(sand);
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.15, 64), new THREE.MeshStandardMaterial({ color: 0x2a2438, metalness: 0.5 }));
+  plat.position.y = 0.075; colosseum.add(plat);
+  for (let t = 0; t < 5; t++) {
+    const tier = new THREE.Mesh(new THREE.TorusGeometry(3.5 + t*1.1, 0.35, 8, 64), new THREE.MeshStandardMaterial({ color: 0x3a3448, roughness: 0.7 }));
+    tier.rotation.x = Math.PI/2; tier.position.y = 0.6 + t*0.7; colosseum.add(tier);
+  }
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const torch = new THREE.PointLight(0xff9a3c, 2, 10);
+    torch.position.set(Math.cos(a)*5.5, 2.2, Math.sin(a)*5.5);
+    colosseum.add(torch);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2), new THREE.MeshBasicMaterial({ color: 0x4a4030 }));
+    pole.position.copy(torch.position); pole.position.y = 1.1; colosseum.add(pole);
+  }
+  scene.add(colosseum);
+}
+
+const metro = new THREE.Group(); metro.visible = false;
+function buildMetro() {
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 40, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x1c1a22, side: THREE.BackSide, roughness: 0.8 }));
+  tube.rotation.z = Math.PI/2; metro.add(tube);
+  const railL = new THREE.Mesh(new THREE.BoxGeometry(40, 0.08, 0.15), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+  railL.position.set(0, -1.6, -1.2); metro.add(railL);
+  const railR = railL clone(); railR.position.z = 1.2; metro.add(railR);
+  for (let i = 0; i < 12; i++) {
+    const lamp = new THREE.PointLight(0xffd27a, 1.5, 12);
+    lamp.position.set(-18 + i*3.2, 2.5, 0); metro.add(lamp);
+  }
+  scene.add(metro);
+}
+
+$("btn-colosseum").onclick = () => { sceneMode = "colosseum"; colosseum.visible = true; metro.visible = false; camera.position.set(6,5,8); };
+$("btn-metro").onclick = () => { sceneMode = "metro"; colosseum.visible = false; metro.visible = true; camera.position.set(0, 1.2, 10); };
+
+loader.load("/static/RIGGED_poyo_walking.glb", (g) => {
+  character = g.scene;
+  character.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const box = new THREE.Box3().setFromObject(character, true);
+  const s = 1.8 / Math.max(box.getSize(new THREE.Vector3()).y, 1e-3);
+  character.scale.setScalar(s);
+  character.updateMatrixWorld(true);
+  const b2 = new THREE.Box3().setFromObject(character, true);
+  const c = b2.getCenter(new THREE.Vector3());
+  character.position.x -= c.x; character.position.z -= c.z; character.position.y -= b2.min.y;
+  scene.add(character);
+  mixer = new THREE.AnimationMixer(character);
+  g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); });
+  playClip(Object.keys(clips)[0]);
+});
+
+loader.load("/static/RIGGED_poyo_running.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
+loader.load("/static/poyo_X_cast.glb", (g) => { g.animations.forEach(a => { clips[a.name] = mixer.clipAction(a); }); });
+
+function playClip(name) {
+  const act = clips[name];
+  if (!act || act === curAction) return;
+  if (curAction) curAction.fadeOut(0.25);
+  act.reset().fadeIn(0.25).play();
+  curAction = act;
+}
+$("btn-walk").onclick = () => playClip(Object.keys(clips).find(k => /walk/i.test(k)) || Object.keys(clips)[0]);
+$("btn-run").onclick = () => playClip(Object.keys(clips).find(k => /run/i.test(k)) || Object.keys(clips)[0]);
+$("btn-cast").onclick = () => playClip(Object.keys(clips).find(k => /cast|spell|charg/i.test(k)) || Object.keys(clips)[0]);
+$("btn-idle").onclick = () => playClip(Object.keys(clips).find(k => /idle/i.test(k)) || Object.keys(clips)[0]);
+
+const stick = $("stick"), knob = $("stick-knob");
+let dragging = false;
+function setStick(cx, cy) {
+  const r = stick.clientWidth/2 - 22;
+  let dx = cx - stick.clientWidth/2, dy = cy - stick.clientHeight/2;
+  const len = Math.hypot(dx, dy);
+  if (len > r) { dx *= r/len; dy *= r/len; }
+  knob.style.left = (stick.clientWidth/2 + dx) + "px";
+  knob.style.top = (stick.clientHeight/2 + dy) + "px";
+  move.x = dx/r; move.y = -dy/r;
+}
+function onDown(e) { dragging = true; const t = e.touches ? e.touches[0] : e; const rect = stick.getBoundingClientRect(); setStick(t.clientX - rect.left, t.clientY - rect.top); }
+function onMove(e) { if (!dragging) return; const t = e.touches ? e.touches[0] : e; const rect = stick.getBoundingClientRect(); setStick(t.clientX - rect.left, t.clientY - rect.top); }
+function onUp() { dragging = false; knob.style.left = "50%"; knob.style.top = "50%"; move.x = 0; move.y = 0; }
+stick.addEventListener("pointerdown", onDown);
+window.addEventListener("pointermove", onMove);
+window.addEventListener("pointerup", onUp);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp" || e.key === "w") move.y = 1;
+  if (e.key === "ArrowDown" || e.key === "s") move.y = -1;
+  if (e.key === "ArrowLeft" || e.key === "a") move.x = -1;
+  if (e.key === "ArrowRight" || e.key === "d") move.x = 1;
+});
+document.addEventListener("keydown", (e) => {});
+document.addEventListener("keyup", (e) => {
+  if (["ArrowUp","w","ArrowDown","s"].includes(e.key)) move.y = 0;
+  if (["ArrowLeft","a","ArrowRight","d"].includes(e.key)) move.x = 0;
+});
+
+const clock = new THREE.Clock();
+function loop() {
+  raf = requestAnimationFrame(loop);
+  const dt = clock.getDelta();
+  if (mixer) mixer.update(dt);
+  if (character) {
+    character.position.x += move.x * dt * (move.y < -0.3 ? 4 : 2.2);
+    character.position.z += move.y * dt * (move.y < -0.3 ? 4 : 2.2);
+    if (move.x !== 0 || move.y !== 0) {
+      character.rotation.y = Math.atan2(move.x, move.y);
+      const run = Math.hypot(move.x, move.y) > 0.6;
+      playClip(Object.keys(clips).find(k => run ? /run/i.test(k) : /walk/i.test(k)) || Object.keys(clips)[0]);
+    }
+  }
+  if (sceneMode === "colosseum") {
+    camera.position.x = 6 + character.position.x*0.15;
+    camera.position.z = 8 + character.position.z*0.15;
+    camera.lookAt(character.position.x, 1, character.position.z);
+  } else {
+    camera.position.x = character.position.x;
+    camera.lookAt(character.position.x, 1.2, character.position.z + 4);
+  }
+  renderer.render(scene, camera);
+}
+build();
+loop();
+addMsg("Hey, you made it.", "them");
+</script>
 {% endblock %}
