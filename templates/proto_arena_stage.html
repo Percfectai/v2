@@ -1,10 +1,256 @@
 {% extends "base.html" %}
 {% block title %}Arena Stage — Percfect Studios{% endblock %}
+
 {% block content %}
-<div id="arena-stage">
-    <!-- STUB: arena stage UI -->
+<div id="arena-stage" class="container" style="max-width: 1100px; margin: 32px auto; padding: 0 16px;">
+  <!-- Arena Header -->
+  <div class="arena-header text-center" style="margin-bottom: 24px;">
+    <h1 style="font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; letter-spacing: -0.03em; margin-bottom: 8px; background: linear-gradient(135deg, #fff8f0, #f0c674 40%, #e8a54b 70%, #c45c2a); -webkit-background-clip: text; background-clip: text; color: transparent;">The Arena</h1>
+    <p style="color: var(--text-muted, #b8a08a); font-size: 1rem;">Pick two players — library opens from the corner</p>
+  </div>
+
+  <!-- Matchup Cards -->
+  <div class="matchup-grid" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 32px;">
+    <div class="player-card" id="p1-card" onclick="openCharacterPicker(1)" style="background: var(--bg-2, #16110d); border: 2px dashed var(--border-2, #5c4330); border-radius: 14px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+      <div id="p1-avatar" style="font-size: 2.5rem; margin-bottom: 8px;">👤</div>
+      <div id="p1-name" style="font-weight: 700; font-size: 1.1rem; color: var(--accent-3, #f5e0b8);">P1 Choose player</div>
+      <span style="font-size: 0.8rem; color: var(--text-muted, #b8a08a);">Click to select</span>
+    </div>
+    <div class="vs-badge" style="font-weight: 900; font-size: 1.8rem; color: var(--accent, #e8a54b); padding: 12px; text-shadow: 0 0 16px rgba(232, 165, 75, 0.4); text-align: center;">VS</div>
+    <div class="player-card" id="p2-card" onclick="openCharacterPicker(2)" style="background: var(--bg-2, #16110d); border: 2px dashed var(--border-2, #5c4330); border-radius: 14px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+      <div id="p2-avatar" style="font-size: 2.5rem; margin-bottom: 8px;">👤</div>
+      <div id="p2-name" style="font-weight: 700; font-size: 1.1rem; color: var(--accent-3, #f5e0b8);">P2 Choose player</div>
+      <span style="font-size: 0.8rem; color: var(--text-muted, #b8a08a);">Click to select</span>
+    </div>
+  </div>
+
+  <!-- Arena Form & Controls Panel -->
+  <form id="arenaForm" method="POST" action="/studios/percfectcharacter/arena/generate">
+    <input type="hidden" name="character_ids" id="character_ids" value="">
+    <input type="hidden" name="action" id="action" value="fight">
+    <input type="hidden" name="duration" id="duration" value="6">
+    <input type="hidden" name="bg_mode" id="bg_mode" value="preset">
+
+    <div class="controls-panel" style="background: var(--bg-2, #16110d); border: 1px solid var(--border, #3d2e22); border-radius: 14px; padding: 24px; margin-bottom: 32px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);">
+      <!-- Duration Selector -->
+      <div class="control-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.8rem; color: var(--accent-2, #f0c674); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Video Duration</label>
+        <div class="duration-selector" style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button type="button" class="duration-opt active" onclick="setDuration(6, 18)" style="background: var(--bg-3, #221a14); border: 1px solid var(--accent, #e8a54b); padding: 10px 20px; border-radius: 8px; cursor: pointer; color: var(--text, #fff6ea); font-weight: 600;">6s (+18 credits)</button>
+          <button type="button" class="duration-opt" onclick="setDuration(10, 28)" style="background: var(--bg-3, #221a14); border: 1px solid var(--border-2, #5c4330); padding: 10px 20px; border-radius: 8px; cursor: pointer; color: var(--text-muted, #b8a08a); font-weight: 600;">10s (+28 credits)</button>
+          <button type="button" class="duration-opt" onclick="setDuration(15, 38)" style="background: var(--bg-3, #221a14); border: 1px solid var(--border-2, #5c4330); padding: 10px 20px; border-radius: 8px; cursor: pointer; color: var(--text-muted, #b8a08a); font-weight: 600;">15s (+38 credits)</button>
+        </div>
+      </div>
+
+      <!-- Stage Environment Selector (19 Locations) -->
+      <div class="control-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.8rem; color: var(--accent-2, #f0c674); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Stage Environment (19 Locations)</label>
+        <select name="bg_preset" id="stageSelect" class="form-select stage-select" style="width: 100%; padding: 12px; background: var(--bg-3, #221a14); border: 1px solid var(--border-2, #5c4330); color: var(--text, #fff6ea); border-radius: 8px; font-size: 1rem;">
+          <option value="arena" selected>Roman Colosseum</option>
+          <option value="green_coordinate">Green Coordinate Stage</option>
+          <option value="clean_studio">Clean Studio</option>
+          <option value="throne_room">Throne Room</option>
+          <option value="neon_city">Neon City</option>
+          <option value="enchanted_forest">Enchanted Forest</option>
+          <option value="beach_sunset">Beach Sunset</option>
+          <option value="outer_space">Outer Space</option>
+          <option value="boxing_ring">Boxing Ring</option>
+          <option value="open_highway">Open Highway Race Track</option>
+          <option value="snowy_mountain">Snowy Mountain Ski Slope</option>
+          <option value="desert_dunes">Desert Dunes</option>
+          <option value="basketball_court">Basketball Court</option>
+          <option value="sports_stadium">Sports Stadium</option>
+          <option value="sports_field">Sports Field</option>
+          <option value="tennis_court">Tennis Court</option>
+          <option value="grand_ballroom">Grand Ballroom</option>
+          <option value="night_club">Night Club</option>
+          <option value="city_rooftop">City Rooftop</option>
+        </select>
+      </div>
+
+      <!-- Custom Prompt Field -->
+      <div class="control-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.8rem; color: var(--accent-2, #f0c674); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Custom Scene Prompt (Optional)</label>
+        <textarea name="custom_prompt" id="custom_prompt" class="form-control" rows="2" placeholder='e.g., "They spar with blades in the Colosseum dust until one bows"' style="width: 100%; padding: 12px; background: var(--bg-3, #221a14); border: 1px solid var(--border-2, #5c4330); color: var(--text, #fff6ea); border-radius: 8px;"></textarea>
+      </div>
+
+      <!-- Generate Button -->
+      <button type="submit" id="generateBtn" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 1.15rem; font-weight: 800; border: none; border-radius: 10px; background: var(--theme-grad, linear-gradient(135deg, #e8a54b 0%, #c45c2a 50%, #8b2942 100%)); color: #1a1008; cursor: pointer; box-shadow: 0 6px 24px rgba(232, 165, 75, 0.35); transition: transform 0.15s ease;">
+        ▶ Generate (6s · ~18 credits)
+      </button>
+    </div>
+
+    <!-- Interaction & Animation Presets -->
+    <div class="presets-section" style="background: var(--bg-2, #16110d); border: 1px solid var(--border, #3d2e22); border-radius: 14px; padding: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);">
+      <h3 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 16px; color: var(--accent-3, #f5e0b8);">Interaction Presets</h3>
+
+      <!-- Category: Free -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-2, #f0c674); margin: 16px 0 8px;">Free (Quick 6)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip active" onclick="selectAction('fight', 0, this)">🥊 Fight</button>
+        <button type="button" class="preset-chip" onclick="selectAction('romance', 0, this)">💕 Romance</button>
+        <button type="button" class="preset-chip" onclick="selectAction('dance', 0, this)">💃 Dance</button>
+        <button type="button" class="preset-chip" onclick="selectAction('hug', 0, this)">🤗 Hug</button>
+        <button type="button" class="preset-chip" onclick="selectAction('highfive', 0, this)">🙌 High Five</button>
+        <button type="button" class="preset-chip" onclick="selectAction('faceoff', 0, this)">⚔ Face-Off</button>
+      </div>
+
+      <!-- Category: 18+ (+15 credits) -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #fb7185; margin: 20px 0 8px;">18+ (+15 credits)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip" onclick="selectAction('surprise_me', 15, this)">🎲 Surprise me (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('partner_yoga', 15, this)">🧘 Partner yoga (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('movie_night', 15, this)">🍿 Movie night (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('beach_day', 15, this)">🏖 Beach day (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('shoulder_rub', 15, this)">💆 Shoulder rub (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('caught_in_rain', 15, this)">🌧 Caught in rain (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('kitchen_chemistry', 15, this)">👩‍🍳 Kitchen chemistry (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('photoshoot', 15, this)">📸 Photoshoot (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('sleepover', 15, this)">🛏 Sleepover (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('after_the_wine', 15, this)">🍷 After the wine (+15cr)</button>
+        <button type="button" class="preset-chip" onclick="selectAction('invisible_trampoline', 15, this)">🤸 Invisible trampoline (+15cr)</button>
+      </div>
+
+      <!-- Category: Combat -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-2, #f0c674); margin: 20px 0 8px;">Combat (10)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip" onclick="selectAction('fencing', 0, this)">🤺 Fencing Duel</button>
+        <button type="button" class="preset-chip" onclick="selectAction('boxing', 0, this)">🥊 Boxing Match</button>
+        <button type="button" class="preset-chip" onclick="selectAction('sword_fight', 0, this)">⚔ Sword Fight</button>
+        <button type="button" class="preset-chip" onclick="selectAction('kung_fu', 0, this)">🥋 Kung-Fu</button>
+        <button type="button" class="preset-chip" onclick="selectAction('karate', 0, this)">🥷 Karate</button>
+        <button type="button" class="preset-chip" onclick="selectAction('wrestling', 0, this)">🤼 Wrestling</button>
+        <button type="button" class="preset-chip" onclick="selectAction('mma', 0, this)">🥊 MMA Cage</button>
+        <button type="button" class="preset-chip" onclick="selectAction('lightsaber', 0, this)">🔦 Lightsaber</button>
+        <button type="button" class="preset-chip" onclick="selectAction('staff_fight', 0, this)">🥢 Staff Fight</button>
+        <button type="button" class="preset-chip" onclick="selectAction('standoff', 0, this)">😤 Standoff</button>
+      </div>
+
+      <!-- Category: Sports -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-2, #f0c674); margin: 20px 0 8px;">Sports (13)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip" onclick="selectAction('basketball', 0, this)">🏀 Basketball</button>
+        <button type="button" class="preset-chip" onclick="selectAction('football', 0, this)">🏈 Football</button>
+        <button type="button" class="preset-chip" onclick="selectAction('baseball', 0, this)">⚾ Baseball</button>
+        <button type="button" class="preset-chip" onclick="selectAction('soccer', 0, this)">⚽ Soccer</button>
+        <button type="button" class="preset-chip" onclick="selectAction('tennis', 0, this)">🎾 Tennis</button>
+        <button type="button" class="preset-chip" onclick="selectAction('skiing', 0, this)">⛷ Skiing</button>
+        <button type="button" class="preset-chip" onclick="selectAction('snowboarding', 0, this)">🏂 Snowboarding</button>
+        <button type="button" class="preset-chip" onclick="selectAction('dirt_bikes', 0, this)">🏍 Dirt Bikes</button>
+        <button type="button" class="preset-chip" onclick="selectAction('quad_atv', 0, this)">🛞 Quad / ATV</button>
+        <button type="button" class="preset-chip" onclick="selectAction('snowmobile', 0, this)">🛷 Snowmobile</button>
+        <button type="button" class="preset-chip" onclick="selectAction('surfing', 0, this)">🏄 Surfing</button>
+        <button type="button" class="preset-chip" onclick="selectAction('skateboarding', 0, this)">🛹 Skateboarding</button>
+        <button type="button" class="preset-chip" onclick="selectAction('golf', 0, this)">⛳ Golf</button>
+      </div>
+
+      <!-- Category: Dance -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-2, #f0c674); margin: 20px 0 8px;">Dance (9)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip" onclick="selectAction('dance_off', 0, this)">🕺 Dance-Off</button>
+        <button type="button" class="preset-chip" onclick="selectAction('tango', 0, this)">💃 Tango</button>
+        <button type="button" class="preset-chip" onclick="selectAction('ballroom_waltz', 0, this)">🎩 Ballroom Waltz</button>
+        <button type="button" class="preset-chip" onclick="selectAction('salsa', 0, this)">🌶 Salsa</button>
+        <button type="button" class="preset-chip" onclick="selectAction('ballet', 0, this)">🩰 Ballet</button>
+        <button type="button" class="preset-chip" onclick="selectAction('breakdance', 0, this)">🤸 Breakdance</button>
+        <button type="button" class="preset-chip" onclick="selectAction('hip_hop', 0, this)">🧢 Hip-Hop</button>
+        <button type="button" class="preset-chip" onclick="selectAction('contemporary', 0, this)">🌀 Contemporary</button>
+        <button type="button" class="preset-chip" onclick="selectAction('swing', 0, this)">🎷 Swing</button>
+      </div>
+
+      <!-- Category: Racing -->
+      <div class="cat-title" style="font-family: var(--font-mono, monospace); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-2, #f0c674); margin: 20px 0 8px;">Racing (2)</div>
+      <div class="chip-wall" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button type="button" class="preset-chip" onclick="selectAction('motorcycle_race', 0, this)">🏍 Motorcycle Race</button>
+        <button type="button" class="preset-chip" onclick="selectAction('convertible_race', 0, this)">🏎 Convertible Race</button>
+      </div>
+    </div>
+  </form>
 </div>
+
+<style>
+.preset-chip {
+  background: var(--bg-3, #221a14);
+  border: 1px solid var(--border-2, #5c4330);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text, #fff6ea);
+  transition: all 0.15s ease;
+}
+.preset-chip:hover {
+  border-color: var(--accent, #e8a54b);
+  background: rgba(232, 165, 75, 0.12);
+}
+.preset-chip.active {
+  background: var(--theme-grad, linear-gradient(135deg, #e8a54b, #c45c2a 50%, #8b2942)) !important;
+  border-color: transparent !important;
+  color: #1a1008 !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(232, 165, 75, 0.3);
+}
+.player-card:hover {
+  border-color: var(--accent, #e8a54b) !important;
+  background: rgba(232, 165, 75, 0.08) !important;
+}
+</style>
 {% endblock %}
+
 {% block scripts %}
+<script>
+let currentDuration = 6;
+let currentDurationCost = 18;
+let currentActionExtra = 0;
+let currentAction = 'fight';
+let selectedPlayers = { 1: null, 2: null };
+
+function setDuration(dur, cr) {
+  currentDuration = dur;
+  currentDurationCost = cr;
+  document.getElementById('duration').value = dur;
+  document.querySelectorAll('.duration-opt').forEach(el => {
+    el.style.borderColor = 'var(--border-2, #5c4330)';
+    el.style.color = 'var(--text-muted, #b8a08a)';
+  });
+  event.target.style.borderColor = 'var(--accent, #e8a54b)';
+  event.target.style.color = 'var(--text, #fff6ea)';
+  updateGenerateButton();
+}
+
+function selectAction(actionKey, extraCost, btn) {
+  currentAction = actionKey;
+  currentActionExtra = extraCost;
+  document.getElementById('action').value = actionKey;
+  document.querySelectorAll('.preset-chip').forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+  updateGenerateButton();
+}
+
+function updateGenerateButton() {
+  const totalCredits = currentDurationCost + currentActionExtra;
+  document.getElementById('generateBtn').innerText = `▶ Generate (${currentDuration}s · ~${totalCredits} credits)`;
+}
+
+function openCharacterPicker(slot) {
+  const charId = prompt(`Enter Character ID or Name for Player ${slot}:`);
+  if (charId && charId.trim()) {
+    selectedPlayers[slot] = charId.trim();
+    document.getElementById(`p${slot}-name`).innerText = charId.trim();
+    document.getElementById(`p${slot}-card`).style.borderColor = 'var(--accent, #e8a54b)';
+    const ids = [selectedPlayers[1], selectedPlayers[2]].filter(Boolean);
+    document.getElementById('character_ids').value = ids.join(',');
+  }
+}
+
+document.getElementById('arenaForm').addEventListener('submit', function(e) {
+  const ids = document.getElementById('character_ids').value;
+  if (!ids || ids.split(',').length < 2) {
+    e.preventDefault();
+    alert('Please pick two characters to stage the battle.');
+  }
+});
+</script>
 <script src="/static/js/world_chat_boards_boot.js"></script>
 {% endblock %}
