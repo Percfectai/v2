@@ -341,3 +341,512 @@
 
   global.PercfectStudioJobs = api;
 })(window);
+
+/**
+ * SpicyAPI Model Picker, Dynamic Options, Credit Pricing & Moderation Redirect UI
+ * Enhances Photos (/studios/photos) and Videos (/studios/videos) cleanly.
+ */
+(function (global) {
+  if (typeof document === 'undefined') return;
+
+  const state = {
+    imageModels: [],
+    videoModels: [],
+    imgModel: 'grok',
+    imgRes: '',
+    vidModel: 'grok',
+    vidRes: '',
+    vidAspect: 'auto',
+    vidDur: 6,
+    vidAudio: false,
+    extendModel: 'grok',
+    extendRes: '',
+    extendDur: 6,
+    moderatedUntil: { img: 0, batch: 0, vid: 0, extend: 0 },
+  };
+
+  function findModel(mod, id) {
+    if (!id || id === 'grok') return null;
+    const list = mod === 'video' ? state.videoModels : state.imageModels;
+    return list.find((m) => m.id === id) || null;
+  }
+
+  function injectStyles() {
+    if (document.getElementById('spicy-studio-css')) return;
+    const st = document.createElement('style');
+    st.id = 'spicy-studio-css';
+    st.textContent = [
+      '.studio-model-box{margin-top:.55rem;padding:.55rem .65rem;border:1px solid var(--border-2,#263d52);border-radius:12px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:.42rem;}',
+      '.studio-model-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}',
+      '.studio-model-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-2,#a78bfa);font-family:var(--font-mono,ui-monospace,monospace);}',
+      '.studio-model-select{width:100%;padding:.48rem .6rem;border-radius:9px;border:1px solid var(--border-2,#263d52);background:var(--bg-3,#11131d);color:var(--text,#eef4f9);font-size:.85rem;font-weight:600;font-family:inherit;}',
+      '.studio-model-select:focus{outline:none;border-color:var(--accent,#7c5cfc);}',
+      '.studio-model-opts{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;}',
+      '.studio-opt-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted,#9fb0c0);min-width:3.1rem;}',
+      '.studio-model-opts .photos-split-chips{flex:1 1 auto;flex-wrap:wrap;}',
+      '.studio-audio-toggle{display:inline-flex;align-items:center;gap:.4rem;font-size:.76rem;color:var(--text,#eef4f9);cursor:pointer;margin:0;}',
+      '.studio-audio-toggle input{accent-color:var(--accent,#7c5cfc);}',
+      '.studio-model-hint{font-size:.72rem;color:#fbbf24;line-height:1.3;}',
+      '.studio-mod-banner{margin-top:.55rem;padding:.7rem .85rem;border-radius:12px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.1);color:#fde68a;font-size:.82rem;line-height:1.4;}',
+      '.studio-mod-banner a{color:#fbbf24;font-weight:700;text-decoration:underline;margin-left:.35rem;}',
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  function renderChips(containerId, items, activeVal, onPick) {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+    box.innerHTML = '';
+    (items || []).forEach((val) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'style-chip' + (String(val) === String(activeVal) ? ' active' : '');
+      btn.textContent = String(val);
+      btn.onclick = () => onPick(val, btn);
+      box.appendChild(btn);
+    });
+  }
+
+  function populateSelect(selectId, mod, models, extendOnly) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const prev = sel.value || 'grok';
+    const list = extendOnly ? models.filter((m) => m.routes && m.routes.extend) : models;
+    const featured = list.filter((m) => m.featured);
+    const rest = list.filter((m) => !m.featured);
+
+    function opt(m) {
+      const p = m.pricing || {};
+      const u = p.unit === 'second' ? ' cr/s' : ' cr';
+      const label = `${m.label} (${p.default_credits || 1}${u})`;
+      return `<option value="${String(m.id).replace(/"/g, '&quot;')}">${label.replace(/</g, '&lt;')}</option>`;
+    }
+
+    const baseRate = mod === 'image' ? '1 cr' : (extendOnly ? `${global.VIDEO_EXTEND_RATE || 6} cr/s` : `${global.VIDEO_RATE || 3} cr/s`);
+    let html = `<optgroup label="Featured"><option value="grok">Grok Imagine (Default · ${baseRate})</option>`;
+    html += featured.map(opt).join('') + '</optgroup>';
+    if (rest.length) html += `<optgroup label="All Models">${rest.map(opt).join('')}</optgroup>`;
+    sel.innerHTML = html;
+    sel.value = Array.from(sel.options).some((o) => o.value === prev) ? prev : 'grok';
+  }
+
+  function updateHints(mod) {
+    if (mod === 'image') {
+      const hint = document.getElementById('img-model-hint');
+      if (!hint) return;
+      const m = findModel('image', state.imgModel);
+      const refs = typeof global.photoRefCount === 'function' ? global.photoRefCount() : 0;
+      if (m && m.requires_ref && refs === 0) {
+        hint.textContent = '⚠ Requires at least 1 reference photo in References.';
+        hint.style.display = 'block';
+      } else if (m && m.text_only && refs > 0) {
+        hint.textContent = '⚠ Text-only model — remove reference photos or switch to Seedream / an Edit model.';
+        hint.style.display = 'block';
+      } else {
+        hint.style.display = 'none';
+      }
+      return;
+    }
+    const hint = document.getElementById('vid-model-hint');
+    if (!hint) return;
+    const m = findModel('video', state.vidModel);
+    const refs = typeof global.videoRefCount === 'function' ? global.videoRefCount() : 0;
+    if (m && m.requires_ref && refs === 0) {
+      hint.textContent = '⚠ Requires 1 reference photo (pick from Library or upload in References →).';
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+
+  function showModNotice(panel, data) {
+    state.moderatedUntil[panel] = Date.now() + 3000;
+    const targetId = panel === 'img' ? 'img-toast' : (panel === 'batch' ? 'batch-toast' : (panel === 'extend' ? 'extend-error' : 'vid-error'));
+    const box = document.getElementById(targetId);
+    if (!box) return;
+    box.className = 'studio-mod-banner';
+    box.style.display = 'block';
+    box.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = (data && data.message) || 'Sent to your private vault on the mature site. Sign in with your same login to get your file.';
+    box.appendChild(span);
+    if (data && data.mature_site_url) {
+      const a = document.createElement('a');
+      a.href = data.mature_site_url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Open mature site →';
+      box.appendChild(a);
+    }
+    // Update visible credit hook
+    const crEl = document.getElementById(panel === 'vid' || panel === 'extend' ? 'vid-credits' : 'img-credits');
+    if (crEl && data && data.charged != null) {
+      const bal = parseInt(crEl.textContent, 10);
+      if (!isNaN(bal)) crEl.textContent = String(Math.max(0, bal - Number(data.charged || 0)));
+    }
+  }
+
+  function onImgModelChange() {
+    const sel = document.getElementById('img-model-select');
+    state.imgModel = sel ? sel.value : 'grok';
+    const m = findModel('image', state.imgModel);
+    const wrap = document.getElementById('img-res-wrap');
+    if (m && m.resolutions && m.resolutions.length) {
+      if (!m.resolutions.includes(state.imgRes)) state.imgRes = m.default_resolution || m.resolutions[0];
+      if (wrap) wrap.style.display = 'flex';
+      renderChips('img-res-chips', m.resolutions, state.imgRes, (val) => {
+        state.imgRes = val;
+        onImgModelChange();
+      });
+    } else {
+      state.imgRes = '';
+      if (wrap) wrap.style.display = 'none';
+    }
+    updateHints('image');
+    if (typeof global.photoUpdateCostUI === 'function') global.photoUpdateCostUI();
+  }
+
+  function onVidModelChange() {
+    const sel = document.getElementById('vid-model-select');
+    state.vidModel = sel ? sel.value : 'grok';
+    const m = findModel('video', state.vidModel);
+    const resWrap = document.getElementById('vid-res-wrap');
+    const arWrap = document.getElementById('vid-aspect-wrap');
+    const audWrap = document.getElementById('vid-audio-wrap');
+
+    if (m && m.resolutions && m.resolutions.length) {
+      if (!m.resolutions.includes(state.vidRes)) state.vidRes = m.default_resolution || m.resolutions[0];
+      if (resWrap) resWrap.style.display = 'flex';
+      renderChips('vid-res-chips', m.resolutions, state.vidRes, (val) => {
+        state.vidRes = val;
+        onVidModelChange();
+      });
+    } else {
+      state.vidRes = '';
+      if (resWrap) resWrap.style.display = 'none';
+    }
+
+    if (m && m.aspect_ratios && m.aspect_ratios.length) {
+      const ars = ['auto'].concat(m.aspect_ratios);
+      if (!ars.includes(state.vidAspect)) state.vidAspect = 'auto';
+      if (arWrap) arWrap.style.display = 'flex';
+      renderChips('vid-aspect-chips', ars, state.vidAspect, (val) => {
+        state.vidAspect = val;
+        onVidModelChange();
+      });
+    } else {
+      state.vidAspect = 'auto';
+      if (arWrap) arWrap.style.display = 'none';
+    }
+
+    if (audWrap) audWrap.style.display = (m && m.supports_audio) ? 'inline-flex' : 'none';
+
+    const dOpts = (m && m.durations && m.durations.options && m.durations.options.length) ? m.durations.options : [6, 10, 15];
+    if (!dOpts.includes(state.vidDur)) state.vidDur = dOpts.includes(6) ? 6 : dOpts[0];
+    const durBox = document.getElementById('vid-duration-chips');
+    if (durBox) {
+      durBox.innerHTML = '';
+      dOpts.forEach((sec) => {
+        const chip = document.createElement('span');
+        chip.className = 'style-chip' + (sec === state.vidDur ? ' active' : '');
+        chip.textContent = `${sec}s`;
+        chip.onclick = () => {
+          state.vidDur = sec;
+          if (typeof global.setDuration === 'function') global.setDuration(chip, sec);
+        };
+        durBox.appendChild(chip);
+      });
+    }
+    updateHints('video');
+    if (typeof global.updateVidCostUI === 'function') global.updateVidCostUI();
+  }
+
+  function onExtendModelChange() {
+    const sel = document.getElementById('extend-model-select');
+    state.extendModel = sel ? sel.value : 'grok';
+    const m = findModel('video', state.extendModel);
+    const resWrap = document.getElementById('extend-res-wrap');
+    if (m && m.resolutions && m.resolutions.length) {
+      if (!m.resolutions.includes(state.extendRes)) state.extendRes = m.default_resolution || m.resolutions[0];
+      if (resWrap) resWrap.style.display = 'flex';
+      renderChips('extend-res-chips', m.resolutions, state.extendRes, (val) => {
+        state.extendRes = val;
+        onExtendModelChange();
+      });
+    } else {
+      state.extendRes = '';
+      if (resWrap) resWrap.style.display = 'none';
+    }
+    const dOpts = (m && m.durations && m.durations.options && m.durations.options.length) ? m.durations.options : [6, 8, 10];
+    if (!dOpts.includes(state.extendDur)) state.extendDur = dOpts.includes(6) ? 6 : dOpts[0];
+    const exBox = document.getElementById('extend-chips');
+    if (exBox) {
+      exBox.innerHTML = '';
+      dOpts.forEach((sec) => {
+        const chip = document.createElement('span');
+        chip.className = 'style-chip' + (sec === state.extendDur ? ' active' : '');
+        chip.textContent = `+${sec}s`;
+        chip.onclick = () => {
+          state.extendDur = sec;
+          if (typeof global.setExtend === 'function') global.setExtend(chip, sec);
+        };
+        exBox.appendChild(chip);
+      });
+    }
+    const ec = document.getElementById('extend-cost');
+    if (ec && typeof global.extendCreditCost === 'function') ec.textContent = String(global.extendCreditCost(state.extendDur));
+  }
+
+  function wrapGlobalFunctions() {
+    if (typeof global.photoCost === 'function') {
+      const origPhotoCost = global.photoCost;
+      global.photoCost = function () {
+        const m = findModel('image', state.imgModel);
+        if (m && m.pricing) {
+          const rkey = state.imgRes || 'default';
+          return (m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || m.pricing.default_credits || 1;
+        }
+        return origPhotoCost();
+      };
+    }
+    if (typeof global.photoUpdateCostUI === 'function') {
+      const origPhotoUI = global.photoUpdateCostUI;
+      global.photoUpdateCostUI = function () {
+        origPhotoUI();
+        updateHints('image');
+      };
+    }
+    if (typeof global.videoGenRate === 'function') {
+      const origRate = global.videoGenRate;
+      global.videoGenRate = function () {
+        const m = findModel('video', state.vidModel);
+        if (m && m.pricing) {
+          const rkey = state.vidRes || 'default';
+          return (m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || m.pricing.default_credits || 3;
+        }
+        return origRate();
+      };
+    }
+    if (typeof global.videoCreditCost === 'function') {
+      const origVidCost = global.videoCreditCost;
+      global.videoCreditCost = function (secs) {
+        const m = findModel('video', state.vidModel);
+        const s = parseInt(secs || state.vidDur, 10) || 6;
+        if (m && m.pricing) {
+          const rkey = state.vidRes || 'default';
+          const dmap = m.pricing.by_duration && m.pricing.by_duration[rkey];
+          if (dmap && dmap[String(s)] != null) return dmap[String(s)];
+          if (m.pricing.unit === 'second') return s * global.videoGenRate();
+          return m.pricing.default_credits || 18;
+        }
+        return origVidCost(s);
+      };
+    }
+    if (typeof global.setDuration === 'function') {
+      const origSetDur = global.setDuration;
+      global.setDuration = function (chip, secs) {
+        const s = parseInt(secs, 10) || 6;
+        state.vidDur = s;
+        if (!findModel('video', state.vidModel)) return origSetDur(chip, s);
+        const root = (chip && chip.closest && chip.closest('.duration-chips')) || document.getElementById('vid-duration-chips');
+        if (root) root.querySelectorAll('.style-chip').forEach((c) => c.classList.remove('active'));
+        if (chip) chip.classList.add('active');
+        if (typeof global.updateVidCostUI === 'function') global.updateVidCostUI();
+      };
+    }
+    if (typeof global.updateVidCostUI === 'function') {
+      const origVidUI = global.updateVidCostUI;
+      global.updateVidCostUI = function () {
+        const m = findModel('video', state.vidModel);
+        if (!m) {
+          origVidUI();
+          updateHints('video');
+          return;
+        }
+        const rate = global.videoGenRate();
+        const cost = global.videoCreditCost(state.vidDur);
+        const vc = document.getElementById('vid-cost');
+        if (vc) vc.textContent = String(cost);
+        const note = document.getElementById('duration-note');
+        if (note) {
+          const rateTxt = (m.pricing && m.pricing.unit === 'request') ? `flat ${cost} cr` : `${rate} credits/sec`;
+          note.textContent = `${state.vidDur}s · ${rateTxt}${state.vidRes ? ' · ' + state.vidRes : ''}`;
+        }
+        updateHints('video');
+      };
+    }
+    if (typeof global.extendCreditCost === 'function') {
+      const origExCost = global.extendCreditCost;
+      global.extendCreditCost = function (secs) {
+        const m = findModel('video', state.extendModel);
+        const s = parseInt(secs || state.extendDur, 10) || 6;
+        if (m && m.pricing) {
+          const rkey = state.extendRes || 'default';
+          const dmap = m.pricing.by_duration && m.pricing.by_duration[rkey];
+          if (dmap && dmap[String(s)] != null) return dmap[String(s)];
+          const rate = (m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || m.pricing.default_credits || 6;
+          return m.pricing.unit === 'second' ? s * rate : rate;
+        }
+        return origExCost(s);
+      };
+    }
+    if (typeof global.setExtend === 'function') {
+      const origSetEx = global.setExtend;
+      global.setExtend = function (chip, secs) {
+        const s = parseInt(secs, 10) || 6;
+        state.extendDur = s;
+        if (!findModel('video', state.extendModel)) return origSetEx(chip, s);
+        const box = document.getElementById('extend-chips');
+        if (box) box.querySelectorAll('.style-chip').forEach((c) => c.classList.remove('active'));
+        if (chip) chip.classList.add('active');
+        const ec = document.getElementById('extend-cost');
+        if (ec) ec.textContent = String(global.extendCreditCost(s));
+      };
+    }
+    // Suppress false "No image/video returned" red error right after a moderated redirect
+    ['showError', 'showBatchError', 'showVidError', 'showExtendError'].forEach((fnName) => {
+      if (typeof global[fnName] !== 'function') return;
+      const orig = global[fnName];
+      global[fnName] = function () {
+        const now = Date.now();
+        if (fnName === 'showError') {
+          const p = arguments[0];
+          if (state.moderatedUntil[p] && now < state.moderatedUntil[p]) return;
+        } else if (fnName === 'showBatchError' && now < state.moderatedUntil.batch) {
+          return;
+        } else if (fnName === 'showVidError' && now < state.moderatedUntil.vid) {
+          return;
+        } else if (fnName === 'showExtendError' && now < state.moderatedUntil.extend) {
+          return;
+        }
+        return orig.apply(this, arguments);
+      };
+    });
+  }
+
+  function installPollAndFetchHooks() {
+    const api = global.PercfectStudioJobs;
+    if (api && !api.__spicyWrapped) {
+      api.__spicyWrapped = true;
+      const origResolve = api.resolveGenerationResponse;
+      api.resolveGenerationResponse = async function (res, opts) {
+        const data = await origResolve.call(this, res, opts);
+        if (data && (data.moderated_redirect || (data.moderated_count > 0 && !(data.urls && data.urls.length)))) {
+          const k = (opts && opts.kind) || '';
+          const panel = k === 'batch' ? 'batch' : (k === 'extend' ? 'extend' : (k === 'video' ? 'vid' : 'img'));
+          showModNotice(panel, data);
+        }
+        return data;
+      };
+    }
+
+    if (global.__spicyFetchWrapped) return;
+    global.__spicyFetchWrapped = true;
+    const origFetch = global.fetch;
+    global.fetch = function (input, init) {
+      try {
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        const method = ((init && init.method) || 'GET').toUpperCase();
+        if (method === 'POST' && init && init.body instanceof FormData) {
+          if (url.endsWith('/percfectstudios/generate-image') || url.endsWith('/percfectstudios/generate-batch')) {
+            init.body.set('model', state.imgModel || 'grok');
+            if (state.imgRes) init.body.set('resolution', state.imgRes);
+          } else if (url.endsWith('/percfectstudios/generate-video')) {
+            init.body.set('model', state.vidModel || 'grok');
+            if (state.vidModel && state.vidModel !== 'grok') {
+              init.body.set('duration', String(state.vidDur || 6));
+              if (state.vidRes) init.body.set('resolution', state.vidRes);
+              if (state.vidAspect && state.vidAspect !== 'auto') init.body.set('aspect_ratio', state.vidAspect);
+              const aud = document.getElementById('vid-audio-check');
+              if (aud && document.getElementById('vid-audio-wrap')?.style.display !== 'none') {
+                init.body.set('generate_audio', aud.checked ? '1' : '0');
+              }
+            }
+          } else if (url.endsWith('/percfectstudios/extend-video')) {
+            init.body.set('model', state.extendModel || 'grok');
+            if (state.extendModel && state.extendModel !== 'grok') {
+              init.body.set('duration', String(state.extendDur || 6));
+              if (state.extendRes) init.body.set('resolution', state.extendRes);
+            }
+          }
+        }
+      } catch (_e) {}
+      return origFetch.apply(this, arguments);
+    };
+  }
+
+  async function mountStudioModels() {
+    const imgBtn = document.getElementById('img-btn');
+    const vidDur = document.getElementById('vid-duration-chips');
+    if (!imgBtn && !vidDur) return;
+
+    injectStyles();
+    wrapGlobalFunctions();
+    installPollAndFetchHooks();
+
+    if (imgBtn && !document.getElementById('img-model-box')) {
+      const box = document.createElement('div');
+      box.className = 'studio-model-box';
+      box.id = 'img-model-box';
+      box.innerHTML =
+        '<div class="studio-model-head"><span class="studio-model-label">Model</span></div>' +
+        '<select id="img-model-select" class="studio-model-select" aria-label="Image model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 1 cr)</option></optgroup></select>' +
+        '<div id="img-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="img-res-chips"></div></div>' +
+        '<div id="img-model-hint" class="studio-model-hint" style="display:none"></div>';
+      imgBtn.parentNode.insertBefore(box, imgBtn);
+      document.getElementById('img-model-select').addEventListener('change', onImgModelChange);
+      try {
+        const res = await fetch('/api/spicy/studio-models?modality=image&spicy=0');
+        const data = await res.json();
+        state.imageModels = (data && data.models) || [];
+        populateSelect('img-model-select', 'image', state.imageModels, false);
+        onImgModelChange();
+      } catch (_e) {}
+    }
+
+    if (vidDur && !document.getElementById('vid-model-box')) {
+      const box = document.createElement('div');
+      box.className = 'studio-model-box';
+      box.id = 'vid-model-box';
+      box.innerHTML =
+        '<div class="studio-model-head"><span class="studio-model-label">Model</span></div>' +
+        '<select id="vid-model-select" class="studio-model-select" aria-label="Video model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 3 cr/s)</option></optgroup></select>' +
+        '<div id="vid-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="vid-res-chips"></div></div>' +
+        '<div id="vid-aspect-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Ratio</span><div class="style-chips photos-split-chips" id="vid-aspect-chips"></div></div>' +
+        '<label id="vid-audio-wrap" class="studio-audio-toggle" style="display:none"><input type="checkbox" id="vid-audio-check"> Generate audio</label>' +
+        '<div id="vid-model-hint" class="studio-model-hint" style="display:none"></div>';
+      vidDur.parentNode.insertBefore(box, vidDur);
+      document.getElementById('vid-model-select').addEventListener('change', onVidModelChange);
+
+      const extAdv = document.querySelector('#vid-extend .photos-col-adv');
+      if (extAdv && !document.getElementById('extend-model-box')) {
+        const ebox = document.createElement('div');
+        ebox.className = 'studio-model-box';
+        ebox.id = 'extend-model-box';
+        ebox.style.marginTop = '0';
+        ebox.innerHTML =
+          '<div class="studio-model-head"><span class="studio-model-label">Extend model</span></div>' +
+          '<select id="extend-model-select" class="studio-model-select" aria-label="Extend model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 6 cr/s)</option></optgroup></select>' +
+          '<div id="extend-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="extend-res-chips"></div></div>';
+        extAdv.insertBefore(ebox, extAdv.firstChild);
+        document.getElementById('extend-model-select').addEventListener('change', onExtendModelChange);
+      }
+
+      try {
+        const res = await fetch('/api/spicy/studio-models?modality=video&spicy=0');
+        const data = await res.json();
+        state.videoModels = (data && data.models) || [];
+        populateSelect('vid-model-select', 'video', state.videoModels, false);
+        onVidModelChange();
+        populateSelect('extend-model-select', 'video', state.videoModels, true);
+        onExtendModelChange();
+      } catch (_e) {}
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountStudioModels);
+  } else {
+    mountStudioModels();
+  }
+})(window);
