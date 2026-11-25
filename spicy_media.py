@@ -135,31 +135,19 @@ def list_price_for(model_id: str) -> Optional[Dict[str, Any]]:
 
 
 # --- Studio pricing, family grouping, route resolution & input mapping -------
-IMAGE_USD_PER_CREDIT = 0.03
+IMAGE_USD_PER_CREDIT = 0.015
 VIDEO_USD_PER_CREDIT = 0.012
 
-FEATURED_IMAGE_FAMILIES = (
+STUDIO_IMAGE_FAMILIES = (
     "bytedance/seedream-5.5",
-    "bytedance/seedream-4.5",
-    "alibaba/z-image-spicy-pro",
-    "alibaba/z-image-spicy",
-    "alibaba/qwen-image-spicy-edit",
-    "bytedance/seedream-5.0-pro",
-    "black-forest-labs/flux-3-klein",
 )
 
-FEATURED_VIDEO_FAMILIES = (
+STUDIO_VIDEO_FAMILIES = (
     "minimax/h3",
-    "minimax/h3-spicy",
-    "alibaba/wan-3.0",
-    "alibaba/wan-3.0-spicy",
-    "alibaba/wan-3.0-prime-spicy",
-    "bytedance/seedance-2.0-spicy",
-    "bytedance/seedance-2.5-spicy",
-    "vidu/q3-spicy",
-    "kling/3.0",
-    "google/veo-3.1-fast",
 )
+
+FEATURED_IMAGE_FAMILIES = STUDIO_IMAGE_FAMILIES
+FEATURED_VIDEO_FAMILIES = STUDIO_VIDEO_FAMILIES
 
 _IMAGE_GEN_TASKS = {"text-to-image", "image-to-image", "image-edit"}
 _VIDEO_GEN_TASKS = {"text-to-video", "image-to-video", "reference-to-video", "video-extend"}
@@ -416,11 +404,12 @@ def _extract_resolutions(rec: Dict[str, Any]) -> List[str]:
     return found
 
 
-def studio_models(modality: str = "image", include_spicy: bool = True) -> List[Dict[str, Any]]:
+def studio_models(modality: str = "image", include_spicy: bool = True, only_allowed: bool = True) -> List[Dict[str, Any]]:
     """Family-grouped generation models for Photos & Videos UI, with dynamic options + credit pricing."""
     mod = (modality or "image").strip().lower()
     wanted = _VIDEO_GEN_TASKS if mod == "video" else _IMAGE_GEN_TASKS
     featured_order = FEATURED_VIDEO_FAMILIES if mod == "video" else FEATURED_IMAGE_FAMILIES
+    allowed_set = set(featured_order) if only_allowed else None
     featured_idx = {fid: i for i, fid in enumerate(featured_order)}
 
     grouped: Dict[str, Dict[str, Any]] = {}
@@ -437,6 +426,8 @@ def studio_models(modality: str = "image", include_spicy: bool = True) -> List[D
         if "/" not in mid:
             continue
         fid = mid.rsplit("/", 1)[0]
+        if allowed_set is not None and fid not in allowed_set:
+            continue
         entry = grouped.setdefault(fid, {
             "id": fid,
             "label": m.get("familyDisplayName") or fid.split("/")[-1],
@@ -490,6 +481,8 @@ def studio_models(modality: str = "image", include_spicy: bool = True) -> List[D
                 default_res = pv_res
         if not default_res and resolutions:
             default_res = resolutions[0]
+        if fid == "bytedance/seedream-5.5" and "2k" in resolutions:
+            default_res = "2k"
 
         ar_enum = [str(a) for a in ((ospec.get("aspect_ratio") or {}).get("enum") or []) if a]
         dur_spec = _extract_duration_spec(primary) if mod == "video" else None
@@ -610,7 +603,7 @@ def resolve_model_route(
         return direct["model"], direct
 
     # Family id match
-    for fam in studio_models(modality, include_spicy=True):
+    for fam in studio_models(modality, include_spicy=True, only_allowed=False):
         if fam["id"] == raw:
             routes = fam["routes"]
             if modality == "image":

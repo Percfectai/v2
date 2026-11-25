@@ -343,32 +343,33 @@
 })(window);
 
 /**
- * SpicyAPI Model Picker, Dynamic Options, Credit Pricing & Moderation Redirect UI
- * Enhances Photos (/studios/photos) and Videos (/studios/videos) cleanly.
+ * SpicyAPI Studio Controls, Dynamic Options, Credit Pricing & Moderation Redirect UI
+ * - Photos (/studios/photos): dedicated "18+ Generate for Mature Audiences" button (no model dropdown)
+ * - Videos (/studios/videos): Grok Imagine (Default) + MiniMax H3 with quality, duration & credit math
  */
 (function (global) {
   if (typeof document === 'undefined') return;
 
   const state = {
-    imageModels: [],
+    maturePhotoModelId: 'bytedance/seedream-5.5',
+    maturePhotoRes: '2k',
+    maturePhotoCredits: 3,
+    nextPhotoModel: '',
+    nextPhotoRes: '',
     videoModels: [],
-    imgModel: 'grok',
-    imgRes: '',
     vidModel: 'grok',
     vidRes: '',
     vidAspect: 'auto',
     vidDur: 6,
-    vidAudio: false,
     extendModel: 'grok',
     extendRes: '',
     extendDur: 6,
     moderatedUntil: { img: 0, batch: 0, vid: 0, extend: 0 },
   };
 
-  function findModel(mod, id) {
+  function findVideoModel(id) {
     if (!id || id === 'grok') return null;
-    const list = mod === 'video' ? state.videoModels : state.imageModels;
-    return list.find((m) => m.id === id) || null;
+    return state.videoModels.find((m) => m.id === id) || null;
   }
 
   function injectStyles() {
@@ -376,6 +377,10 @@
     const st = document.createElement('style');
     st.id = 'spicy-studio-css';
     st.textContent = [
+      '.studio-mature-btn{width:100%;margin-top:.48rem;padding:.68rem .9rem;border-radius:12px;border:1px solid rgba(244,114,182,.45);background:linear-gradient(135deg,rgba(190,24,93,.22),rgba(124,92,252,.22));color:#fdf2f8;font-size:.9rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:.5rem;cursor:pointer;transition:transform .12s ease,border-color .15s ease,background .15s ease;}',
+      '.studio-mature-btn:hover:not(:disabled){border-color:rgba(244,114,182,.8);background:linear-gradient(135deg,rgba(190,24,93,.34),rgba(124,92,252,.32));transform:translateY(-1px);}',
+      '.studio-mature-btn:disabled{opacity:.6;cursor:not-allowed;}',
+      '.studio-mature-badge{display:inline-flex;align-items:center;justify-content:center;padding:.12rem .42rem;border-radius:6px;background:rgba(244,63,94,.28);border:1px solid rgba(251,113,133,.65);color:#fecdd3;font-size:.7rem;font-weight:800;letter-spacing:.04em;line-height:1.1;}',
       '.studio-model-box{margin-top:.55rem;padding:.55rem .65rem;border:1px solid var(--border-2,#263d52);border-radius:12px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:.42rem;}',
       '.studio-model-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}',
       '.studio-model-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-2,#a78bfa);font-family:var(--font-mono,ui-monospace,monospace);}',
@@ -407,49 +412,42 @@
     });
   }
 
-  function populateSelect(selectId, mod, models, extendOnly) {
+  function populateVideoSelect(selectId, models, extendOnly) {
     const sel = document.getElementById(selectId);
     if (!sel) return;
     const prev = sel.value || 'grok';
     const list = extendOnly ? models.filter((m) => m.routes && m.routes.extend) : models;
-    const featured = list.filter((m) => m.featured);
-    const rest = list.filter((m) => !m.featured);
 
     function opt(m) {
       const p = m.pricing || {};
       const u = p.unit === 'second' ? ' cr/s' : ' cr';
-      const label = `${m.label} (${p.default_credits || 1}${u})`;
+      const label = `${m.label} (${p.default_credits || 3}${u})`;
       return `<option value="${String(m.id).replace(/"/g, '&quot;')}">${label.replace(/</g, '&lt;')}</option>`;
     }
 
-    const baseRate = mod === 'image' ? '1 cr' : (extendOnly ? `${global.VIDEO_EXTEND_RATE || 6} cr/s` : `${global.VIDEO_RATE || 3} cr/s`);
-    let html = `<optgroup label="Featured"><option value="grok">Grok Imagine (Default · ${baseRate})</option>`;
-    html += featured.map(opt).join('') + '</optgroup>';
-    if (rest.length) html += `<optgroup label="All Models">${rest.map(opt).join('')}</optgroup>`;
+    const baseRate = extendOnly ? `${global.VIDEO_EXTEND_RATE || 6} cr/s` : `${global.VIDEO_RATE || 3} cr/s`;
+    let html = `<option value="grok">Grok Imagine (Default · ${baseRate})</option>` + list.map(opt).join('');
     sel.innerHTML = html;
     sel.value = Array.from(sel.options).some((o) => o.value === prev) ? prev : 'grok';
   }
 
-  function updateHints(mod) {
-    if (mod === 'image') {
-      const hint = document.getElementById('img-model-hint');
-      if (!hint) return;
-      const m = findModel('image', state.imgModel);
-      const refs = typeof global.photoRefCount === 'function' ? global.photoRefCount() : 0;
-      if (m && m.requires_ref && refs === 0) {
-        hint.textContent = '⚠ Requires at least 1 reference photo in References.';
-        hint.style.display = 'block';
-      } else if (m && m.text_only && refs > 0) {
-        hint.textContent = '⚠ Text-only model — remove reference photos or switch to Seedream / an Edit model.';
-        hint.style.display = 'block';
-      } else {
-        hint.style.display = 'none';
-      }
-      return;
+  function updateMatureButtonLabel(busy) {
+    const btn = document.getElementById('img-mature-btn');
+    const txt = document.getElementById('img-mature-btn-text');
+    if (!btn || !txt) return;
+    btn.disabled = !!busy;
+    const c = state.maturePhotoCredits || 3;
+    if (busy) {
+      txt.textContent = 'Generating…';
+    } else {
+      txt.innerHTML = `Generate for Mature Audiences (<span id="img-mature-cost">${c} credit${c === 1 ? '' : 's'}</span>)`;
     }
+  }
+
+  function updateVideoHint() {
     const hint = document.getElementById('vid-model-hint');
     if (!hint) return;
-    const m = findModel('video', state.vidModel);
+    const m = findVideoModel(state.vidModel);
     const refs = typeof global.videoRefCount === 'function' ? global.videoRefCount() : 0;
     if (m && m.requires_ref && refs === 0) {
       hint.textContent = '⚠ Requires 1 reference photo (pick from Library or upload in References →).';
@@ -478,7 +476,6 @@
       a.textContent = 'Open mature site →';
       box.appendChild(a);
     }
-    // Update visible credit hook
     const crEl = document.getElementById(panel === 'vid' || panel === 'extend' ? 'vid-credits' : 'img-credits');
     if (crEl && data && data.charged != null) {
       const bal = parseInt(crEl.textContent, 10);
@@ -486,30 +483,10 @@
     }
   }
 
-  function onImgModelChange() {
-    const sel = document.getElementById('img-model-select');
-    state.imgModel = sel ? sel.value : 'grok';
-    const m = findModel('image', state.imgModel);
-    const wrap = document.getElementById('img-res-wrap');
-    if (m && m.resolutions && m.resolutions.length) {
-      if (!m.resolutions.includes(state.imgRes)) state.imgRes = m.default_resolution || m.resolutions[0];
-      if (wrap) wrap.style.display = 'flex';
-      renderChips('img-res-chips', m.resolutions, state.imgRes, (val) => {
-        state.imgRes = val;
-        onImgModelChange();
-      });
-    } else {
-      state.imgRes = '';
-      if (wrap) wrap.style.display = 'none';
-    }
-    updateHints('image');
-    if (typeof global.photoUpdateCostUI === 'function') global.photoUpdateCostUI();
-  }
-
   function onVidModelChange() {
     const sel = document.getElementById('vid-model-select');
     state.vidModel = sel ? sel.value : 'grok';
-    const m = findModel('video', state.vidModel);
+    const m = findVideoModel(state.vidModel);
     const resWrap = document.getElementById('vid-res-wrap');
     const arWrap = document.getElementById('vid-aspect-wrap');
     const audWrap = document.getElementById('vid-audio-wrap');
@@ -557,14 +534,14 @@
         durBox.appendChild(chip);
       });
     }
-    updateHints('video');
+    updateVideoHint();
     if (typeof global.updateVidCostUI === 'function') global.updateVidCostUI();
   }
 
   function onExtendModelChange() {
     const sel = document.getElementById('extend-model-select');
     state.extendModel = sel ? sel.value : 'grok';
-    const m = findModel('video', state.extendModel);
+    const m = findVideoModel(state.extendModel);
     const resWrap = document.getElementById('extend-res-wrap');
     if (m && m.resolutions && m.resolutions.length) {
       if (!m.resolutions.includes(state.extendRes)) state.extendRes = m.default_resolution || m.resolutions[0];
@@ -598,28 +575,17 @@
   }
 
   function wrapGlobalFunctions() {
-    if (typeof global.photoCost === 'function') {
-      const origPhotoCost = global.photoCost;
-      global.photoCost = function () {
-        const m = findModel('image', state.imgModel);
-        if (m && m.pricing) {
-          const rkey = state.imgRes || 'default';
-          return (m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || m.pricing.default_credits || 1;
-        }
-        return origPhotoCost();
-      };
-    }
-    if (typeof global.photoUpdateCostUI === 'function') {
-      const origPhotoUI = global.photoUpdateCostUI;
-      global.photoUpdateCostUI = function () {
-        origPhotoUI();
-        updateHints('image');
+    if (typeof global.setLoading === 'function') {
+      const origSetLoading = global.setLoading;
+      global.setLoading = function (prefix, on) {
+        origSetLoading(prefix, on);
+        if (prefix === 'img') updateMatureButtonLabel(!!on);
       };
     }
     if (typeof global.videoGenRate === 'function') {
       const origRate = global.videoGenRate;
       global.videoGenRate = function () {
-        const m = findModel('video', state.vidModel);
+        const m = findVideoModel(state.vidModel);
         if (m && m.pricing) {
           const rkey = state.vidRes || 'default';
           return (m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || m.pricing.default_credits || 3;
@@ -630,7 +596,7 @@
     if (typeof global.videoCreditCost === 'function') {
       const origVidCost = global.videoCreditCost;
       global.videoCreditCost = function (secs) {
-        const m = findModel('video', state.vidModel);
+        const m = findVideoModel(state.vidModel);
         const s = parseInt(secs || state.vidDur, 10) || 6;
         if (m && m.pricing) {
           const rkey = state.vidRes || 'default';
@@ -647,7 +613,7 @@
       global.setDuration = function (chip, secs) {
         const s = parseInt(secs, 10) || 6;
         state.vidDur = s;
-        if (!findModel('video', state.vidModel)) return origSetDur(chip, s);
+        if (!findVideoModel(state.vidModel)) return origSetDur(chip, s);
         const root = (chip && chip.closest && chip.closest('.duration-chips')) || document.getElementById('vid-duration-chips');
         if (root) root.querySelectorAll('.style-chip').forEach((c) => c.classList.remove('active'));
         if (chip) chip.classList.add('active');
@@ -657,10 +623,10 @@
     if (typeof global.updateVidCostUI === 'function') {
       const origVidUI = global.updateVidCostUI;
       global.updateVidCostUI = function () {
-        const m = findModel('video', state.vidModel);
+        const m = findVideoModel(state.vidModel);
         if (!m) {
           origVidUI();
-          updateHints('video');
+          updateVideoHint();
           return;
         }
         const rate = global.videoGenRate();
@@ -672,13 +638,13 @@
           const rateTxt = (m.pricing && m.pricing.unit === 'request') ? `flat ${cost} cr` : `${rate} credits/sec`;
           note.textContent = `${state.vidDur}s · ${rateTxt}${state.vidRes ? ' · ' + state.vidRes : ''}`;
         }
-        updateHints('video');
+        updateVideoHint();
       };
     }
     if (typeof global.extendCreditCost === 'function') {
       const origExCost = global.extendCreditCost;
       global.extendCreditCost = function (secs) {
-        const m = findModel('video', state.extendModel);
+        const m = findVideoModel(state.extendModel);
         const s = parseInt(secs || state.extendDur, 10) || 6;
         if (m && m.pricing) {
           const rkey = state.extendRes || 'default';
@@ -695,7 +661,7 @@
       global.setExtend = function (chip, secs) {
         const s = parseInt(secs, 10) || 6;
         state.extendDur = s;
-        if (!findModel('video', state.extendModel)) return origSetEx(chip, s);
+        if (!findVideoModel(state.extendModel)) return origSetEx(chip, s);
         const box = document.getElementById('extend-chips');
         if (box) box.querySelectorAll('.style-chip').forEach((c) => c.classList.remove('active'));
         if (chip) chip.classList.add('active');
@@ -703,7 +669,6 @@
         if (ec) ec.textContent = String(global.extendCreditCost(s));
       };
     }
-    // Suppress false "No image/video returned" red error right after a moderated redirect
     ['showError', 'showBatchError', 'showVidError', 'showExtendError'].forEach((fnName) => {
       if (typeof global[fnName] !== 'function') return;
       const orig = global[fnName];
@@ -748,19 +713,21 @@
         const url = typeof input === 'string' ? input : (input && input.url) || '';
         const method = ((init && init.method) || 'GET').toUpperCase();
         if (method === 'POST' && init && init.body instanceof FormData) {
-          if (url.endsWith('/percfectstudios/generate-image') || url.endsWith('/percfectstudios/generate-batch')) {
-            init.body.set('model', state.imgModel || 'grok');
-            if (state.imgRes) init.body.set('resolution', state.imgRes);
+          if (url.endsWith('/percfectstudios/generate-image')) {
+            if (state.nextPhotoModel) {
+              init.body.set('model', state.nextPhotoModel);
+              if (state.nextPhotoRes) init.body.set('resolution', state.nextPhotoRes);
+              state.nextPhotoModel = '';
+              state.nextPhotoRes = '';
+            } else {
+              init.body.set('model', 'grok');
+            }
           } else if (url.endsWith('/percfectstudios/generate-video')) {
             init.body.set('model', state.vidModel || 'grok');
             if (state.vidModel && state.vidModel !== 'grok') {
               init.body.set('duration', String(state.vidDur || 6));
               if (state.vidRes) init.body.set('resolution', state.vidRes);
               if (state.vidAspect && state.vidAspect !== 'auto') init.body.set('aspect_ratio', state.vidAspect);
-              const aud = document.getElementById('vid-audio-check');
-              if (aud && document.getElementById('vid-audio-wrap')?.style.display !== 'none') {
-                init.body.set('generate_audio', aud.checked ? '1' : '0');
-              }
             }
           } else if (url.endsWith('/percfectstudios/extend-video')) {
             init.body.set('model', state.extendModel || 'grok');
@@ -775,6 +742,23 @@
     };
   }
 
+  function triggerMaturePhotoGenerate() {
+    const start = () => {
+      state.nextPhotoModel = state.maturePhotoModelId || 'bytedance/seedream-5.5';
+      state.nextPhotoRes = state.maturePhotoRes || '2k';
+      if (typeof global._generateImage === 'function') {
+        global._generateImage();
+      } else if (typeof global.generateImage === 'function') {
+        global.generateImage();
+      }
+    };
+    if (typeof global.requireAuth === 'function') {
+      global.requireAuth(start);
+    } else {
+      start();
+    }
+  }
+
   async function mountStudioModels() {
     const imgBtn = document.getElementById('img-btn');
     const vidDur = document.getElementById('vid-duration-chips');
@@ -784,23 +768,27 @@
     wrapGlobalFunctions();
     installPollAndFetchHooks();
 
-    if (imgBtn && !document.getElementById('img-model-box')) {
-      const box = document.createElement('div');
-      box.className = 'studio-model-box';
-      box.id = 'img-model-box';
-      box.innerHTML =
-        '<div class="studio-model-head"><span class="studio-model-label">Model</span></div>' +
-        '<select id="img-model-select" class="studio-model-select" aria-label="Image model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 1 cr)</option></optgroup></select>' +
-        '<div id="img-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="img-res-chips"></div></div>' +
-        '<div id="img-model-hint" class="studio-model-hint" style="display:none"></div>';
-      imgBtn.parentNode.insertBefore(box, imgBtn);
-      document.getElementById('img-model-select').addEventListener('change', onImgModelChange);
+    if (imgBtn && !document.getElementById('img-mature-btn')) {
+      const mBtn = document.createElement('button');
+      mBtn.type = 'button';
+      mBtn.id = 'img-mature-btn';
+      mBtn.className = 'studio-mature-btn';
+      mBtn.innerHTML =
+        '<span class="studio-mature-badge" aria-hidden="true">18+</span>' +
+        '<span id="img-mature-btn-text">Generate for Mature Audiences (<span id="img-mature-cost">3 credits</span>)</span>';
+      imgBtn.insertAdjacentElement('afterend', mBtn);
+      mBtn.addEventListener('click', triggerMaturePhotoGenerate);
       try {
         const res = await fetch('/api/spicy/studio-models?modality=image&spicy=0');
         const data = await res.json();
-        state.imageModels = (data && data.models) || [];
-        populateSelect('img-model-select', 'image', state.imageModels, false);
-        onImgModelChange();
+        const m = ((data && data.models) || [])[0];
+        if (m) {
+          state.maturePhotoModelId = m.id;
+          state.maturePhotoRes = m.default_resolution || '2k';
+          const rkey = state.maturePhotoRes || 'default';
+          state.maturePhotoCredits = (m.pricing && m.pricing.by_resolution && m.pricing.by_resolution[rkey]) || (m.pricing && m.pricing.default_credits) || 3;
+          updateMatureButtonLabel(false);
+        }
       } catch (_e) {}
     }
 
@@ -810,7 +798,7 @@
       box.id = 'vid-model-box';
       box.innerHTML =
         '<div class="studio-model-head"><span class="studio-model-label">Model</span></div>' +
-        '<select id="vid-model-select" class="studio-model-select" aria-label="Video model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 3 cr/s)</option></optgroup></select>' +
+        '<select id="vid-model-select" class="studio-model-select" aria-label="Video model"><option value="grok">Grok Imagine (Default · 3 cr/s)</option></select>' +
         '<div id="vid-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="vid-res-chips"></div></div>' +
         '<div id="vid-aspect-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Ratio</span><div class="style-chips photos-split-chips" id="vid-aspect-chips"></div></div>' +
         '<label id="vid-audio-wrap" class="studio-audio-toggle" style="display:none"><input type="checkbox" id="vid-audio-check"> Generate audio</label>' +
@@ -826,7 +814,7 @@
         ebox.style.marginTop = '0';
         ebox.innerHTML =
           '<div class="studio-model-head"><span class="studio-model-label">Extend model</span></div>' +
-          '<select id="extend-model-select" class="studio-model-select" aria-label="Extend model"><optgroup label="Featured"><option value="grok">Grok Imagine (Default · 6 cr/s)</option></optgroup></select>' +
+          '<select id="extend-model-select" class="studio-model-select" aria-label="Extend model"><option value="grok">Grok Imagine (Default · 6 cr/s)</option></select>' +
           '<div id="extend-res-wrap" class="studio-model-opts" style="display:none"><span class="studio-opt-label">Quality</span><div class="style-chips photos-split-chips" id="extend-res-chips"></div></div>';
         extAdv.insertBefore(ebox, extAdv.firstChild);
         document.getElementById('extend-model-select').addEventListener('change', onExtendModelChange);
@@ -836,9 +824,9 @@
         const res = await fetch('/api/spicy/studio-models?modality=video&spicy=0');
         const data = await res.json();
         state.videoModels = (data && data.models) || [];
-        populateSelect('vid-model-select', 'video', state.videoModels, false);
+        populateVideoSelect('vid-model-select', state.videoModels, false);
         onVidModelChange();
-        populateSelect('extend-model-select', 'video', state.videoModels, true);
+        populateVideoSelect('extend-model-select', state.videoModels, true);
         onExtendModelChange();
       } catch (_e) {}
     }
